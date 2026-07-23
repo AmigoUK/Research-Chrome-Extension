@@ -1,18 +1,41 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-23 — end of session._
+_Last updated: 2026-07-23 — Phase 2 core complete._
 
 ## Where we are
 
-**Phase 1 MVP is complete and shipped.** The autonomous loop worked through all seven
-milestones (M0–M6) of [`build-plan.md`](build-plan.md), each with the full loop
-(plan → code → test → commit → release).
+**Phase 2 (Dashboard & Workflow) core is complete and shipped.** The autonomous loop worked
+through all six milestones (M1–M6), each with the full loop (plan → code → test → commit → release).
+Phase 1 MVP shipped earlier at v0.1.1.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** `main` and `feat/phase-1-mvp` both at **v0.1.1** (in sync).
-- **Releases:** v0.0.1 → v0.1.1 (7 GitHub releases, tags on `main`).
+- **Branch state:** work on **`feat/phase-2-dashboard`** at **v0.7.0** (not yet merged to `main`,
+  which is at v0.1.1).
+- **Releases:** v0.2.0 → v0.7.0 (6 Phase-2 GitHub releases; earlier v0.0.1 → v0.1.1 for Phase 1).
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 56 unit + 2 E2E, all green.
+- **Tests:** 71 unit + 9 E2E (7 dashboard + 2 side panel), all green.
+
+### Phase 2 delivered (verified end-to-end in headed Chromium + screenshots)
+
+| Milestone | Version | State |
+|---|---|---|
+| M1 — Dashboard app-shell (sidebar, project switcher, router, drawer, credit footer) | v0.2.0 | ✅ |
+| M2 — Overview stat tiles + Kanban (drag-and-drop + keyboard), status popover | v0.3.0 | ✅ |
+| M3 — Documents table (search, status filter chips, status pill, DOI link) | v0.4.0 | ✅ |
+| M4 — References view + DOI import (doi.org content negotiation, dedupe) | v0.5.0 | ✅ |
+| M5 — Annotations view (anchor locator, review-status workflow, Cite) | v0.6.0 | ✅ |
+| M6 — Citation styles (profiles + lightweight rule editor, live preview) | v0.7.0 | ✅ |
+
+Dashboard-local CSS (`src/options/dashboard.css`); the side panel's `panel.css` was left untouched.
+New read/write messages wired with no IndexedDB schema change (all stores existed in schema v1).
+
+### Deferred by design (not blocking)
+
+- **Team view** (members/roles) and the **full CSL rule editor** (Phase 4) were scoped out of the
+  core-first Phase 2.
+- **DOI import** is verified via unit tests (injected fetch) and the import-form E2E; a real-network
+  round trip needs the runtime host-permission grant and was not exercised in headless CI.
+- Prior Phase 1 follow-ups still stand (dev-dep dependabot alerts, OFL web fonts).
 
 ### Delivered (verified end-to-end in real Chrome)
 
@@ -42,26 +65,25 @@ Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters 
 3. **Per-source status control** — the reading list advances status by click-cycling; the
    prototype's "move to" popover is a nicety for later.
 
-## Resume plan — Phase 2 (Dashboard & Workflow)
+## Resume plan — next steps
 
-Designs already exist in `doc/design_mock/` (`research-dashboard.html`). Suggested milestones:
+**Immediate housekeeping:** decide whether to merge `feat/phase-2-dashboard` → `main` (Phase 1 kept
+the two in sync). Not done automatically — `main` is still at v0.1.1.
 
-1. **Dashboard shell** — options page app-shell (sidebar nav, project switcher, router) with the
-   **credit footer** (decision: footer goes here, NOT the side panel — see project memory).
-2. **Documents & references views** — tables with search/status filter, import (Zotero/BibTeX/RIS/DOI).
-3. **Annotations view** — list across the project with the `draft/accepted/rejected/includedInReport`
-   review workflow.
-4. **Kanban board** — drag-and-drop + arrow-key status moves across the four stages.
-5. **Citation styles view** — style profiles + the rule editor (bridges to Phase 4 style editor).
+**Remaining Phase 2 (optional, deferred):** the **Team** view (members/roles, links to
+`collaboration-sync.html`) and richer capture-into-project from the dashboard.
 
-Later phases (designs also ready): Phase 3 PDF anchoring (`pdf-anchoring.html`, own pdf.js viewer —
-heavy epic), Phase 4 CSL style editor (`citation-style-editor.html`), Phase 5 collaboration/sync
-(`collaboration-sync.html`, evolutionary path local → file-based → backend).
+**Phase 3 — PDF anchoring** (design ready: `doc/design_mock/.../pdf-anchoring.html`). A heavy epic:
+bundle a pdf.js viewer, render pages, and resolve `PdfAnchor` (page + percent-coordinate rects) for
+text highlights and figure/table region selections. The `PdfAnchor` type and store already exist.
+
+Later phases (designs also ready): Phase 4 CSL style editor (`citation-style-editor.html`, the "Full
+editor" the dashboard links to), Phase 5 collaboration/sync (`collaboration-sync.html`).
 
 ### How to resume
 
 ```
-/loop work through Phase 2 (Dashboard) milestones, one milestone per iteration, full loop each time
+/loop work through Phase 3 (PDF anchoring) milestones, one milestone per iteration, full loop each time
 ```
 
 Environment is ready: Node 22, deps installed, `gh` authenticated with `workflow` scope, Playwright
