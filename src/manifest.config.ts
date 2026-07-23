@@ -1,0 +1,33 @@
+import { defineManifest } from '@crxjs/vite-plugin';
+import pkg from '../package.json';
+
+/**
+ * MV3 manifest.
+ *
+ * Permissions follow least privilege (architecture.md):
+ * - `sidePanel` is the primary workflow surface.
+ * - Host access is NOT granted by default. An all-URLs match pattern is
+ *   declared only as an OPTIONAL host permission and requested per-origin
+ *   at runtime (opt-in), so the extension holds no standing access to
+ *   every site.
+ */
+export default defineManifest({
+  manifest_version: 3,
+  name: 'Scientific Context Notes',
+  version: pkg.version,
+  description: pkg.description,
+  minimum_chrome_version: '116',
+  permissions: ['storage', 'scripting', 'activeTab', 'sidePanel'],
+  optional_host_permissions: ['*://*/*'],
+  background: {
+    service_worker: 'src/background/service-worker.ts',
+    type: 'module',
+  },
+  action: {
+    default_title: 'Open Context Notes',
+  },
+  side_panel: {
+    default_path: 'src/sidepanel/index.html',
+  },
+  options_page: 'src/options/index.html',
+});
