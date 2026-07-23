@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Phase 1 MVP in progress — see `doc/build-plan.md`._
 
+## [0.0.5] — 2026-07-23
+
+### Added
+
+- Citation formatting via citeproc-js (bundled locally through citation-js): `CitationFormatter`
+  port and `CiteJsFormatter` adapter, with the en-US locale bundled.
+- Five base styles: APA, Harvard, and Vancouver (built-in) plus Chicago author-date and MLA
+  (vendored CSL under `src/assets/csl`, registered at runtime).
+- Citation use-cases (`formatProjectBibliography`, `formatReferenceCitation`) and
+  `citations/bibliography` / `citations/reference` messages, formatting from stored `cslData`.
+- Golden-file tests pinning exact output for 4 styles × 1/3/4-author references (48 tests total).
+
+### Changed
+
+- Router now takes structured deps (`{ capture, formatter }`); the service worker injects the
+  citeproc formatter.
+
 ## [0.0.4] — 2026-07-23
 
 ### Added
@@ -58,7 +75,8 @@ _Phase 1 MVP in progress — see `doc/build-plan.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.4...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...HEAD
+[0.0.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.1...v0.0.2

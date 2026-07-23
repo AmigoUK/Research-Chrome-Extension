@@ -5,7 +5,7 @@
  * Server: `registerMessageRouter` wires incoming messages to the pure router,
  * resolving repositories lazily so the ephemeral service worker can cold-start.
  */
-import { handleRequest } from '../../core/router';
+import { handleRequest, type RouterDeps } from '../../core/router';
 import type { RepositorySet } from '../../core/ports/repositories';
 import type { MessageMap, MessageType, Request, Result } from '../../core/messages';
 
@@ -24,12 +24,15 @@ export async function sendRequest<T extends MessageType>(
  * Register the router on `chrome.runtime.onMessage`. `getRepos` is awaited on
  * each message (typically returning a cached open-DB promise).
  */
-export function registerMessageRouter(getRepos: () => Promise<RepositorySet>): void {
+export function registerMessageRouter(
+  getRepos: () => Promise<RepositorySet>,
+  deps: RouterDeps = {},
+): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     void (async () => {
       try {
         const repos = await getRepos();
-        sendResponse(await handleRequest(repos, message));
+        sendResponse(await handleRequest(repos, message, deps));
       } catch (error) {
         sendResponse({
           ok: false,

@@ -1,6 +1,6 @@
 {
   "name": "scientific-context-notes",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "A Chrome MV3 research companion: contextual annotations, project organisation, and CSL citations.",
   "type": "module",
   "private": true,
@@ -36,6 +36,8 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@citation-js/core": "^0.7.21",
+    "@citation-js/plugin-csl": "^0.7.22",
     "dom-anchor-text-position": "^5.0.0",
     "dom-anchor-text-quote": "^4.0.2",
     "idb": "^8.0.3"

@@ -15,6 +15,11 @@ export interface MessageMap {
   'documents/put': { req: { document: Document }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
   'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
+  'citations/bibliography': { req: { projectId: Id; template: string }; res: string };
+  'citations/reference': {
+    req: { referenceId: Id; template: string };
+    res: { inText: string; bibliography: string };
+  };
 }
 
 export type MessageType = keyof MessageMap;
