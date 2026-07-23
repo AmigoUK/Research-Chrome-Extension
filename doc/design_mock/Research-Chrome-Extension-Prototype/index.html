@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scientific Context Notes — Overview</title>
+<style>
+  :root{
+    --bg:oklch(98% 0.004 95); --surface:oklch(100% 0.002 95); --surface-2:oklch(96.5% 0.005 95);
+    --fg:oklch(20% 0.018 70); --muted:oklch(45% 0.014 70); --border:oklch(90% 0.006 95);
+    --accent:oklch(52% 0.10 28); --accent-soft:oklch(52% 0.10 28 / 0.10);
+    --s-toread:oklch(62% 0.010 70); --s-inreview:oklch(68% 0.095 70); --s-analysed:oklch(56% 0.070 155); --s-used:var(--accent);
+    --font-display:'Iowan Old Style','Charter',Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --ease-out:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+  @keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  body{font-family:var(--font-body);color:var(--fg);background:
+    radial-gradient(130% 90% at 15% -10%, oklch(96.5% 0.006 95) 0%, var(--bg) 55%) fixed;
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;line-height:1.5;min-height:100vh}
+  .wrap{max-width:1000px;margin:0 auto;padding:clamp(40px,7vw,88px) clamp(22px,5vw,40px) 64px}
+
+  /* Header */
+  .kicker{display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);animation:rise .5s var(--ease-out) both}
+  .glyph{width:18px;height:18px;border:1.7px solid var(--accent);border-radius:3px;position:relative;flex:0 0 auto}
+  .glyph::after{content:"";position:absolute;left:3.5px;right:3.5px;top:5px;height:1.7px;background:var(--accent);box-shadow:0 4.5px 0 var(--accent)}
+  h1{font-family:var(--font-display);font-weight:600;font-size:clamp(38px,6vw,62px);letter-spacing:-.03em;line-height:1.03;margin:22px 0 0;max-width:16ch;animation:rise .5s var(--ease-out) .05s both}
+  .lede{font-size:clamp(15px,2vw,18px);color:var(--muted);max-width:62ch;margin-top:18px;animation:rise .5s var(--ease-out) .1s both}
+  .lede b{color:var(--fg);font-weight:550}
+  .stack{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px;animation:rise .5s var(--ease-out) .15s both}
+  .stack .t{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.03em;color:var(--muted);border:1px solid var(--border);border-radius:20px;padding:4px 11px;background:var(--surface)}
+
+  .rule{height:1px;background:var(--border);margin:46px 0 30px}
+  .sec-lbl{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+
+  /* Surface cards */
+  .surfaces{display:grid;grid-template-columns:repeat(auto-fit,minmax(266px,1fr));gap:18px}
+  @media (max-width:600px){.surfaces{grid-template-columns:1fr}}
+  .card{position:relative;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:16px;background:var(--surface);padding:24px;text-decoration:none;color:inherit;overflow:hidden;transition:border-color .16s,box-shadow .16s,transform .12s;animation:rise .55s var(--ease-out) both}
+  .card:nth-child(1){animation-delay:.2s}.card:nth-child(2){animation-delay:.28s}.card:nth-child(3){animation-delay:.36s}
+  .card:hover{border-color:oklch(80% .01 95);box-shadow:0 18px 40px -24px oklch(20% .02 70/.5);transform:translateY(-2px)}
+  .card__no{font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;color:var(--accent)}
+  .card h2{font-family:var(--font-display);font-weight:600;font-size:23px;letter-spacing:-.015em;margin:9px 0 3px}
+  .card__role{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .card__desc{font-size:13.5px;color:var(--muted);line-height:1.55;margin:14px 0 16px}
+  .feat{display:flex;flex-direction:column;gap:9px;margin-bottom:20px}
+  .feat li{list-style:none;display:flex;align-items:flex-start;gap:9px;font-size:12.5px;color:var(--fg)}
+  .feat svg{width:15px;height:15px;color:var(--accent);flex:0 0 auto;margin-top:1px}
+  .card__go{margin-top:auto;display:inline-flex;align-items:center;gap:8px;font-size:13.5px;font-weight:560;letter-spacing:.01em;color:var(--fg)}
+  .card__go .arw{transition:transform .16s var(--ease-out)}
+  .card:hover .card__go .arw{transform:translateX(4px)}
+  .badge{flex:0 0 auto;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--accent-soft);color:var(--accent);border:1px solid oklch(82% .08 28)}
+
+  /* mini schematic strips */
+  .card-top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .mini{display:flex;gap:5px;flex:1;min-width:0}
+  .mini .m{height:6px;border-radius:3px;flex:1}
+
+  /* Build status + spec */
+  .grid2{display:grid;grid-template-columns:1.15fr 1fr;gap:40px;align-items:start}
+  @media (max-width:720px){.grid2{grid-template-columns:1fr;gap:34px}}
+  .phase{display:flex;gap:14px;padding:13px 0;border-bottom:1px solid var(--border)}
+  .phase:last-child{border-bottom:0}
+  .phase__dot{width:11px;height:11px;border-radius:50%;flex:0 0 auto;margin-top:4px;border:2px solid var(--border);background:var(--surface)}
+  .phase.done .phase__dot{background:var(--s-analysed);border-color:var(--s-analysed)}
+  .phase.now .phase__dot{background:var(--accent);border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+  .phase__b{min-width:0}
+  .phase__t{font-size:13.5px;font-weight:550}
+  .phase__s{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .phase__tag{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:2px 7px;margin-left:auto;flex:0 0 auto;align-self:flex-start;margin-top:2px}
+  .phase.done .phase__tag{color:var(--s-analysed);border-color:oklch(80% .06 155)}
+  .phase.now .phase__tag{color:var(--accent);border-color:oklch(82% .08 28)}
+
+  .docs{display:flex;flex-direction:column;gap:2px}
+  .doc-lnk{display:flex;align-items:center;gap:11px;padding:10px 11px;border-radius:9px;text-decoration:none;color:inherit;transition:background .12s}
+  .doc-lnk:hover{background:var(--surface)}
+  .doc-lnk .fn{font-family:var(--font-mono);font-size:12px;color:var(--fg)}
+  .doc-lnk .ds{font-size:11.5px;color:var(--muted);margin-left:auto;text-align:right}
+  .doc-lnk svg{width:15px;height:15px;color:var(--muted);flex:0 0 auto}
+
+  footer{margin-top:48px;padding-top:22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+  footer .mono{font-family:var(--font-mono);letter-spacing:.02em}
+</style>
+</head>
+<body>
+  <div class="wrap" data-od-id="launcher">
+    <header data-od-id="hero">
+      <div class="kicker"><span class="glyph"></span>Scientific Context Notes · Chrome extension</div>
+      <h1>Research notes, anchored to their source.</h1>
+      <p class="lede">A Manifest V3 extension for scientists and investigators — capture sources, annotate passages in context, and move them through a review pipeline while <b>CSL</b> generates citations in your institution's style. Three working prototype surfaces:</p>
+      <div class="stack">
+        <span class="t">Manifest V3</span><span class="t">IndexedDB</span><span class="t">CSL / citeproc</span><span class="t">Content scripts</span><span class="t">Service worker</span>
+      </div>
+    </header>
+
+    <div class="rule"></div>
+    <div class="sec-lbl">Prototype surfaces</div>
+    <div class="surfaces">
+
+      <a class="card" href="research-companion-panel.html" data-od-id="card-panel">
+        <div class="card-top">
+          <div class="mini"><span class="m" style="background:var(--s-toread)"></span><span class="m" style="background:var(--s-inreview)"></span><span class="m" style="background:var(--s-analysed)"></span><span class="m" style="background:var(--s-used)"></span></div>
+          <span class="badge">Interactive</span>
+        </div>
+        <span class="card__no">01</span>
+        <h2>Research Companion</h2>
+        <span class="card__role">Side panel · docked beside the page</span>
+        <p class="card__desc">The persistent reading-list organizer. Files the open paper into a project and moves sources through the workflow — the day-one job, in a narrow strip.</p>
+        <ul class="feat">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Capture + auto-extracted metadata</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Collapsible status groups &amp; filters</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>One-click in-text &amp; bibliography copy</li>
+        </ul>
+        <span class="card__go">Open side panel <svg class="arw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="17" height="17"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
+      </a>
+
+      <a class="card" href="research-dashboard.html" data-od-id="card-dashboard">
+        <div class="card-top">
+          <div class="mini"><span class="m" style="background:var(--border)"></span><span class="m" style="background:var(--border)"></span><span class="m" style="flex:2;background:var(--accent-soft)"></span><span class="m" style="background:var(--border)"></span></div>
+          <span class="badge">Interactive</span>
+        </div>
+        <span class="card__no">02</span>
+        <h2>Project Dashboard</h2>
+        <span class="card__role">Options page · full management</span>
+        <p class="card__desc">The whole workspace: documents, annotations, references, and a citation-style rule editor — with a drag-and-drop Kanban across the four workflow stages.</p>
+        <ul class="feat">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Kanban board · drag or arrow-keys</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Annotations &amp; references with import/export</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Live citation-style rule editor</li>
+        </ul>
+        <span class="card__go">Open dashboard <svg class="arw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="17" height="17"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
+      </a>
+
+      <a class="card" href="pdf-anchoring.html" data-od-id="card-pdf">
+        <div class="card-top">
+          <div class="mini"><span class="m" style="background:var(--border)"></span><span class="m" style="flex:1.6;background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent-line, oklch(52% 0.10 28/.55))"></span><span class="m" style="background:var(--border)"></span><span class="m" style="background:var(--border)"></span></div>
+          <span class="badge">Interactive</span>
+        </div>
+        <span class="card__no">03</span>
+        <h2>PDF Anchoring</h2>
+        <span class="card__role">Content script · in-context notes</span>
+        <p class="card__desc">Phase 3 — annotate a paper where it lives. Highlight text or box a figure; every note anchors to page + coordinates and re-anchors on reload.</p>
+        <ul class="feat">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Text-range &amp; region (figure/table) anchors</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Inline toolbar · highlight · note · link</li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Page + coordinate locators, zoom-safe</li>
+        </ul>
+        <span class="card__go">Open PDF reader <svg class="arw" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="17" height="17"><path d="M5 12h14M13 5l7 7-7 7"/></svg></span>
+      </a>
+    </div>
+
+    <div class="rule"></div>
+    <div class="grid2">
+      <div data-od-id="roadmap">
+        <div class="sec-lbl">Build roadmap</div>
+        <div class="phase done"><span class="phase__dot"></span><div class="phase__b"><div class="phase__t">Phase 1 — MVP</div><div class="phase__s">Data model, project creation, text annotations, minimal metadata, base CSL styles</div></div><span class="phase__tag">Shipped</span></div>
+        <div class="phase now"><span class="phase__dot"></span><div class="phase__b"><div class="phase__t">Phase 2 — Dashboard &amp; workflow</div><div class="phase__s">Project management, workflow statuses, Kanban, search &amp; filters</div></div><span class="phase__tag">Prototyped</span></div>
+        <div class="phase now"><span class="phase__dot"></span><div class="phase__b"><div class="phase__t">Phase 3 — Anchoring &amp; PDF</div><div class="phase__s">Tables, figures, PDF page+coordinate anchors, robust re-anchoring</div></div><span class="phase__tag">Prototyped</span></div>
+        <div class="phase now"><span class="phase__dot"></span><div class="phase__b"><div class="phase__t">Phase 4 — Style editor</div><div class="phase__s">CSL profiles, user-rule editor, override translation</div></div><span class="phase__tag">Prototyped</span></div>
+        <div class="phase now"><span class="phase__dot"></span><div class="phase__b"><div class="phase__t">Phase 5 — Collaboration &amp; sync</div><div class="phase__s">Multi-user roles, change tracking, export/import &amp; sync</div></div><span class="phase__tag">Prototyped</span></div>
+      </div>
+
+      <div data-od-id="spec">
+        <div class="sec-lbl">Specification</div>
+        <div class="docs">
+          <a class="doc-lnk" href="architecture.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">architecture.md</span><span class="ds">MV3 · worker · scripts</span></a>
+          <a class="doc-lnk" href="data-model.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">data-model.md</span><span class="ds">6 core entities</span></a>
+          <a class="doc-lnk" href="ui-ux.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">ui-ux.md</span><span class="ds">surfaces &amp; flows</span></a>
+          <a class="doc-lnk" href="citations.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">citations.md</span><span class="ds">CSL &amp; user rules</span></a>
+          <a class="doc-lnk" href="roadmap.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">roadmap.md</span><span class="ds">5 phases</span></a>
+          <a class="doc-lnk" href="README.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="fn">README.md</span><span class="ds">overview</span></a>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span>Scientific Context Notes — internal prototype</span>
+      <span class="mono">Light · intuitive · user-centric</span>
+    </footer>
+  </div>
+</body>
+</html>

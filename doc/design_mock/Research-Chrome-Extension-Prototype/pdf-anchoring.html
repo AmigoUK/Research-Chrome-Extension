@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Notes — PDF Anchoring</title>
+<style>
+  :root{
+    --bg:oklch(98% 0.004 95); --surface:oklch(100% 0.002 95); --surface-2:oklch(96.5% 0.005 95);
+    --canvas:oklch(93% 0.006 90);
+    --fg:oklch(20% 0.018 70); --muted:oklch(45% 0.014 70); --border:oklch(90% 0.006 95);
+    --accent:oklch(52% 0.10 28); --accent-soft:oklch(52% 0.10 28 / 0.14); --accent-line:oklch(52% 0.10 28 / 0.55);
+    --danger:oklch(53% 0.17 27); --success:oklch(52% 0.09 155);
+    --font-display:'Iowan Old Style','Charter',Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --ease:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+    --rail:340px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 var(--accent-soft)}60%{box-shadow:0 0 0 10px transparent}100%{box-shadow:0 0 0 0 transparent}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  html,body{height:100%}
+  body{font-family:var(--font-body);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+  .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+  /* ---- Toolbar ---- */
+  .bar{display:flex;align-items:center;gap:14px;padding:11px 18px;border-bottom:1px solid var(--border);background:var(--surface);z-index:20}
+  .back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:12.5px;font-weight:520;padding:7px 10px;border-radius:8px;transition:background .12s,color .12s}
+  .back:hover{background:var(--surface-2);color:var(--fg)}
+  .back svg{width:15px;height:15px}
+  .doc-id{min-width:0}
+  .doc-id .dt{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:42ch}
+  .doc-id .ds{font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:2px}
+  .bar-grow{flex:1}
+  .cluster{display:inline-flex;align-items:center;gap:2px;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px}
+  .cbtn{width:32px;height:32px;display:grid;place-items:center;border:0;background:none;color:var(--fg);border-radius:6px;cursor:pointer;transition:background .12s}
+  .cbtn:hover{background:var(--surface)}.cbtn[disabled]{opacity:.35;cursor:default}
+  .cbtn svg{width:16px;height:16px}
+  .cluster .rd{font-family:var(--font-mono);font-size:12px;padding:0 10px;min-width:66px;text-align:center;color:var(--muted)}
+  .cluster .rd b{color:var(--fg)}
+  /* mode toggle */
+  .modeseg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px}
+  .modeseg button{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:12px;font-weight:530;border:0;background:none;color:var(--muted);cursor:pointer;padding:6px 12px;border-radius:6px;min-height:32px;transition:background .12s,color .12s}
+  .modeseg button svg{width:14px;height:14px}
+  .modeseg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px oklch(20% .02 70/.1)}
+
+  /* ---- Body split ---- */
+  .split{flex:1;display:grid;grid-template-columns:1fr var(--rail);min-height:0}
+
+  /* PDF canvas */
+  .pagewrap{overflow:auto;background:var(--canvas);padding:34px 24px 60px;position:relative}
+  .pagewrap::-webkit-scrollbar{width:12px;height:12px}.pagewrap::-webkit-scrollbar-thumb{background:oklch(80% .01 90);border-radius:9px;border:3px solid var(--canvas)}
+  .pagescale{margin:0 auto;position:relative;transition:width .12s,height .12s}
+  .pdf-page{width:700px;background:var(--surface);box-shadow:0 6px 30px -10px oklch(20% .02 70/.35);position:relative;transform-origin:top left;padding:64px 60px 72px;display:none}
+  .pdf-page.on{display:block}
+  .mode-region .pdf-page{cursor:crosshair}
+  .mode-region ::selection{background:transparent}
+
+  /* Article typography */
+  .run{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:9px;margin-bottom:26px}
+  .art-title{font-family:var(--font-display);font-weight:600;font-size:25px;line-height:1.15;letter-spacing:-.02em;max-width:26ch}
+  .art-auth{font-size:12.5px;color:var(--muted);margin-top:11px}
+  .art-aff{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:4px;letter-spacing:.02em}
+  .abs{border-left:2px solid var(--border);padding-left:16px;margin:22px 0 26px;font-size:12.5px;line-height:1.6;color:var(--fg)}
+  .abs b{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:block;margin-bottom:6px}
+  .h2{font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:-.01em;margin:22px 0 9px}
+  .cols{column-count:2;column-gap:30px}
+  .cols p{font-size:11.5px;line-height:1.62;margin-bottom:11px;text-align:justify;hyphens:auto}
+  .cols p .lead{font-variant:small-caps;letter-spacing:.02em}
+  .full{break-inside:avoid}
+
+  /* Figures & tables (region-anchorable) */
+  .fig{break-inside:avoid;border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:15px 16px 13px;margin:8px 0 16px;position:relative}
+  .fig figcaption{font-size:10px;color:var(--muted);line-height:1.45;margin-top:11px}
+  .fig figcaption b{color:var(--fg);font-weight:600}
+  .chart{--max:10;display:flex;flex-direction:column;gap:7px}
+  .brow{display:flex;align-items:center;gap:9px}
+  .blab{font-family:var(--font-mono);font-size:8.5px;color:var(--muted);width:42px;flex:0 0 auto;text-align:right}
+  .btrack{flex:1;height:11px;background:var(--surface);border:1px solid var(--border);border-radius:3px;overflow:hidden}
+  .bfill{height:100%;background:var(--accent);border-radius:0}
+  .bval{font-family:var(--font-mono);font-size:8.5px;color:var(--fg);width:34px;flex:0 0 auto}
+  table.data{width:100%;border-collapse:collapse;font-size:10px}
+  table.data th,table.data td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border)}
+  table.data th{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  table.data td.n{text-align:right;font-family:var(--font-mono)}
+
+  /* Annotation overlays */
+  .anno-layer{position:absolute;inset:0;pointer-events:none}
+  .ov{position:absolute;pointer-events:auto;cursor:pointer}
+  .ov.text{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent-line);border-radius:2px}
+  .ov.region{border:1.6px solid var(--accent);border-radius:4px;background:var(--accent-soft)}
+  .ov.region .cnr{position:absolute;top:-9px;left:-1px;font-family:var(--font-mono);font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;background:var(--accent);color:oklch(99% .01 95);padding:1px 5px;border-radius:3px}
+  .ov.on{animation:pulse .9s var(--ease)}
+  .ov.dim{opacity:.35}
+
+  /* Inline selection toolbar */
+  .seltool{position:fixed;z-index:50;display:none;align-items:center;gap:2px;background:var(--fg);border-radius:10px;padding:4px;box-shadow:0 12px 28px -12px oklch(20% .02 70/.7)}
+  .seltool.on{display:flex;animation:rise .12s var(--ease-out)}
+  .seltool button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:520;color:oklch(97% .01 95);background:none;border:0;cursor:pointer;padding:7px 10px;border-radius:7px}
+  .seltool button:hover{background:oklch(30% .02 70)}
+  .seltool button svg{width:14px;height:14px}
+  .seltool .sep{width:1px;align-self:stretch;background:oklch(35% .02 70);margin:3px 1px}
+
+  /* ---- Rail ---- */
+  .rail{border-left:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;min-height:0}
+  .rail-h{padding:15px 16px 12px;border-bottom:1px solid var(--border)}
+  .rail-h .t{display:flex;align-items:baseline;gap:9px}
+  .rail-h .t h2{font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .rail-h .t .n{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+  .rail-seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px;margin-top:11px}
+  .rail-seg button{font:inherit;font-size:11.5px;font-weight:520;border:0;background:none;color:var(--muted);cursor:pointer;padding:5px 12px;border-radius:6px;min-height:28px}
+  .rail-seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px oklch(20% .02 70/.1)}
+  .rail-list{flex:1;overflow-y:auto;padding:13px 14px 30px}
+  .rail-list::-webkit-scrollbar{width:9px}.rail-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--surface)}
+
+  .ac{border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:13px;margin-bottom:11px;animation:rise .28s var(--ease-out) both}
+  .ac.active{border-color:var(--accent)}
+  .ac-top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+  .loc{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:5px;padding:3px 7px;cursor:pointer}
+  .loc:hover{background:var(--accent-soft)}
+  .loc .k{color:var(--muted)}
+  .ac-kind{margin-left:auto;font-family:var(--font-mono);font-size:8.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .quote{font-size:11px;color:var(--muted);font-style:italic;border-left:2px solid var(--border);padding-left:10px;margin-bottom:10px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .note-ta{width:100%;font:inherit;font-size:13px;line-height:1.45;color:var(--fg);border:1px solid var(--border);border-radius:8px;background:var(--surface-2);padding:9px 10px;resize:vertical;min-height:58px;transition:border-color .12s}
+  .note-ta:focus{outline:none;border-color:var(--fg);background:var(--surface)}
+  .note-ta::placeholder{color:var(--muted)}
+  .ac-foot{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+  .msel{font:inherit;font-size:10.5px;font-family:var(--font-mono);padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--fg);cursor:pointer;min-height:26px}
+  .tag{font-family:var(--font-mono);font-size:9px;letter-spacing:.04em;padding:2px 7px;border-radius:20px;border:1px solid var(--border);color:var(--muted)}
+  .ac-del{margin-left:auto;width:26px;height:26px;display:grid;place-items:center;border:1px solid transparent;border-radius:6px;background:none;color:var(--muted);cursor:pointer}
+  .ac-del:hover{color:var(--danger);border-color:oklch(85% .08 27)}
+  .ac-del svg{width:14px;height:14px}
+
+  .hint{font-size:11.5px;line-height:1.6;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 13px;margin-bottom:13px}
+  .hint b{color:var(--fg);font-weight:560}
+  .rail-empty{text-align:center;padding:32px 18px;color:var(--muted)}
+  .rail-empty .et{font-family:var(--font-display);font-size:15px;color:var(--fg);margin-bottom:6px}
+  .rail-empty .ed{font-size:12px;line-height:1.5}
+
+  /* section-link popover */
+  .pop{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:9px;box-shadow:0 14px 34px -16px oklch(20% .02 70/.5);padding:5px;min-width:160px;opacity:0;transform:scale(.97);pointer-events:none;transition:.1s}
+  .pop.on{opacity:1;transform:none;pointer-events:auto}
+  .pop .pl{font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px 4px}
+  .pop button{display:block;width:100%;text-align:left;font:inherit;font-size:13px;padding:8px;border:0;border-radius:6px;background:none;cursor:pointer;color:var(--fg)}
+  .pop button:hover{background:var(--surface-2)}
+
+  /* toast */
+  .toast-wrap{position:fixed;bottom:18px;left:0;right:var(--rail);display:flex;justify-content:center;z-index:90;pointer-events:none}
+  .toast{background:var(--fg);color:var(--bg);font-size:12.5px;padding:10px 15px;border-radius:9px;box-shadow:0 12px 26px -12px oklch(20% .02 70/.6);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(10px);transition:.2s;max-width:420px}
+  .toast.show{opacity:1;transform:none}.toast svg{width:15px;height:15px;flex:0 0 auto}
+  .toast--error{background:var(--danger);color:oklch(99% .01 25)}
+
+  @media (max-width:900px){
+    :root{--rail:0px}
+    .split{grid-template-columns:1fr}
+    .rail{position:fixed;right:0;top:0;bottom:0;width:340px;transform:translateX(100%);transition:transform .2s;z-index:40;box-shadow:-12px 0 40px -24px oklch(20% .02 70/.5)}
+    .rail.open{transform:none}
+    .toast-wrap{right:0}
+    .rail-toggle{display:inline-flex!important}
+  }
+  .rail-toggle{display:none}
+</style>
+</head>
+<body>
+  <div class="app" id="app" data-od-id="pdf-reader">
+    <!-- Toolbar -->
+    <header class="bar" data-od-id="toolbar">
+      <a class="back" href="research-dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>Dashboard</a>
+      <div class="doc-id">
+        <div class="dt">Nocturnal urban heat island intensity and heat-related mortality</div>
+        <div class="ds">Draft manuscript · PDF · Urban Heat &amp; Mortality</div>
+      </div>
+      <div class="bar-grow"></div>
+
+      <div class="modeseg" role="group" aria-label="Annotation mode" id="modeSeg">
+        <button data-mode="text" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V5h16v2M9 5v14M7 19h4"/></svg>Text</button>
+        <button data-mode="region" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/></svg>Region</button>
+      </div>
+
+      <div class="cluster" aria-label="Page navigation">
+        <button class="cbtn" id="pgPrev" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m15 18-6-6 6-6"/></svg></button>
+        <span class="rd">p. <b id="pgCur">1</b> / <span id="pgTot">2</span></span>
+        <button class="cbtn" id="pgNext" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="m9 18 6-6-6-6"/></svg></button>
+      </div>
+      <div class="cluster" aria-label="Zoom">
+        <button class="cbtn" id="zOut" aria-label="Zoom out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M21 21l-4.3-4.3"/></svg></button>
+        <span class="rd"><b id="zVal">100</b>%</span>
+        <button class="cbtn" id="zIn" aria-label="Zoom in"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="11" cy="11" r="7"/><path d="M11 8v6M8 11h6M21 21l-4.3-4.3"/></svg></button>
+      </div>
+      <button class="cbtn rail-toggle" id="railToggle" aria-label="Toggle annotations" style="border:1px solid var(--border);border-radius:8px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
+    </header>
+
+    <div class="split">
+      <!-- PDF canvas -->
+      <div class="pagewrap" id="pagewrap">
+        <div class="pagescale" id="pagescale">
+
+          <!-- PAGE 1 -->
+          <article class="pdf-page on" data-page="1" id="page1">
+            <div class="run"><span>Preprint · under review</span><span>2023 · p. 1</span></div>
+            <h1 class="art-title">Nocturnal urban heat island intensity and heat-related mortality: a multi-city panel</h1>
+            <div class="art-auth">A. Nowak, M. Okafor, L. Reyes</div>
+            <div class="art-aff">Institute for Urban Climate &amp; Health · corresponding: a.nowak@example.org</div>
+            <div class="abs"><b>Abstract</b>We assemble a twelve-city panel linking hourly urban heat island (UHI) intensity to daily all-cause mortality among adults over 65. Using a distributed-lag non-linear model, we find that <span id="seedQuote">nocturnal UHI intensity above roughly four degrees is associated with a steep, non-linear rise in mortality odds</span>, independent of daytime maxima. The effect concentrates in dense, low-albedo districts and persists after adjusting for background climate.</div>
+
+            <div class="h2 full">1 · Introduction</div>
+            <div class="cols">
+              <p><span class="lead">Heat-related</span> mortality is driven less by peak afternoon temperature than by the failure of cities to cool overnight. When the urban fabric re-radiates stored daytime heat, residents are denied the nocturnal recovery period that regulates cardiovascular strain, and the physiological burden accumulates across consecutive warm nights.</p>
+              <p>Prior work has quantified UHI magnitude and, separately, the temperature–mortality curve. Fewer studies isolate the nocturnal component at the district scale, where exposure is most heterogeneous. This paper links the two using a panel design that holds slow-moving city-level confounders fixed and exploits within-city night-to-night variation.</p>
+              <figure class="fig full" id="fig1" data-el="fig1">
+                <div class="chart" style="--max:9">
+                  <div class="brow"><span class="blab">≤2 °C</span><span class="btrack"><span class="bfill" style="width:calc(1.1/9*100%)"></span></span><span class="bval">1.1×</span></div>
+                  <div class="brow"><span class="blab">2–4 °C</span><span class="btrack"><span class="bfill" style="width:calc(1.9/9*100%)"></span></span><span class="bval">1.9×</span></div>
+                  <div class="brow"><span class="blab">4–6 °C</span><span class="btrack"><span class="bfill" style="width:calc(4.6/9*100%)"></span></span><span class="bval">4.6×</span></div>
+                  <div class="brow"><span class="blab">&gt;6 °C</span><span class="btrack"><span class="bfill" style="width:calc(8.2/9*100%)"></span></span><span class="bval">8.2×</span></div>
+                </div>
+                <figcaption><b>Figure 1.</b> Mortality odds ratio (over-65, all-cause) by nocturnal UHI intensity band, pooled across the panel. Illustrative.</figcaption>
+              </figure>
+              <p>The non-linearity in Figure 1 motivates a threshold specification rather than a linear exposure term: below about four degrees the association is weak, above it the slope steepens sharply, consistent with the exhaustion of overnight thermoregulation.</p>
+              <p>Section 2 describes the panel and the distributed-lag model; Section 3 reports the exposure–response surface and district-level heterogeneity; Section 4 discusses adaptation implications for low-albedo neighbourhoods.</p>
+            </div>
+          </article>
+
+          <!-- PAGE 2 -->
+          <article class="pdf-page" data-page="2" id="page2">
+            <div class="run"><span>Preprint · under review</span><span>2023 · p. 2</span></div>
+            <div class="h2 full" style="margin-top:0">2 · Data and methods</div>
+            <div class="cols">
+              <p><span class="lead">We drew</span> hourly air temperature from paired reference and district stations across twelve mid-latitude cities over 2003–2019. Nocturnal UHI intensity was computed as the district-minus-rural difference averaged over the 00:00–05:00 window, then matched to daily mortality counts for adults over 65.</p>
+              <figure class="fig full" id="tab1" data-el="tab1">
+                <table class="data">
+                  <thead><tr><th>City band</th><th class="n">Cities</th><th class="n">Stations</th><th class="n">Mean UHI</th></tr></thead>
+                  <tbody>
+                    <tr><td>Coastal</td><td class="n">4</td><td class="n">37</td><td class="n">2.8 °C</td></tr>
+                    <tr><td>Continental</td><td class="n">5</td><td class="n">51</td><td class="n">4.6 °C</td></tr>
+                    <tr><td>Basin</td><td class="n">3</td><td class="n">29</td><td class="n">6.1 °C</td></tr>
+                  </tbody>
+                </table>
+                <figcaption><b>Table 1.</b> Panel composition by geographic band (illustrative). Basin cities show the highest mean nocturnal UHI.</figcaption>
+              </figure>
+              <p>Exposure was entered through a distributed-lag non-linear model with lags to 21 days, adjusting for season, day-of-week, relative humidity, and a slow trend. City fixed effects absorb population structure and healthcare capacity.</p>
+              <div class="h2">3 · Results</div>
+              <p>Each additional degree of nocturnal UHI above the four-degree threshold corresponded to a six to nine percent rise in mortality odds, with the steepest response in basin cities. Daytime maxima added little once the nocturnal term was included.</p>
+              <p>District-level analysis localised the burden to dense, low-albedo cores, where the overnight difference from the urban edge exceeded five degrees on more than forty nights per summer.</p>
+            </div>
+          </article>
+
+        </div>
+      </div>
+
+      <!-- Rail -->
+      <aside class="rail" id="rail" data-od-id="annotation-rail" aria-label="Annotations">
+        <div class="rail-h">
+          <div class="t"><h2>Annotations</h2><span class="n" id="railN"></span></div>
+          <div class="rail-seg" role="group" aria-label="Scope" id="railSeg">
+            <button data-scope="page" aria-pressed="true">This page</button>
+            <button data-scope="all" aria-pressed="false">All pages</button>
+          </div>
+        </div>
+        <div class="rail-list" id="railList"></div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- floating -->
+  <div class="seltool" id="seltool"></div>
+  <div class="pop" id="pop"></div>
+  <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Phase 3 — PDF anchoring prototype.
+   Anchors are stored as page + coordinate rectangles (percent of
+   the page box) plus a text quote or element id, mirroring the
+   Annotation.anchor descriptor in data-model.md. Percent rects
+   survive zoom & reflow — the basis for robust re-anchoring.
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const PAGES=2;
+const SECTIONS=['Literature','Methods','Data','Report'];
+const ASTAT={draft:'Draft',accepted:'Accepted',rejected:'Rejected',includedInReport:'In report'};
+const ICON={
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>',
+  hl:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg>',
+  region:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="4 3"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+};
+
+/* seeds reference elements; rects resolved on load */
+let ANNOS=[
+  {id:'s1',page:1,kind:'text',elId:'seedQuote',quote:'nocturnal UHI intensity above roughly four degrees is associated with a steep, non-linear rise in mortality odds',note:'Central claim — reconcile the 4 °C threshold with Gasparrini (2015) lag structure before citing.',tags:['mortality'],status:'accepted',section:'Data'},
+  {id:'s2',page:1,kind:'region',elId:'fig1',label:'Figure 1',note:'Odds ratio turns sharply non-linear above the 4–6 °C band — foreground this in the discussion.',tags:['figure'],status:'draft',section:'Report'},
+  {id:'s3',page:2,kind:'region',elId:'tab1',label:'Table 1',note:'Confirm the basin-city population threshold used for inclusion.',tags:['methods'],status:'draft',section:'Methods'},
+];
+
+const state={page:1,zoom:1,mode:'text',scope:'page',sel:null,active:null};
+const pageEl=n=>$('#page'+n);
+
+/* ---- geometry: element / range → percent rects of its page ---- */
+function pctRects(rectList,page){
+  const pr=pageEl(page).getBoundingClientRect();
+  return [...rectList].filter(r=>r.width>1&&r.height>1).map(r=>({
+    l:(r.left-pr.left)/pr.width*100, t:(r.top-pr.top)/pr.height*100,
+    w:r.width/pr.width*100, h:r.height/pr.height*100,
+  }));
+}
+function resolveSeeds(){
+  ANNOS.forEach(a=>{
+    if((a.rects&&a.rects.length)||!a.elId)return;
+    const el=document.getElementById(a.elId); if(!el||el.getBoundingClientRect().width<1)return; // skip hidden pages
+    let rects;
+    if(a.kind==='text'){const rg=document.createRange();rg.selectNodeContents(el);rects=pctRects(rg.getClientRects(),a.page);}
+    else rects=pctRects([el.getBoundingClientRect()],a.page);
+    if(rects.length)a.rects=rects;
+  });
+}
+
+/* ---- overlays ---- */
+function renderOverlays(){
+  for(let p=1;p<=PAGES;p++){
+    let layer=pageEl(p).querySelector('.anno-layer');
+    if(!layer){layer=document.createElement('div');layer.className='anno-layer';pageEl(p).appendChild(layer);}
+    layer.innerHTML='';
+    ANNOS.filter(a=>a.page===p&&a.rects).forEach(a=>{
+      a.rects.forEach((r,i)=>{
+        const d=document.createElement('div');
+        d.className='ov '+(a.kind==='region'?'region':'text')+(state.active===a.id?' on':'');
+        d.style.cssText=`left:${r.l}%;top:${r.t}%;width:${r.w}%;height:${r.h}%`;
+        if(a.kind==='region'&&i===0)d.innerHTML=`<span class="cnr">${esc(a.label||'Region')}</span>`;
+        d.title=a.note||a.quote||'annotation';
+        d.onclick=e=>{e.stopPropagation();focusAnno(a.id,false);};
+        layer.appendChild(d);
+      });
+    });
+  }
+}
+
+/* ---- rail ---- */
+function railData(){return ANNOS.filter(a=>state.scope==='all'||a.page===state.page);}
+function renderRail(){
+  const list=$('#railList');
+  $('#railN').textContent=`${ANNOS.length} on ${PAGES} pages`;
+  const rows=railData();
+  if(!rows.length){
+    list.innerHTML=`<div class="hint"><b>Anchoring.</b> In <b>Text</b> mode select any sentence; in <b>Region</b> mode click a figure or table. Each note anchors to page + coordinates and survives zoom.</div>
+      <div class="rail-empty"><div class="et">No annotations on this page</div><div class="ed">Select text or a figure to add the first one.</div></div>`;
+    return;
+  }
+  list.innerHTML=`<div class="hint"><b>Anchoring.</b> Notes store <b>page + coordinate rects</b> plus the quoted text — the basis for re-anchoring after reload.</div>`
+    +rows.map(a=>{
+    const loc=a.kind==='text'?`p.${a.page} <span class="k">·</span> ¶ text`:`p.${a.page} <span class="k">·</span> ${esc(a.label||'region')}`;
+    return `<div class="ac${state.active===a.id?' active':''}" data-id="${a.id}">
+      <div class="ac-top">
+        <button class="loc" data-jump="${a.id}" title="Jump to anchor">${a.kind==='region'?ICON.region:ICON.hl}${loc}</button>
+        <span class="ac-kind">${a.kind}</span>
+      </div>
+      ${a.quote?`<div class="quote">“${esc(a.quote)}”</div>`:''}
+      <textarea class="note-ta" data-note="${a.id}" placeholder="Write a note…" aria-label="Note">${esc(a.note||'')}</textarea>
+      <div class="ac-foot">
+        <select class="msel" data-sec="${a.id}" aria-label="Section">${SECTIONS.map(s=>`<option${a.section===s?' selected':''}>${s}</option>`).join('')}</select>
+        <select class="msel" data-stat="${a.id}" aria-label="Status">${Object.keys(ASTAT).map(k=>`<option value="${k}"${a.status===k?' selected':''}>${ASTAT[k]}</option>`).join('')}</select>
+        ${(a.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}
+        <button class="ac-del" data-del="${a.id}" aria-label="Delete annotation">${ICON.trash}</button>
+      </div>
+    </div>`;
+  }).join('');
+  $$('#railList [data-jump]').forEach(b=>b.onclick=()=>focusAnno(b.dataset.jump,true));
+  $$('#railList [data-note]').forEach(t=>t.addEventListener('input',()=>{annoById(t.dataset.note).note=t.value;}));
+  $$('#railList [data-sec]').forEach(s=>s.onchange=()=>{annoById(s.dataset.sec).section=s.value;toast('Linked to “'+s.value+'”',ICON.link);});
+  $$('#railList [data-stat]').forEach(s=>s.onchange=()=>{annoById(s.dataset.stat).status=s.value;toast('Status · '+ASTAT[s.value]);});
+  $$('#railList [data-del]').forEach(b=>b.onclick=()=>{ANNOS=ANNOS.filter(x=>x.id!==b.dataset.del);renderAll();toast('Annotation removed');});
+}
+const annoById=id=>ANNOS.find(a=>a.id===id);
+
+/* ---- focus / jump ---- */
+function focusAnno(id,scroll){
+  const a=annoById(id); if(!a)return;
+  state.active=id;
+  if(a.page!==state.page)setPage(a.page); else renderOverlays();
+  if(state.scope==='page'&&a.page!==state.page){} // handled by setPage re-render
+  renderRail();
+  if(scroll&&a.rects&&a.rects[0]){
+    const ph=pageEl(a.page).offsetHeight, wrap=$('#pagewrap');
+    const y=pageEl(a.page).offsetTop + (a.rects[0].t/100)*ph - 90;
+    wrap.scrollTo({top:Math.max(0,y),behavior:'smooth'});
+  }
+  const card=$(`#railList .ac[data-id="${id}"]`);
+  if(card&&scroll)card.scrollIntoView?card.parentElement.scrollTop=card.offsetTop-120:0;
+  setTimeout(()=>{state.active=null;renderOverlays();$$('#railList .ac.active').forEach(c=>c.classList.remove('active'));},1400);
+}
+
+/* ---- selection → inline toolbar ---- */
+function onSelect(){
+  if(state.mode!=='text')return;
+  const s=window.getSelection();
+  if(!s||s.isCollapsed||!s.toString().trim()){hideTool();return;}
+  const rg=s.getRangeAt(0);
+  if(!pageEl(state.page).contains(rg.commonAncestorContainer)){hideTool();return;}
+  const rects=pctRects(rg.getClientRects(),state.page);
+  if(!rects.length){hideTool();return;}
+  state.sel={kind:'text',page:state.page,quote:s.toString().trim().replace(/\s+/g,' '),rects};
+  const last=[...rg.getClientRects()].pop();
+  showTool(last.left+last.width/2, last.top, [
+    {ic:ICON.hl,l:'Highlight',fn:()=>commit(false)},
+    {ic:ICON.note,l:'Note',fn:()=>commit(true)},
+    'sep',
+    {ic:ICON.link,l:'Link',fn:linkMenu},
+  ]);
+}
+function onRegionClick(e){
+  if(state.mode!=='region')return;
+  const fig=e.target.closest('.fig'); if(!fig||!pageEl(state.page).contains(fig))return;
+  const label=fig.id==='tab1'?'Table 1':fig.id==='fig1'?'Figure 1':'Region';
+  state.sel={kind:'region',page:state.page,label,rects:pctRects([fig.getBoundingClientRect()],state.page)};
+  const r=fig.getBoundingClientRect();
+  showTool(r.left+r.width/2, r.top, [
+    {ic:ICON.region,l:'Anchor '+label,fn:()=>commit(false)},
+    {ic:ICON.note,l:'Note',fn:()=>commit(true)},
+    'sep',
+    {ic:ICON.link,l:'Link',fn:linkMenu},
+  ]);
+}
+function showTool(cx,cy,items){
+  const t=$('#seltool');
+  t.innerHTML=items.map(it=>it==='sep'?'<span class="sep"></span>':`<button>${it.ic}${it.l}</button>`).join('');
+  let bi=0;items.forEach(it=>{if(it!=='sep'){t.children[bi].onclick=it.fn;bi++;}else bi++;});
+  t.classList.add('on');
+  const w=t.offsetWidth,h=t.offsetHeight;
+  t.style.left=Math.max(10,Math.min(cx-w/2,innerWidth-w-10))+'px';
+  t.style.top=Math.max(10,cy-h-10)+'px';
+}
+function hideTool(){$('#seltool').classList.remove('on');}
+function linkMenu(){
+  const t=$('#seltool').getBoundingClientRect(); // capture before commit hides the toolbar
+  const a=commit(false,true); // create region/text anchor first
+  const pop=$('#pop');
+  pop.innerHTML=`<div class="pl">Link to section</div>`+SECTIONS.map(s=>`<button data-s="${s}">${s}</button>`).join('');
+  $$('#pop [data-s]').forEach(b=>b.onclick=()=>{a.section=b.dataset.s;renderRail();closePop();toast('Linked to “'+b.dataset.s+'”',ICON.link);});
+  pop.classList.add('on');
+  pop.style.left=Math.min(t.left,innerWidth-pop.offsetWidth-10)+'px';
+  pop.style.top=(t.bottom+6)+'px';
+}
+function closePop(){$('#pop').classList.remove('on');}
+
+let seq=0;
+function commit(withNote,silent){
+  const s=state.sel; if(!s)return;
+  const a={id:'a'+(++seq),page:s.page,kind:s.kind,rects:s.rects,
+    quote:s.kind==='text'?s.quote:'', label:s.label||'', note:'', tags:[], status:'draft', section:'—'};
+  ANNOS.push(a);
+  window.getSelection&&window.getSelection().removeAllRanges();
+  hideTool(); state.sel=null; state.active=a.id;
+  renderAll();
+  if(!silent)toast(s.kind==='region'?'Region anchored · '+(s.label||''):'Highlight anchored',ICON.check);
+  if(withNote)setTimeout(()=>{const ta=$(`#railList [data-note="${a.id}"]`);if(ta){ta.focus();openRail();}},60);
+  setTimeout(()=>{state.active=null;renderOverlays();},1400);
+  return a;
+}
+
+/* ---- pages / zoom ---- */
+function setPage(n){
+  state.page=Math.max(1,Math.min(PAGES,n));
+  $$('.pdf-page').forEach(p=>p.classList.toggle('on',+p.dataset.page===state.page));
+  $('#pgCur').textContent=state.page;
+  $('#pgPrev').disabled=state.page<=1; $('#pgNext').disabled=state.page>=PAGES;
+  applyZoom(); resolveSeeds(); renderOverlays(); if(state.scope==='page')renderRail();
+}
+function applyZoom(){
+  const pg=pageEl(state.page), sc=$('#pagescale');
+  pg.style.transform=`scale(${state.zoom})`;
+  sc.style.width=pg.offsetWidth*state.zoom+'px';
+  sc.style.height=pg.offsetHeight*state.zoom+'px';
+  $('#zVal').textContent=Math.round(state.zoom*100);
+}
+function zoom(dir){state.zoom=Math.max(.75,Math.min(1.75,+(state.zoom+dir*.15).toFixed(2)));applyZoom();renderOverlays();}
+
+function setMode(m){
+  state.mode=m; hideTool();
+  $$('#modeSeg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));
+  $('#app').classList.toggle('mode-region',m==='region');
+}
+
+/* ---- toast ---- */
+let tt;
+function toast(msg,icon,err){
+  const w=$('#toastWrap');w.innerHTML='';
+  const t=document.createElement('div');t.className='toast'+(err?' toast--error':'');t.setAttribute('role',err?'alert':'status');
+  t.innerHTML=`${icon||ICON.check}<span>${esc(msg)}</span>`;
+  w.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(tt);tt=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),220);},err?3200:2400);
+}
+function openRail(){$('#rail').classList.add('open');}
+
+function renderAll(){renderOverlays();renderRail();}
+
+/* ---- init ---- */
+function init(){
+  $('#pgTot').textContent=PAGES;
+  resolveSeeds(); setPage(1);
+  $('#pgPrev').onclick=()=>setPage(state.page-1);
+  $('#pgNext').onclick=()=>setPage(state.page+1);
+  $('#zIn').onclick=()=>zoom(1); $('#zOut').onclick=()=>zoom(-1);
+  $$('#modeSeg button').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+  $$('#railSeg button').forEach(b=>b.onclick=()=>{state.scope=b.dataset.scope;$$('#railSeg button').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.scope===state.scope)));renderRail();});
+  $('#railToggle').onclick=()=>$('#rail').classList.toggle('open');
+  document.addEventListener('mouseup',e=>{ if(e.target.closest('.seltool')||e.target.closest('.pop'))return; setTimeout(onSelect,0); });
+  $('#pagewrap').addEventListener('click',onRegionClick);
+  document.addEventListener('mousedown',e=>{if(!e.target.closest('.pop'))closePop();});
+  document.addEventListener('scroll',()=>{hideTool();closePop();},true);
+  document.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){hideTool();closePop();$('#rail').classList.remove('open');}
+    if(e.target.matches('textarea,input,select'))return;
+    if(e.key==='ArrowRight')setPage(state.page+1);
+    if(e.key==='ArrowLeft')setPage(state.page-1);
+  });
+  window.addEventListener('resize',()=>{ANNOS.forEach(a=>{if(a.elId)a.rects=null;});resolveSeeds();applyZoom();renderOverlays();});
+  renderRail();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

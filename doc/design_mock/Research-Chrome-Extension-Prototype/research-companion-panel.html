@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Notes — Research Companion (Side Panel)</title>
+<style>
+  :root{
+    --bg:      oklch(98% 0.004 95);
+    --surface: oklch(100% 0.002 95);
+    --fg:      oklch(20% 0.018 70);
+    --muted:   oklch(45% 0.014 70);
+    --border:  oklch(90% 0.006 95);
+    --accent:  oklch(52% 0.10 28);
+    --accent-soft: oklch(52% 0.10 28 / 0.10);
+    --danger:  oklch(53% 0.17 27);
+
+    /* restrained semantic dots for workflow status */
+    --s-toread:   oklch(62% 0.010 70);
+    --s-inreview: oklch(68% 0.095 70);
+    --s-analysed: oklch(56% 0.070 155);
+    --s-used:     var(--accent);
+
+    --font-display: 'Iowan Old Style','Charter',Georgia,serif;
+    --font-body: -apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono: 'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+
+    --panel-w: 388px;
+    --ease: cubic-bezier(.4,0,.2,1);
+    --ease-out: cubic-bezier(.16,1,.3,1);
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+  a:focus-visible,button:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+    outline:2px solid var(--accent);outline-offset:2px;
+  }
+  @keyframes rowIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  @keyframes flashWash{0%{background:var(--accent-soft);border-color:var(--accent)}100%{background:var(--surface);border-color:var(--border)}}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+  }
+  html,body{height:100%}
+  body{
+    font-family:var(--font-body);
+    color:var(--fg);
+    background:var(--bg);
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+
+  /* ---- Stage: faint article on the left, panel docked right ---- */
+  .stage{
+    min-height:100vh;
+    display:flex;
+    justify-content:flex-end;
+    align-items:stretch;
+    background:
+      radial-gradient(120% 80% at 12% 0%, oklch(96% 0.006 95) 0%, var(--bg) 55%);
+  }
+
+  /* Backdrop article — the page the researcher is reading */
+  .reading{
+    flex:1;
+    min-width:0;
+    padding:56px clamp(32px,6vw,120px);
+    display:flex;
+    justify-content:center;
+    user-select:none;
+    -webkit-user-select:none;
+  }
+  .reading__col{max-width:560px;width:100%;opacity:.62}
+  .reading__kicker{
+    font-family:var(--font-mono);
+    font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);
+  }
+  .reading__title{
+    font-family:var(--font-display);
+    font-weight:600;
+    font-size:34px;line-height:1.14;letter-spacing:-.02em;
+    margin:14px 0 10px;
+    max-width:16ch;
+  }
+  .reading__byline{
+    font-size:13.5px;color:var(--muted);letter-spacing:.01em;margin-bottom:34px;
+  }
+  .reading__bars{display:flex;flex-direction:column;gap:13px}
+  .bar{height:10px;border-radius:2px;background:var(--border)}
+  .bar.mark{background:var(--accent-soft);box-shadow:inset 0 -2px 0 var(--accent)}
+  .reading__hint{
+    margin-top:30px;font-family:var(--font-mono);font-size:11px;
+    letter-spacing:.06em;color:var(--muted);display:flex;align-items:center;gap:8px;
+  }
+
+  /* ---- The side panel ---- */
+  .panel{
+    width:var(--panel-w);
+    flex:0 0 var(--panel-w);
+    background:var(--surface);
+    border-left:1px solid var(--border);
+    height:100vh;
+    position:sticky;top:0;
+    display:flex;flex-direction:column;
+    box-shadow:-1px 0 0 oklch(90% 0.006 95), -18px 0 40px -30px oklch(20% 0.02 70 / .35);
+  }
+
+  /* ---- Header ---- */
+  .head{padding:14px 16px 12px;border-bottom:1px solid var(--border)}
+  .head__top{display:flex;align-items:center;justify-content:space-between}
+  .wordmark{
+    display:flex;align-items:center;gap:8px;
+    font-family:var(--font-mono);font-size:11px;font-weight:600;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--fg);
+  }
+  .wordmark .glyph{
+    width:16px;height:16px;border:1.6px solid var(--accent);border-radius:3px;
+    position:relative;flex:0 0 auto;
+  }
+  .wordmark .glyph::after{
+    content:"";position:absolute;left:3px;right:3px;top:4px;height:1.6px;
+    background:var(--accent);box-shadow:0 4px 0 var(--accent);
+  }
+  .iconbtn{
+    width:30px;height:30px;display:grid;place-items:center;
+    border:1px solid transparent;border-radius:6px;background:none;color:var(--muted);
+    cursor:pointer;transition:background .12s,color .12s,border-color .12s;
+  }
+  .iconbtn:hover{background:var(--bg);color:var(--fg);border-color:var(--border)}
+  .iconbtn svg{width:16px;height:16px}
+
+  /* Project switcher */
+  .switch{position:relative;margin-top:12px}
+  .switch__btn{
+    width:100%;display:flex;align-items:center;gap:11px;
+    padding:10px 11px;border:1px solid var(--border);border-radius:8px;
+    background:var(--surface);cursor:pointer;text-align:left;
+    transition:border-color .12s,background .12s;
+  }
+  .switch__btn:hover{border-color:oklch(82% 0.01 95)}
+  .switch__btn[aria-expanded="true"]{border-color:var(--fg)}
+  .switch__spine{
+    width:3px;align-self:stretch;border-radius:2px;background:var(--accent);flex:0 0 auto;
+  }
+  .switch__meta{flex:1;min-width:0}
+  .switch__name{
+    display:block;
+    font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:-.01em;
+    line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--fg);
+  }
+  .switch__sub{
+    display:block;
+    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .menu__item .mname,.switch__name{max-width:100%}
+  .switch__chev{color:var(--muted);flex:0 0 auto;transition:transform .16s}
+  .switch__btn[aria-expanded="true"] .switch__chev{transform:rotate(180deg)}
+
+  .menu{
+    position:absolute;left:0;right:0;top:calc(100% + 6px);z-index:40;
+    background:var(--surface);border:1px solid var(--border);border-radius:9px;
+    box-shadow:0 12px 30px -14px oklch(20% 0.02 70 / .4);
+    padding:5px;opacity:0;transform:translateY(-4px);pointer-events:none;
+    transition:opacity .13s,transform .13s;
+  }
+  .menu.open{opacity:1;transform:translateY(0);pointer-events:auto}
+  .menu__item{
+    display:flex;align-items:center;gap:10px;width:100%;
+    padding:9px 9px;border-radius:6px;background:none;border:0;cursor:pointer;text-align:left;
+    color:var(--fg);
+  }
+  .menu__item:hover{background:var(--bg)}
+  .menu__item .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+  .menu__item.active .dot{background:var(--accent)}
+  .menu__item .mtxt{flex:1;min-width:0}
+  .menu__item .mname{font-size:14px;font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .menu__item .mcount{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);letter-spacing:.04em}
+  .menu__sep{height:1px;background:var(--border);margin:5px 4px}
+  .menu__new{color:var(--accent);font-weight:550;font-size:13.5px}
+
+  /* ---- Scroll body ---- */
+  .body{flex:1;overflow-y:auto;overscroll-behavior:contain}
+  .body::-webkit-scrollbar{width:9px}
+  .body::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--surface)}
+
+  .section-label{
+    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted);display:flex;align-items:center;gap:8px;
+  }
+  .section-label .rule{flex:1;height:1px;background:var(--border)}
+
+  /* ---- Capture card ---- */
+  .capture{padding:15px 16px;border-bottom:1px solid var(--border);background:
+    linear-gradient(var(--bg),var(--bg)) ,var(--surface);}
+  .cap-src{margin-top:11px}
+  .cap-src__type{
+    font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);
+  }
+  .cap-src__title{
+    font-family:var(--font-display);font-weight:600;font-size:16.5px;line-height:1.24;
+    letter-spacing:-.01em;margin:5px 0 6px;color:var(--fg);
+  }
+  .cap-src__meta{font-size:12.5px;color:var(--muted);line-height:1.45}
+  .cap-src__meta b{color:var(--fg);font-weight:550}
+  .doi{font-family:var(--font-mono);font-size:11px;letter-spacing:0;color:var(--muted);margin-top:5px;display:block}
+
+  .cap-actions{display:flex;gap:8px;margin-top:13px}
+  .btn{
+    font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--border);
+    background:var(--surface);color:var(--fg);
+    padding:9px 12px;font-size:13px;font-weight:550;letter-spacing:.01em;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    transition:background .12s,border-color .12s,transform .06s;
+  }
+  .btn:hover{background:var(--bg);border-color:oklch(80% 0.01 95)}
+  .btn:active{transform:translateY(1px)}
+  .btn svg{width:14px;height:14px}
+  .btn--primary{
+    background:var(--accent);border-color:var(--accent);color:oklch(99% 0.01 95);flex:1;
+    box-shadow:0 1px 0 oklch(42% 0.10 28), 0 6px 14px -8px oklch(52% 0.10 28 / .7);
+  }
+  .btn--primary:hover{background:oklch(48% 0.10 28);border-color:oklch(48% 0.10 28)}
+  .btn--filed{background:var(--surface);color:var(--muted);border-color:var(--border);cursor:default;box-shadow:none;flex:1}
+  .btn--filed:hover{background:var(--surface)}
+
+  .cite-row{display:flex;gap:8px;margin-top:8px}
+  .cite-btn{flex:1;font-size:12px;padding:8px 10px;color:var(--muted)}
+  .cite-btn:hover{color:var(--fg)}
+
+  /* ---- List controls ---- */
+  .controls{padding:14px 16px 6px;position:sticky;top:0;background:var(--surface);z-index:10;
+    box-shadow:0 1px 0 var(--border)}
+  .search{position:relative;margin:10px 0 11px}
+  .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted)}
+  .search input{
+    width:100%;font:inherit;font-size:13px;color:var(--fg);
+    padding:9px 30px 9px 32px;border:1px solid var(--border);border-radius:8px;background:var(--bg);
+    transition:border-color .12s,background .12s;
+  }
+  .search input:focus{outline:none;border-color:var(--fg);background:var(--surface)}
+  .search input::placeholder{color:var(--muted)}
+  .search kbd{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    font-family:var(--font-mono);font-size:10px;color:var(--muted);
+    border:1px solid var(--border);border-radius:4px;padding:1px 5px;background:var(--surface);
+  }
+
+  .segmented{display:flex;gap:2px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:3px;overflow-x:auto;scrollbar-width:none}
+  .segmented::-webkit-scrollbar{display:none}
+  .seg{
+    flex:1;font:inherit;font-size:11.5px;font-weight:550;letter-spacing:.01em;
+    border:0;background:none;color:var(--muted);cursor:pointer;padding:6px 4px;border-radius:5px;
+    display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;
+    transition:background .12s,color .12s;
+  }
+  .seg:hover{color:var(--fg)}
+  .seg[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px oklch(20% 0.02 70 / .08)}
+  .seg .n{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+  .seg[aria-pressed="true"] .n{color:var(--accent)}
+
+  .tags-row{display:flex;flex-wrap:wrap;gap:5px;padding:10px 0 2px}
+  .tag{
+    display:inline-flex;align-items:center;min-height:24px;
+    font-family:var(--font-mono);font-size:10.5px;letter-spacing:.02em;
+    padding:3px 9px;border:1px solid var(--border);border-radius:20px;background:var(--surface);
+    color:var(--muted);cursor:pointer;transition:border-color .12s,color .12s,background .12s;
+  }
+  .tag:hover{border-color:var(--fg);color:var(--fg)}
+  .tag[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+
+  /* ---- Groups & rows ---- */
+  .list{padding:6px 16px 4px}
+  .group{margin-top:12px}
+  .group__head{
+    display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;cursor:pointer;
+    padding:6px 0;color:var(--fg);text-align:left;
+  }
+  .group__dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .group__name{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .group__count{font-family:var(--font-mono);font-size:10.5px;color:var(--muted);letter-spacing:.04em}
+  .group__chev{margin-left:auto;color:var(--muted);transition:transform .16s}
+  .group.collapsed .group__chev{transform:rotate(-90deg)}
+  .group__body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .3s var(--ease)}
+  .group.collapsed .group__body{grid-template-rows:0fr}
+  .group__items{overflow:hidden;min-height:0;display:flex;flex-direction:column;gap:8px;padding:6px 2px 3px}
+
+  .doc{
+    border:1px solid var(--border);border-radius:9px;background:var(--surface);
+    padding:11px 12px;cursor:pointer;position:relative;
+    transition:border-color .16s var(--ease),box-shadow .16s var(--ease),transform .06s;
+    animation:rowIn .34s var(--ease-out) both;
+  }
+  .doc.flash{animation:rowIn .34s var(--ease-out) both, flashWash .95s var(--ease) .04s}
+  .doc:hover{border-color:oklch(82% 0.01 95);box-shadow:0 4px 14px -10px oklch(20% 0.02 70 / .4)}
+  .doc:active{transform:translateY(1px)}
+  .doc__top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+  .doc__title{
+    font-family:var(--font-display);font-weight:600;font-size:14.5px;line-height:1.28;
+    letter-spacing:-.005em;color:var(--fg);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .doc__meta{font-size:11.5px;color:var(--muted);margin-top:5px;letter-spacing:.005em;line-height:1.4}
+  .doc__foot{display:flex;align-items:center;gap:6px;margin-top:9px;flex-wrap:wrap}
+  .chip{
+    font-family:var(--font-mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;
+    padding:2px 6px;border-radius:4px;background:var(--bg);color:var(--muted);border:1px solid var(--border);
+  }
+  .chip--section{color:var(--fg);border-color:oklch(84% 0.01 95)}
+  .doc__notes{
+    margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted);
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .doc__notes svg{width:11px;height:11px}
+
+  /* status control on each doc */
+  .status-btn{
+    display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;min-height:24px;
+    font:inherit;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;
+    padding:3px 8px 3px 7px;border-radius:20px;border:1px solid var(--border);background:var(--bg);
+    color:var(--muted);cursor:pointer;transition:border-color .12s,color .12s;
+  }
+  .status-btn:hover{border-color:var(--fg);color:var(--fg)}
+  .status-btn .sdot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+
+  .popover{
+    position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+    box-shadow:0 14px 34px -14px oklch(20% 0.02 70 / .45);padding:5px;min-width:172px;
+    opacity:0;transform:scale(.97);pointer-events:none;transition:opacity .1s,transform .1s;
+  }
+  .popover.open{opacity:1;transform:scale(1);pointer-events:auto}
+  .popover__lbl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);padding:6px 8px 4px}
+  .popover__item{display:flex;align-items:center;gap:9px;width:100%;padding:8px 8px;border-radius:6px;
+    border:0;background:none;cursor:pointer;text-align:left;color:var(--fg);font-size:13px}
+  .popover__item:hover{background:var(--bg)}
+  .popover__item .sdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .popover__item .chk{margin-left:auto;color:var(--accent);opacity:0}
+  .popover__item.current .chk{opacity:1}
+
+  .empty{
+    text-align:center;padding:40px 24px;color:var(--muted);
+  }
+  .empty__mark{width:40px;height:40px;margin:0 auto 14px;border:1.6px dashed var(--border);border-radius:9px;
+    display:grid;place-items:center;color:var(--muted)}
+  .empty__t{font-family:var(--font-display);font-size:16px;color:var(--fg);margin-bottom:6px}
+  .empty__d{font-size:12.5px;line-height:1.5;max-width:26ch;margin:0 auto}
+
+  /* ---- Footer / progress ---- */
+  .foot{border-top:1px solid var(--border);padding:12px 16px;background:var(--surface)}
+  .prog__top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .prog__lbl{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .prog__val{font-family:var(--font-mono);font-size:11px;color:var(--fg)}
+  .prog__bar{display:flex;height:7px;border-radius:6px;overflow:hidden;background:var(--bg);gap:1px}
+  .prog__seg{transition:flex-grow .3s ease}
+  .foot__actions{display:flex;gap:8px;margin-top:12px}
+  .foot__actions .btn{flex:1}
+
+  /* ---- Toast ---- */
+  .toast-wrap{position:fixed;bottom:18px;left:0;right:0;display:flex;flex-direction:column;
+    align-items:center;gap:8px;z-index:90;pointer-events:none}
+  .toast{
+    background:var(--fg);color:var(--bg);font-size:12.5px;letter-spacing:.01em;
+    padding:9px 14px;border-radius:8px;box-shadow:0 10px 24px -10px oklch(20% 0.02 70 / .6);
+    display:flex;align-items:center;gap:9px;
+    opacity:0;transform:translateY(10px);transition:opacity .2s,transform .2s;max-width:320px;
+  }
+  .toast.show{opacity:1;transform:translateY(0)}
+  .toast svg{width:14px;height:14px;flex:0 0 auto}
+  .toast code{font-family:var(--font-mono);font-size:11px;opacity:.85;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .toast--error{background:var(--danger);color:oklch(99% 0.01 25)}
+
+  /* ---- Skeleton loading (async IndexedDB read) ---- */
+  .sk{display:flex;flex-direction:column;gap:8px;padding:10px 2px}
+  .sk-row{border:1px solid var(--border);border-radius:9px;padding:12px;background:var(--surface)}
+  .sk-bar{height:10px;border-radius:3px;
+    background:linear-gradient(90deg,var(--border) 0%,oklch(94% 0.006 95) 40%,var(--border) 80%);
+    background-size:200% 100%;animation:skShimmer 1.1s linear infinite}
+  .sk-bar + .sk-bar{margin-top:9px}
+  @keyframes skShimmer{from{background-position:200% 0}to{background-position:-200% 0}}
+
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+    clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .btn[disabled]:not(.btn--filed){opacity:.55;cursor:not-allowed}
+
+  /* ---- Narrow: panel becomes full width, hide backdrop ---- */
+  @media (max-width:760px){
+    .reading{display:none}
+    .panel{width:100%;flex:1 1 100%;border-left:0;box-shadow:none}
+    :root{--panel-w:100%}
+  }
+</style>
+</head>
+<body>
+  <div class="stage" data-od-id="stage">
+
+    <!-- Faint article the researcher is reading (context for the docked panel) -->
+    <div class="reading" data-od-id="reading-backdrop" aria-hidden="true">
+      <div class="reading__col">
+        <div class="reading__kicker">Int. J. Biometeorology · 2010</div>
+        <h1 class="reading__title">The urban heat island and its impact on human health in Shanghai</h1>
+        <div class="reading__byline">Tan, J., Zheng, Y., Tang, X., Guo, C., Li, L., Song, G. et al.</div>
+        <div class="reading__bars">
+          <div class="bar" style="width:98%"></div>
+          <div class="bar" style="width:92%"></div>
+          <div class="bar mark" style="width:88%"></div>
+          <div class="bar mark" style="width:70%"></div>
+          <div class="bar" style="width:95%"></div>
+          <div class="bar" style="width:60%"></div>
+          <div class="bar" style="width:90%"></div>
+          <div class="bar" style="width:84%"></div>
+        </div>
+        <div class="reading__hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          2 passages highlighted on this page
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== SIDE PANEL ===================== -->
+    <aside class="panel" data-od-id="side-panel" aria-label="Context Notes research companion">
+      <h1 class="sr-only">Context Notes — research companion</h1>
+
+      <!-- Header -->
+      <header class="head" data-od-id="panel-header">
+        <div class="head__top">
+          <div class="wordmark"><span class="glyph"></span>Context&nbsp;Notes</div>
+          <button class="iconbtn" title="Open dashboard" data-od-id="dashboard-btn" aria-label="Open dashboard">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          </button>
+        </div>
+
+        <!-- Project switcher -->
+        <div class="switch" data-od-id="project-switcher">
+          <button class="switch__btn" id="switchBtn" aria-expanded="false" aria-haspopup="menu">
+            <span class="switch__spine"></span>
+            <span class="switch__meta">
+              <span class="switch__name" id="activeName">Urban Heat &amp; Mortality</span>
+              <span class="switch__sub" id="activeSub">Systematic review · APA 7th</span>
+            </span>
+            <svg class="switch__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="16" height="16"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          <div class="menu" id="projectMenu" role="menu"></div>
+        </div>
+      </header>
+
+      <!-- Scrollable body -->
+      <div class="body" id="scrollBody">
+
+        <!-- Capture card: the current page -->
+        <section class="capture" data-od-id="capture-card">
+          <div class="section-label">On this page <span class="rule"></span></div>
+          <div class="cap-src">
+            <div class="cap-src__type">Article · metadata extracted</div>
+            <div class="cap-src__title">The urban heat island and its impact on heat waves and human health in Shanghai</div>
+            <div class="cap-src__meta"><b>Tan, J.</b> et al. · <b>2010</b> · Int. J. Biometeorology, 54(1), 75–84</div>
+            <span class="doi">doi:10.1007/s00484-009-0256-x</span>
+          </div>
+          <div class="cap-actions">
+            <button class="btn btn--primary" id="fileBtn" data-od-id="file-source-btn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5v14"/></svg>
+              File into “Urban Heat”
+            </button>
+            <button class="btn" id="statusPageBtn" title="Set reading status" data-od-id="page-status-btn">
+              <span class="sdot" style="width:8px;height:8px;border-radius:50%;background:var(--s-toread)"></span>
+              To read
+            </button>
+          </div>
+          <div class="cite-row">
+            <button class="btn cite-btn" data-cite="inText" data-doc="cur" data-od-id="copy-intext">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>
+              In-text
+            </button>
+            <button class="btn cite-btn" data-cite="biblio" data-doc="cur" data-od-id="copy-biblio">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Bibliography
+            </button>
+          </div>
+        </section>
+
+        <!-- List controls -->
+        <div class="controls" data-od-id="list-controls">
+          <div class="section-label">Reading list <span class="rule"></span><span id="totalCount" class="prog__val" style="letter-spacing:.04em"></span></div>
+          <div class="search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <input type="text" id="searchInput" placeholder="Search titles, authors, DOI…" autocomplete="off" aria-label="Search sources">
+            <kbd>/</kbd>
+          </div>
+          <div class="segmented" id="segmented" role="group" aria-label="Filter by status"></div>
+          <div class="tags-row" id="tagsRow"></div>
+        </div>
+
+        <!-- Grouped list -->
+        <div class="list" id="listRoot" data-od-id="reading-list"></div>
+
+      </div>
+
+      <!-- Footer / progress -->
+      <footer class="foot" data-od-id="panel-footer">
+        <div class="prog__top">
+          <span class="prog__lbl">Review progress</span>
+          <span class="prog__val" id="progVal">—</span>
+        </div>
+        <div class="prog__bar" id="progBar" role="img" aria-label="Review progress"></div>
+        <div class="foot__actions">
+          <button class="btn" id="addSourceBtn" data-od-id="add-source-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5v14"/></svg>
+            Add source
+          </button>
+          <button class="btn" id="bibBtn" data-od-id="build-bib-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            Bibliography
+          </button>
+        </div>
+      </footer>
+    </aside>
+  </div>
+
+  <!-- floating popovers / toasts -->
+  <div class="popover" id="statusPop"></div>
+  <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Context Notes — side panel prototype
+   Logical model mirrors data-model.md (Project / Document /
+   Reference / CitationStyle). State is in-memory; a real build
+   would read this from the service worker over IndexedDB.
+   ============================================================ */
+
+const STATUSES = [
+  { id:'toRead',       label:'To read',        dot:'var(--s-toread)'   },
+  { id:'inReview',     label:'In review',      dot:'var(--s-inreview)' },
+  { id:'analysed',     label:'Analysed',       dot:'var(--s-analysed)' },
+  { id:'usedInOutput', label:'Used in output', dot:'var(--s-used)'     },
+];
+const statusById = id => STATUSES.find(s => s.id === id);
+
+/* --- Projects (only the active one is populated; others honestly empty) --- */
+const PROJECTS = [
+  { id:'p1', name:'Urban Heat & Mortality', sub:'Systematic review', style:'APA 7th' },
+  { id:'p2', name:'FOI — Air Quality Monitoring', sub:'Investigation', style:'Chicago 17th' },
+  { id:'p3', name:'Misinformation & Public Trust', sub:'Essay', style:'Harvard' },
+];
+
+/* --- Documents keyed by project (real papers → real citations) --- */
+const DOCS = {
+  p1: [
+    { id:'d1', status:'analysed', section:'Literature', notes:6, tags:['foundational','heat-island'],
+      authors:[{f:'Oke',g:'T. R.'}], year:1982,
+      title:'The energetic basis of the urban heat island',
+      journal:'Quarterly Journal of the Royal Meteorological Society', vol:'108', iss:'455', pages:'1–24',
+      doi:'10.1002/qj.49710845502' },
+    { id:'d2', status:'inReview', section:'Data', notes:3, tags:['mortality','multi-country'],
+      authors:[{f:'Gasparrini',g:'A.'},{f:'Guo',g:'Y.'},{f:'Hashizume',g:'M.'},{f:'Lavigne',g:'E.'}], year:2015,
+      title:'Mortality risk attributable to high and low ambient temperature: a multicountry observational study',
+      journal:'The Lancet', vol:'386', iss:'9991', pages:'369–375',
+      doi:'10.1016/S0140-6736(14)62114-0' },
+    { id:'d3', status:'toRead', section:'Literature', notes:0, tags:['urban-form','vulnerability'],
+      authors:[{f:'Stone',g:'B.'},{f:'Hess',g:'J. J.'},{f:'Frumkin',g:'H.'}], year:2010,
+      title:'Urban form and extreme heat events: are sprawling cities more vulnerable to climate change than compact cities?',
+      journal:'Environmental Health Perspectives', vol:'118', iss:'10', pages:'1425–1428',
+      doi:'10.1289/ehp.0901879' },
+    { id:'d4', status:'analysed', section:'Literature', notes:4, tags:['review','health'],
+      authors:[{f:'Heaviside',g:'C.'},{f:'Macintyre',g:'H.'},{f:'Vardoulakis',g:'S.'}], year:2017,
+      title:'The urban heat island: implications for health in a changing environment',
+      journal:'Current Environmental Health Reports', vol:'4', iss:'3', pages:'296–305',
+      doi:'10.1007/s40572-017-0150-3' },
+    { id:'d5', status:'usedInOutput', section:'Methods', notes:5, tags:['climate','modelling'],
+      authors:[{f:'Zhao',g:'L.'},{f:'Lee',g:'X.'},{f:'Smith',g:'R. B.'},{f:'Oleson',g:'K.'}], year:2014,
+      title:'Strong contributions of local background climate to urban heat islands',
+      journal:'Nature', vol:'511', iss:'7508', pages:'216–219',
+      doi:'10.1038/nature13462' },
+  ],
+  p2: [],
+  p3: [],
+};
+
+/* --- The page currently open in the browser tab (not yet filed) --- */
+const CURRENT_PAGE = {
+  id:'cur', section:'Literature', notes:2, tags:['case-study','heat-wave'],
+  authors:[{f:'Tan',g:'J.'},{f:'Zheng',g:'Y.'},{f:'Tang',g:'X.'},{f:'Guo',g:'C.'}], year:2010,
+  title:'The urban heat island and its impact on heat waves and human health in Shanghai',
+  journal:'International Journal of Biometeorology', vol:'54', iss:'1', pages:'75–84',
+  doi:'10.1007/s00484-009-0256-x',
+  status:'toRead', filed:false,
+};
+
+/* --------------------------- state --------------------------- */
+const state = {
+  activeId:'p1',
+  filterStatus:'all',
+  search:'',
+  activeTag:null,
+  collapsed:new Set(),
+  flashId:null,
+  loading:false,
+};
+
+/* --------------------------- CSL-ish formatting --------------------------- */
+/* Mirrors citations.md: base style + userRules (maxAuthors, et al). Kept
+   deliberately small — a real build routes this to citeproc in the worker. */
+const RULES = { maxAuthors:3 };
+
+function inText(doc){
+  const a = doc.authors;
+  if (a.length === 1) return `(${a[0].f}, ${doc.year})`;
+  if (a.length === 2) return `(${a[0].f} & ${a[1].f}, ${doc.year})`;
+  return `(${a[0].f} et al., ${doc.year})`;
+}
+function bibAuthors(doc){
+  const a = doc.authors;
+  const fmt = p => `${p.f}, ${p.g}`;
+  if (a.length <= RULES.maxAuthors) {
+    if (a.length === 1) return fmt(a[0]);
+    return a.slice(0,-1).map(fmt).join(', ') + ', & ' + fmt(a[a.length-1]);
+  }
+  return a.slice(0,RULES.maxAuthors).map(fmt).join(', ') + ', et al.';
+}
+function biblio(doc){
+  const iss = doc.iss ? `(${doc.iss})` : '';
+  return `${bibAuthors(doc)} (${doc.year}). ${doc.title}. ${doc.journal}, ${doc.vol}${iss}, ${doc.pages}. https://doi.org/${doc.doi}`;
+}
+function metaLine(doc){
+  const a = doc.authors;
+  const who = a.length === 1 ? a[0].f : a.length === 2 ? `${a[0].f} & ${a[1].f}` : `${a[0].f} et al.`;
+  return `${who} · ${doc.year} · ${doc.journal}`;
+}
+
+/* --------------------------- helpers --------------------------- */
+const $  = (s,r=document) => r.querySelector(s);
+const $$ = (s,r=document) => [...r.querySelectorAll(s)];
+const activeDocs = () => DOCS[state.activeId] || [];
+const el = (tag, cls, html) => { const n=document.createElement(tag); if(cls)n.className=cls; if(html!=null)n.innerHTML=html; return n; };
+
+const ICON = {
+  note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  file:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="M22 4 12 14.01l-3-3"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+};
+
+/* =========================================================================
+   RENDER: project switcher menu
+   ========================================================================= */
+function renderProjectMenu(){
+  const menu = $('#projectMenu');
+  menu.innerHTML = '';
+  PROJECTS.forEach(p => {
+    const n = (DOCS[p.id]||[]).length;
+    const item = el('button', 'menu__item' + (p.id===state.activeId?' active':''));
+    item.setAttribute('role','menuitem');
+    item.innerHTML = `<span class="dot"></span>
+      <span class="mtxt"><span class="mname">${p.name}</span></span>
+      <span class="mcount">${n} src</span>`;
+    item.onclick = () => { switchProject(p.id); closeMenu(); };
+    menu.appendChild(item);
+  });
+  menu.appendChild(el('div','menu__sep'));
+  const add = el('button','menu__item');
+  add.innerHTML = `<span class="dot" style="background:var(--accent)"></span>
+    <span class="mtxt"><span class="mname menu__new">New project…</span></span>`;
+  add.onclick = () => { closeMenu(); toast('Projects are created from the dashboard', ICON.file); };
+  menu.appendChild(add);
+}
+function switchProject(id){
+  state.activeId = id;
+  state.filterStatus='all'; state.search=''; state.activeTag=null; state.collapsed.clear();
+  const p = PROJECTS.find(x=>x.id===id);
+  $('#activeName').textContent = p.name;
+  $('#activeSub').textContent  = `${p.sub} · ${p.style}`;
+  $('#searchInput').value = '';
+  // update file button label to the active project's short name
+  const short = p.name.split(/[ —&]/)[0];
+  $('#fileBtn').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M12 5v14"/></svg> File into “${short}”`;
+  CURRENT_PAGE.filed = false;
+  loadThen();
+}
+function openMenu(){ $('#projectMenu').classList.add('open'); $('#switchBtn').setAttribute('aria-expanded','true'); }
+function closeMenu(){ $('#projectMenu').classList.remove('open'); $('#switchBtn').setAttribute('aria-expanded','false'); }
+
+/* =========================================================================
+   RENDER: segmented status filter + tag chips
+   ========================================================================= */
+function renderSegmented(){
+  const seg = $('#segmented');
+  const docs = activeDocs();
+  const counts = { all: docs.length };
+  STATUSES.forEach(s => counts[s.id] = docs.filter(d=>d.status===s.id).length);
+  const opts = [{id:'all',label:'All'}, ...STATUSES.map(s=>({id:s.id,label:s.label.replace(' in output','')}))];
+  seg.innerHTML = '';
+  opts.forEach(o => {
+    const b = el('button','seg');
+    b.setAttribute('aria-pressed', String(state.filterStatus===o.id));
+    b.innerHTML = `${o.label} <span class="n">${counts[o.id]??0}</span>`;
+    b.onclick = () => { state.filterStatus = o.id; renderAll(); };
+    seg.appendChild(b);
+  });
+}
+function renderTags(){
+  const row = $('#tagsRow');
+  const all = [...new Set(activeDocs().flatMap(d=>d.tags))].sort();
+  row.innerHTML = '';
+  if (!all.length){ row.style.display='none'; return; }
+  row.style.display='flex';
+  all.forEach(t => {
+    const b = el('button','tag','#'+t);
+    b.setAttribute('aria-pressed', String(state.activeTag===t));
+    b.onclick = () => { state.activeTag = state.activeTag===t ? null : t; renderAll(); };
+    row.appendChild(b);
+  });
+}
+
+/* =========================================================================
+   RENDER: grouped document list
+   ========================================================================= */
+function visibleDocs(){
+  const q = state.search.trim().toLowerCase();
+  return activeDocs().filter(d => {
+    if (state.filterStatus!=='all' && d.status!==state.filterStatus) return false;
+    if (state.activeTag && !d.tags.includes(state.activeTag)) return false;
+    if (q){
+      const hay = (d.title+' '+d.authors.map(a=>a.f).join(' ')+' '+d.journal+' '+d.doi+' '+d.tags.join(' ')).toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderList(){
+  const root = $('#listRoot');
+  root.innerHTML = '';
+  let rowIdx = 0;
+  root.setAttribute('aria-busy', String(state.loading));
+
+  if (state.loading){ root.appendChild(renderSkeleton()); return; }
+
+  const docs = visibleDocs();
+
+  if (!activeDocs().length){
+    root.appendChild(makeEmpty('No sources filed yet',
+      'Open a paper, then use “File into project” to start this reading list.'));
+    return;
+  }
+  if (!docs.length){
+    root.appendChild(makeEmpty('Nothing matches',
+      'Clear the search, status, or tag filter to see all sources.'));
+    return;
+  }
+
+  // group by status, in pipeline order
+  STATUSES.forEach(s => {
+    const inGroup = docs.filter(d => d.status===s.id);
+    if (!inGroup.length) return;
+    const collapsed = state.collapsed.has(s.id);
+    const group = el('div','group'+(collapsed?' collapsed':''));
+
+    const head = el('button','group__head');
+    head.innerHTML = `
+      <span class="group__dot" style="background:${s.dot}"></span>
+      <span class="group__name">${s.label}</span>
+      <span class="group__count">${inGroup.length}</span>
+      <svg class="group__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="15" height="15"><path d="m6 9 6 6 6-6"/></svg>`;
+    head.setAttribute('aria-expanded', String(!collapsed));
+    head.onclick = () => {
+      const nowCollapsed = !group.classList.contains('collapsed');
+      nowCollapsed ? state.collapsed.add(s.id) : state.collapsed.delete(s.id);
+      group.classList.toggle('collapsed', nowCollapsed);
+      head.setAttribute('aria-expanded', String(!nowCollapsed));
+    };
+    group.appendChild(head);
+
+    const bodyWrap = el('div','group__body');
+    const items = el('div','group__items');
+    inGroup.forEach(d => items.appendChild(makeDocRow(d, rowIdx++)));
+    bodyWrap.appendChild(items);
+    group.appendChild(bodyWrap);
+    root.appendChild(group);
+  });
+}
+
+function makeDocRow(d, idx=0){
+  const s = statusById(d.status);
+  const row = el('div', 'doc' + (state.flashId===d.id ? ' flash' : ''));
+  row.dataset.odId = 'doc-'+d.id;
+  row.tabIndex = 0;
+  row.setAttribute('role','button');
+  row.setAttribute('aria-label', `${d.title}. Status ${s.label}. Enter to jump to annotation.`);
+  row.style.animationDelay = Math.min(idx*24, 260) + 'ms';
+  if (state.flashId===d.id) setTimeout(()=>{ state.flashId = null; }, 1000);
+  const notes = d.notes>0 ? `<span class="doc__notes">${ICON.note}${d.notes}</span>` : '';
+  row.innerHTML = `
+    <div class="doc__top">
+      <div class="doc__title">${d.title}</div>
+    </div>
+    <div class="doc__meta">${metaLine(d)}</div>
+    <div class="doc__foot">
+      <button class="status-btn" data-status-for="${d.id}">
+        <span class="sdot" style="background:${s.dot}"></span>${s.label}
+      </button>
+      <span class="chip chip--section">${d.section}</span>
+      ${d.tags.slice(0,1).map(t=>`<span class="chip">#${t}</span>`).join('')}
+      ${notes}
+    </div>`;
+
+  // click row → "jump to annotation" (simulated)
+  row.addEventListener('click', e => {
+    if (e.target.closest('.status-btn')) return;
+    toast(`Jumped to “${d.authors[0].f} ${d.year}” on the page`, ICON.note);
+  });
+  row.addEventListener('keydown', e => {
+    if ((e.key==='Enter' || e.key===' ') && !e.target.closest('.status-btn')){ e.preventDefault(); row.click(); }
+  });
+  // status pill → popover
+  row.querySelector('.status-btn').addEventListener('click', e => {
+    e.stopPropagation();
+    openStatusPopover(e.currentTarget, d);
+  });
+  return row;
+}
+
+function renderSkeleton(){
+  const sk = el('div','sk');
+  sk.setAttribute('aria-hidden','true');
+  [['86%','54%','40%'],['92%','60%','44%'],['80%','50%','38%']].forEach(w => {
+    const r = el('div','sk-row');
+    r.innerHTML = w.map(x=>`<div class="sk-bar" style="width:${x}"></div>`).join('');
+    sk.appendChild(r);
+  });
+  return sk;
+}
+function makeEmpty(t,d){
+  const e = el('div','empty');
+  e.innerHTML = `<div class="empty__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" width="18" height="18"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+    <div class="empty__t">${t}</div><div class="empty__d">${d}</div>`;
+  return e;
+}
+
+/* =========================================================================
+   Status change popover (shared, floating)
+   ========================================================================= */
+let popTarget = null;
+function openStatusPopover(anchor, doc){
+  const pop = $('#statusPop');
+  popTarget = doc;
+  pop.innerHTML = `<div class="popover__lbl">Move to</div>` + STATUSES.map(s => `
+    <button class="popover__item${s.id===doc.status?' current':''}" data-set="${s.id}">
+      <span class="sdot" style="background:${s.dot}"></span>${s.label}
+      <span class="chk">${ICON.check}</span>
+    </button>`).join('');
+  pop.querySelectorAll('[data-set]').forEach(b => b.onclick = () => {
+    setStatus(doc, b.dataset.set); closePopover();
+  });
+  // position under the anchor, kept inside viewport
+  const r = anchor.getBoundingClientRect();
+  pop.classList.add('open');
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - pw - 12);
+  let top  = r.bottom + 6;
+  if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
+  pop.style.left = Math.max(12,left)+'px';
+  pop.style.top  = top+'px';
+}
+function closePopover(){ $('#statusPop').classList.remove('open'); popTarget=null; }
+
+function setStatus(doc, newStatus){
+  if (doc.status===newStatus) return;
+  doc.status = newStatus;
+  const s = statusById(newStatus);
+  if (doc.id==='cur'){ syncPageStatus(); }
+  state.flashId = doc.id;
+  renderAll();
+  toast(`Moved to “${s.label}”`, ICON.check);
+}
+
+/* =========================================================================
+   Capture card (current page)
+   ========================================================================= */
+function syncPageStatus(){
+  const s = statusById(CURRENT_PAGE.status);
+  const btn = $('#statusPageBtn');
+  btn.innerHTML = `<span class="sdot" style="width:8px;height:8px;border-radius:50%;background:${s.dot}"></span>${s.label}`;
+}
+function fileCurrentPage(){
+  if (CURRENT_PAGE.filed) return;
+  const p = PROJECTS.find(x=>x.id===state.activeId);
+  const newDoc = {
+    id:'cur', status:CURRENT_PAGE.status, section:CURRENT_PAGE.section, notes:CURRENT_PAGE.notes,
+    tags:[...CURRENT_PAGE.tags], authors:CURRENT_PAGE.authors, year:CURRENT_PAGE.year,
+    title:CURRENT_PAGE.title, journal:CURRENT_PAGE.journal, vol:CURRENT_PAGE.vol,
+    iss:CURRENT_PAGE.iss, pages:CURRENT_PAGE.pages, doi:CURRENT_PAGE.doi,
+  };
+  DOCS[state.activeId] = [newDoc, ...activeDocs()];
+  CURRENT_PAGE.filed = true;
+  const fb = $('#fileBtn');
+  fb.className = 'btn btn--filed';
+  fb.innerHTML = `${ICON.check} Filed to ${p.name.split(/[ —&]/)[0]} · ${CURRENT_PAGE.section}`;
+  fb.disabled = true;
+  state.flashId = 'cur';
+  renderAll();
+  toast(`Filed into ${p.name} → ${CURRENT_PAGE.section}`, ICON.check);
+}
+
+/* =========================================================================
+   Footer progress
+   ========================================================================= */
+let lastDone = 0;
+function countUp(node, to, total){
+  const from = lastDone; lastDone = to;
+  if (from === to || !window.requestAnimationFrame){ node.textContent = `${to}/${total} analysed`; return; }
+  let t0 = null;
+  const step = ts => {
+    if (t0 === null) t0 = ts;
+    const p = Math.min(1, (ts - t0) / 420);
+    const v = Math.round(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+    node.textContent = `${v}/${total} analysed`;
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function renderProgress(){
+  const docs = activeDocs();
+  const bar = $('#progBar');
+  bar.innerHTML = '';
+  const total = docs.length || 1;
+  STATUSES.forEach(s => {
+    const n = docs.filter(d=>d.status===s.id).length;
+    const seg = el('div','prog__seg');
+    seg.style.background = s.dot;
+    seg.style.flexGrow = String(n);
+    seg.style.opacity = n? '1':'0';
+    seg.title = `${s.label}: ${n}`;
+    bar.appendChild(seg);
+  });
+  const done = docs.filter(d=>d.status==='analysed'||d.status==='usedInOutput').length;
+  if (docs.length){ countUp($('#progVal'), done, docs.length); }
+  else { lastDone = 0; $('#progVal').textContent = 'no sources'; }
+  $('#totalCount').textContent = docs.length ? `${docs.length} sources` : '';
+  bar.setAttribute('aria-label', docs.length
+    ? 'Review progress: ' + STATUSES.map(s=>`${docs.filter(d=>d.status===s.id).length} ${s.label.toLowerCase()}`).join(', ')
+    : 'No sources yet');
+}
+
+/* =========================================================================
+   Toast
+   ========================================================================= */
+let toastTimer;
+function toast(msg, icon, code, isError){
+  const wrap = $('#toastWrap');
+  wrap.innerHTML = '';
+  const t = el('div','toast' + (isError ? ' toast--error' : ''));
+  t.setAttribute('role', isError ? 'alert' : 'status');
+  t.innerHTML = `${icon||ICON.check}<span>${msg}</span>${code?`<code>${code}</code>`:''}`;
+  wrap.appendChild(t);
+  requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),250); }, isError ? 3600 : 2600);
+}
+
+async function copyCite(kind, docId){
+  const doc = docId==='cur' ? CURRENT_PAGE : activeDocs().find(d=>d.id===docId);
+  if (!doc) return;
+  const text = kind==='inText' ? inText(doc) : biblio(doc);
+  try { await navigator.clipboard.writeText(text); }
+  catch(_){ toast('Couldn’t copy — clipboard blocked', ICON.warn, null, true); return; }
+  toast(kind==='inText'?'In-text citation copied':'Bibliography entry copied', ICON.copy,
+    text.length>44 ? text.slice(0,44)+'…' : text);
+}
+
+/* =========================================================================
+   Wire up
+   ========================================================================= */
+function renderAll(){
+  renderProjectMenu();
+  renderSegmented();
+  renderTags();
+  renderList();
+  renderProgress();
+}
+
+let loadT;
+function loadThen(delay=340){
+  state.loading = true;
+  renderAll();
+  clearTimeout(loadT);
+  loadT = setTimeout(() => { state.loading = false; renderAll(); }, delay);
+}
+
+function init(){
+  // switcher
+  $('#switchBtn').onclick = e => {
+    e.stopPropagation();
+    $('#projectMenu').classList.contains('open') ? closeMenu() : openMenu();
+  };
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.switch')) closeMenu();
+    if (!e.target.closest('.popover') && !e.target.closest('.status-btn')) closePopover();
+  });
+  window.addEventListener('scroll', closePopover, true);
+
+  // search
+  $('#searchInput').addEventListener('input', e => { state.search = e.target.value; renderList(); });
+
+  // capture card
+  $('#fileBtn').addEventListener('click', fileCurrentPage);
+  $('#statusPageBtn').addEventListener('click', e => { e.stopPropagation(); openStatusPopover(e.currentTarget, CURRENT_PAGE); });
+  $$('.cite-btn').forEach(b => b.onclick = () => copyCite(b.dataset.cite, b.dataset.doc));
+
+  // footer
+  $('#addSourceBtn').onclick = () => { $('#scrollBody').scrollTo({top:0,behavior:'smooth'}); toast('Use “File into project” to add the open page', ICON.file); };
+  $('#bibBtn').onclick = async () => {
+    const docs = activeDocs();
+    if (!docs.length){ toast('No sources to compile yet', ICON.file); return; }
+    const bib = docs.slice().sort((a,b)=>a.authors[0].f.localeCompare(b.authors[0].f)).map(biblio).join('\n\n');
+    try { await navigator.clipboard.writeText(bib); }
+    catch(_){ toast('Couldn’t copy — clipboard blocked', ICON.warn, null, true); return; }
+    toast(`Bibliography copied · ${docs.length} entries · APA 7th`, ICON.copy);
+  };
+  $('#dashboardBtn')?.addEventListener('click', ()=>{});
+  $('.iconbtn').addEventListener('click', ()=> toast('Opening full dashboard…', ICON.file));
+
+  // keyboard: "/" focuses search
+  document.addEventListener('keydown', e => {
+    if (e.key==='/' && document.activeElement.tagName!=='INPUT'){ e.preventDefault(); $('#searchInput').focus(); }
+    if (e.key==='Escape'){ closeMenu(); closePopover(); }
+  });
+
+  syncPageStatus();
+  loadThen(460);
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

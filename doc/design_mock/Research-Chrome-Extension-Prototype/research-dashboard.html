@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Notes — Dashboard</title>
+<style>
+  :root{
+    --bg:oklch(98% 0.004 95); --surface:oklch(100% 0.002 95); --surface-2:oklch(96.5% 0.005 95);
+    --fg:oklch(20% 0.018 70); --muted:oklch(45% 0.014 70); --border:oklch(90% 0.006 95);
+    --accent:oklch(52% 0.10 28); --accent-soft:oklch(52% 0.10 28 / 0.10);
+    --danger:oklch(53% 0.17 27); --success:oklch(52% 0.09 155);
+    --s-toread:oklch(62% 0.010 70); --s-inreview:oklch(68% 0.095 70);
+    --s-analysed:oklch(56% 0.070 155); --s-used:var(--accent);
+    --font-display:'Iowan Old Style','Charter',Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --ease:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+    --nav-w:236px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  html,body{height:100%}
+  body{font-family:var(--font-body);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+  /* ---- App shell ---- */
+  .app{display:grid;grid-template-columns:var(--nav-w) 1fr;height:100vh;overflow:hidden}
+
+  /* ---- Sidebar ---- */
+  .sidebar{background:var(--surface-2);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+  .side-head{padding:16px 16px 12px}
+  .wordmark{display:flex;align-items:center;gap:9px;font-family:var(--font-mono);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+  .wordmark .glyph{width:17px;height:17px;border:1.6px solid var(--accent);border-radius:3px;position:relative;flex:0 0 auto}
+  .wordmark .glyph::after{content:"";position:absolute;left:3px;right:3px;top:4.5px;height:1.6px;background:var(--accent);box-shadow:0 4px 0 var(--accent)}
+
+  .proj-switch{position:relative;margin:14px 12px 6px}
+  .proj-btn{width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;text-align:left;transition:border-color .12s}
+  .proj-btn:hover{border-color:oklch(82% 0.01 95)}
+  .proj-btn[aria-expanded="true"]{border-color:var(--fg)}
+  .proj-btn .spine{width:3px;align-self:stretch;border-radius:2px;background:var(--accent);flex:0 0 auto}
+  .proj-btn .pm{flex:1;min-width:0}
+  .proj-btn .pn{display:block;font-family:var(--font-display);font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proj-btn .ps{display:block;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proj-btn .chev{color:var(--muted);flex:0 0 auto;transition:transform .16s}
+  .proj-btn[aria-expanded="true"] .chev{transform:rotate(180deg)}
+  .proj-menu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 14px 34px -16px oklch(20% .02 70/.45);padding:5px;opacity:0;transform:translateY(-4px);pointer-events:none;transition:.13s}
+  .proj-menu.open{opacity:1;transform:none;pointer-events:auto}
+  .pmi{display:flex;align-items:center;gap:9px;width:100%;padding:8px;border:0;border-radius:7px;background:none;cursor:pointer;text-align:left;color:var(--fg)}
+  .pmi:hover{background:var(--surface-2)}
+  .pmi .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:0 0 auto}
+  .pmi.active .dot{background:var(--accent)}
+  .pmi .nm{flex:1;min-width:0;font-size:13.5px;font-weight:520;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pmi .ct{font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+  .pm-sep{height:1px;background:var(--border);margin:5px 4px}
+
+  .nav{padding:10px 12px;flex:1;overflow-y:auto}
+  .nav-lbl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:8px 8px 6px}
+  .nav-item{display:flex;align-items:center;gap:11px;width:100%;padding:8px 9px;border:0;border-radius:8px;background:none;cursor:pointer;color:var(--muted);text-align:left;font:inherit;font-size:13.5px;font-weight:510;letter-spacing:.005em;transition:background .12s,color .12s}
+  .nav-item:hover{background:var(--surface);color:var(--fg)}
+  .nav-item.active{background:var(--surface);color:var(--fg);box-shadow:inset 0 0 0 1px var(--border)}
+  .nav-item.active .ni-ico{color:var(--accent)}
+  .ni-ico{width:17px;height:17px;flex:0 0 auto;color:var(--muted)}
+  .nav-item .ni-ct{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted)}
+  .side-foot{padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);color:oklch(99% .01 95);display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;font-weight:600;flex:0 0 auto}
+  .side-foot .who{font-size:12px;line-height:1.3}
+  .side-foot .who b{font-weight:560;display:block}.side-foot .who span{color:var(--muted);font-size:10.5px}
+
+  /* ---- Main ---- */
+  .main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:16px;padding:15px 26px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .tb-titles{min-width:0}
+  .tb-title{font-family:var(--font-display);font-size:22px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .tb-sub{font-size:12.5px;color:var(--muted);margin-top:3px;letter-spacing:.005em}
+  .tb-actions{margin-left:auto;display:flex;gap:9px;flex-shrink:0}
+  .view{flex:1;overflow-y:auto;padding:24px 26px 40px;animation:fadeIn .2s var(--ease)}
+  .view::-webkit-scrollbar{width:11px}.view::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--bg)}
+
+  /* ---- Buttons ---- */
+  .btn{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--fg);padding:8px 13px;font-size:13px;font-weight:540;letter-spacing:.01em;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;transition:background .12s,border-color .12s,transform .06s}
+  .btn:hover{background:var(--surface-2);border-color:oklch(80% .01 95)}
+  .btn:active{transform:translateY(1px)}
+  .btn svg{width:15px;height:15px}
+  .btn--primary{background:var(--accent);border-color:var(--accent);color:oklch(99% .01 95);box-shadow:0 1px 0 oklch(42% .10 28),0 6px 14px -9px oklch(52% .10 28/.7)}
+  .btn--primary:hover{background:oklch(48% .10 28);border-color:oklch(48% .10 28)}
+  .btn--ghost{border-color:transparent;background:none;color:var(--muted)}.btn--ghost:hover{background:var(--surface-2);color:var(--fg)}
+  .btn--sm{min-height:30px;padding:5px 10px;font-size:12px}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  /* ---- Stat tiles ---- */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:26px}
+  .tile{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:16px 17px}
+  .tile .tl{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px}
+  .tile .tl .d{width:7px;height:7px;border-radius:50%}
+  .tile .tv{font-family:var(--font-display);font-size:38px;font-weight:600;letter-spacing:-.03em;line-height:1;margin-top:12px}
+  .tile .tsub{font-size:11.5px;color:var(--muted);margin-top:6px}
+
+  .sec-h{display:flex;align-items:center;gap:12px;margin:6px 0 14px}
+  .sec-h h2{font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-.01em}
+  .sec-h .ln{flex:1;height:1px;background:var(--border)}
+  .sec-h .cnt{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+  /* ---- Kanban ---- */
+  .kanban{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start}
+  .kcol{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:120px;transition:background .14s,border-color .14s}
+  .kcol.drop{background:var(--accent-soft);border-color:var(--accent)}
+  .kcol-h{display:flex;align-items:center;gap:8px;padding:5px 6px 10px}
+  .kcol-h .d{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+  .kcol-h .knm{font-size:12px;font-weight:600;letter-spacing:.01em}
+  .kcol-h .kct{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:1px 7px}
+  .kcards{display:flex;flex-direction:column;gap:9px;min-height:40px}
+  .kcard{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:11px;cursor:grab;animation:rowIn .3s var(--ease-out) both;transition:box-shadow .14s,border-color .14s,transform .1s}
+  .kcard:hover{border-color:oklch(82% .01 95);box-shadow:0 5px 16px -11px oklch(20% .02 70/.5)}
+  .kcard.dragging{opacity:.5;cursor:grabbing}
+  .kcard .kt{font-family:var(--font-display);font-weight:600;font-size:13.5px;line-height:1.25;letter-spacing:-.005em;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .kcard .km{font-size:11px;color:var(--muted);margin-top:5px}
+  .kcard .kf{display:flex;align-items:center;gap:6px;margin-top:9px}
+  .chip{font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--surface-2);color:var(--muted);border:1px solid var(--border)}
+  .chip--sec{color:var(--fg);border-color:oklch(84% .01 95)}
+  .kcard .kn{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+  .kcard .kn svg{width:11px;height:11px}
+  .kempty{font-size:11.5px;color:var(--muted);text-align:center;padding:16px 8px;border:1px dashed var(--border);border-radius:8px}
+
+  /* ---- Tables ---- */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .search{position:relative;flex:1;min-width:200px;max-width:380px}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted)}
+  .search input{width:100%;font:inherit;font-size:13px;padding:9px 12px 9px 33px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--fg);transition:border-color .12s}
+  .search input:focus{outline:none;border-color:var(--fg)}
+  .search input::placeholder{color:var(--muted)}
+  .filters{display:flex;gap:6px;flex-wrap:wrap}
+  .fchip{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.02em;min-height:30px;display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--muted);cursor:pointer;transition:.12s}
+  .fchip:hover{border-color:var(--fg);color:var(--fg)}
+  .fchip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+  .fchip .d{width:7px;height:7px;border-radius:50%}
+
+  .tbl{width:100%;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);border-collapse:separate;border-spacing:0}
+  .tbl th{text-align:left;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:500;padding:11px 14px;background:var(--surface-2);border-bottom:1px solid var(--border);white-space:nowrap}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--border);font-size:12.5px;vertical-align:top}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl tbody tr{transition:background .1s}.tbl tbody tr:hover{background:var(--surface-2)}
+  .tbl .ttl{font-family:var(--font-display);font-weight:600;font-size:13.5px;letter-spacing:-.005em;line-height:1.3;max-width:340px}
+  .tbl .sub{color:var(--muted);font-size:11.5px;margin-top:3px}
+  .mono{font-family:var(--font-mono);font-size:11px;letter-spacing:0;color:var(--muted)}
+  .tbl a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent}.tbl a:hover{border-color:var(--accent)}
+  .num{text-align:right;font-family:var(--font-mono);font-size:12px}
+
+  /* status pill */
+  .spill{display:inline-flex;align-items:center;gap:6px;min-height:24px;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;padding:3px 9px 3px 7px;border-radius:20px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);cursor:pointer;transition:border-color .12s,color .12s}
+  .spill:hover{border-color:var(--fg);color:var(--fg)}
+  .spill .d{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .stat-tag{display:inline-flex;align-items:center;min-height:22px;font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:2px 8px;border-radius:5px;border:1px solid var(--border);color:var(--muted)}
+  .stat-tag.ok{color:var(--success);border-color:oklch(80% .06 155)}
+  .stat-tag.rej{color:var(--danger);border-color:oklch(82% .09 27)}
+  .stat-tag.rep{color:var(--accent);border-color:oklch(80% .08 28)}
+
+  /* ---- Annotations ---- */
+  .anno{border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:15px 16px;margin-bottom:11px;animation:rowIn .3s var(--ease-out) both}
+  .anno-top{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+  .anno-anchor{font-family:var(--font-mono);font-size:10px;letter-spacing:.04em;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:5px;padding:2px 7px;flex:0 0 auto}
+  .anno-src{font-size:11.5px;color:var(--muted);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .anno-body{font-size:14px;line-height:1.5;color:var(--fg);border-left:2px solid var(--border);padding-left:13px;margin:2px 0 11px}
+  .anno-foot{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+
+  /* ---- Citation styles ---- */
+  .styles-grid{display:grid;grid-template-columns:260px 1fr;gap:22px;align-items:start}
+  .style-list{display:flex;flex-direction:column;gap:9px}
+  .style-card{border:1px solid var(--border);border-radius:11px;background:var(--surface);padding:13px 14px;cursor:pointer;text-align:left;font:inherit;transition:border-color .12s,background .12s}
+  .style-card:hover{border-color:oklch(82% .01 95)}
+  .style-card.sel{border-color:var(--fg);background:var(--surface)}
+  .style-card .snm{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .style-card .sb{font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+  .editor{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:22px}
+  .ed-row{display:flex;align-items:center;gap:16px;padding:14px 0;border-bottom:1px solid var(--border)}
+  .ed-row:last-of-type{border-bottom:0}
+  .ed-lbl{flex:1}.ed-lbl b{font-size:13.5px;font-weight:560;display:block}.ed-lbl span{font-size:11.5px;color:var(--muted);display:block;margin-top:2px}
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px}
+  .seg button{font:inherit;font-size:12px;font-weight:520;border:0;background:none;color:var(--muted);cursor:pointer;padding:6px 13px;border-radius:6px;min-height:30px}
+  .seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px oklch(20% .02 70/.1)}
+  .sw{position:relative;width:42px;height:24px;border-radius:20px;background:var(--border);border:0;cursor:pointer;transition:background .16s;flex:0 0 auto}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px oklch(20% .02 70/.4);transition:transform .16s var(--ease)}
+  .sw[aria-checked="true"]{background:var(--accent)}.sw[aria-checked="true"]::after{transform:translateX(18px)}
+  .stepper{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .stepper button{width:32px;height:32px;border:0;background:var(--surface);color:var(--fg);cursor:pointer;font-size:16px;line-height:1}.stepper button:hover{background:var(--surface-2)}
+  .stepper .val{min-width:34px;text-align:center;font-family:var(--font-mono);font-size:13px;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:6px 0}
+  .preview{margin-top:20px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .preview .pl{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+  .preview .pv{font-family:var(--font-display);font-size:14.5px;line-height:1.55;color:var(--fg)}
+  .preview .pv + .pl{margin-top:16px}
+  .preview .intxt{font-family:var(--font-mono);font-size:13px;color:var(--fg)}
+  .preview .pex{padding:14px 0;border-top:1px solid var(--border)}
+  .preview .pex:first-of-type{border-top:0;padding-top:4px}
+  .preview .pex-l{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+  .preview .pex .intxt{margin-bottom:7px}
+
+  /* ---- Empty ---- */
+  .empty{text-align:center;padding:60px 24px;color:var(--muted)}
+  .empty .em{width:46px;height:46px;margin:0 auto 16px;border:1.6px dashed var(--border);border-radius:11px;display:grid;place-items:center}
+  .empty .et{font-family:var(--font-display);font-size:18px;color:var(--fg);margin-bottom:7px}
+  .empty .ed{font-size:13px;line-height:1.55;max-width:34ch;margin:0 auto 18px}
+
+  /* ---- Popover / toast ---- */
+  .popover{position:fixed;z-index:60;background:var(--surface);border:1px solid var(--border);border-radius:9px;box-shadow:0 16px 38px -16px oklch(20% .02 70/.5);padding:5px;min-width:180px;opacity:0;transform:scale(.97);pointer-events:none;transition:.1s}
+  .popover.open{opacity:1;transform:none;pointer-events:auto}
+  .popover .pl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:6px 8px 4px}
+  .popover button.pi{display:flex;align-items:center;gap:9px;width:100%;padding:8px;border:0;border-radius:6px;background:none;cursor:pointer;text-align:left;color:var(--fg);font:inherit;font-size:13px}
+  .popover button.pi:hover{background:var(--surface-2)}
+  .popover .pi .d{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .popover .pi .ck{margin-left:auto;color:var(--accent);opacity:0}.popover .pi.cur .ck{opacity:1}
+  .toast-wrap{position:fixed;bottom:20px;left:var(--nav-w);right:0;display:flex;flex-direction:column;align-items:center;gap:8px;z-index:90;pointer-events:none}
+  .toast{background:var(--fg);color:var(--bg);font-size:12.5px;padding:10px 15px;border-radius:9px;box-shadow:0 12px 26px -12px oklch(20% .02 70/.6);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(10px);transition:.2s;max-width:420px}
+  .toast.show{opacity:1;transform:none}.toast svg{width:15px;height:15px;flex:0 0 auto}
+  .toast--error{background:var(--danger);color:oklch(99% .01 25)}
+  .toast code{font-family:var(--font-mono);font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* ---- Select ---- */
+  .sel{font:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--fg);cursor:pointer;min-height:36px}
+  .sel:focus{outline:none;border-color:var(--fg)}
+
+  /* ---- Capture modal ---- */
+  .modal-scrim{position:fixed;inset:0;background:oklch(20% .02 70/.42);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
+  .modal-scrim.open{display:flex;animation:fadeIn .15s}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 30px 70px -30px oklch(20% .02 70/.6);width:100%;max-width:470px;padding:22px;animation:rowIn .22s var(--ease-out)}
+  .cap-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .cap-kick{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .cap-type{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+  .cap-title{font-family:var(--font-display);font-weight:600;font-size:18px;line-height:1.25;letter-spacing:-.01em;margin:6px 0}
+  .cap-meta{font-size:12.5px;color:var(--muted);line-height:1.45}
+  .cap-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:18px 0}
+  .fld{display:flex;flex-direction:column;gap:6px}
+  .fld span{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .cap-actions{display:flex;gap:9px;justify-content:flex-end}
+
+  /* ---- Members ---- */
+  .mem-row{display:flex;align-items:center;gap:14px;padding:13px 16px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:10px;animation:rowIn .3s var(--ease-out) both}
+  .mem-av{width:38px;height:38px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;font-family:var(--font-mono);font-size:12px;font-weight:600;flex:0 0 auto}
+  .mem-info{flex:1;min-width:0}
+  .mem-info .mn{font-size:14px;font-weight:550;display:flex;align-items:center;gap:8px}
+  .mem-info .ms{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .role-fixed{font-family:var(--font-mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:6px;padding:6px 11px;flex:0 0 auto}
+  .invite{display:flex;gap:10px;align-items:center;margin:18px 0 16px;flex-wrap:wrap}
+  .perm-note{font-size:12.5px;color:var(--muted);line-height:1.7;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px}
+  .perm-note b{color:var(--fg);font-weight:560}
+
+  /* ---- Responsive ---- */
+  @media (max-width:1080px){.kanban{grid-template-columns:repeat(2,1fr)}}
+  @media (max-width:880px){
+    :root{--nav-w:0px}
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;left:0;top:0;bottom:0;width:236px;z-index:80;transform:translateX(-100%);transition:transform .2s var(--ease)}
+    .sidebar.open{transform:none}
+    .scrim{position:fixed;inset:0;background:oklch(20% .02 70/.35);z-index:70;opacity:0;pointer-events:none;transition:.2s}
+    .scrim.on{opacity:1;pointer-events:auto}
+    .menu-toggle{display:inline-flex!important}
+    .toast-wrap{left:0}
+    .styles-grid{grid-template-columns:1fr}
+    .kanban{grid-template-columns:1fr}
+  }
+  .menu-toggle{display:none}
+  @media (max-width:560px){.stats{grid-template-columns:1fr 1fr}.view{padding:18px 16px 40px}.topbar{padding:13px 16px}}
+</style>
+</head>
+<body>
+  <div class="app" data-od-id="dashboard">
+
+    <!-- ============ SIDEBAR ============ -->
+    <aside class="sidebar" id="sidebar" data-od-id="sidebar">
+      <div class="side-head">
+        <div class="wordmark"><span class="glyph"></span>Context&nbsp;Notes</div>
+      </div>
+
+      <div class="proj-switch" data-od-id="project-switcher">
+        <button class="proj-btn" id="projBtn" aria-expanded="false" aria-haspopup="menu">
+          <span class="spine"></span>
+          <span class="pm"><span class="pn" id="pName">Urban Heat &amp; Mortality</span><span class="ps" id="pSub">Systematic review</span></span>
+          <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <div class="proj-menu" id="projMenu" role="menu"></div>
+      </div>
+
+      <nav class="nav" id="nav" aria-label="Sections"></nav>
+
+      <div class="side-foot">
+        <div class="avatar">TL</div>
+        <div class="who"><b>You</b><span>Owner</span></div>
+      </div>
+    </aside>
+
+    <!-- ============ MAIN ============ -->
+    <div class="main">
+      <header class="topbar">
+        <button class="btn btn--ghost btn--sm menu-toggle" id="menuToggle" aria-label="Open navigation">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+        </button>
+        <div class="tb-titles">
+          <div class="tb-title" id="viewTitle">Overview</div>
+          <div class="tb-sub" id="viewSub">Project workspace</div>
+        </div>
+        <div class="tb-actions" id="viewActions"></div>
+      </header>
+      <main class="view" id="view" tabindex="-1"></main>
+    </div>
+  </div>
+
+  <div class="modal-scrim" id="capScrim"><div class="modal" id="capModal" role="dialog" aria-modal="true" aria-label="Capture source"></div></div>
+  <div class="scrim" id="scrim"></div>
+  <div class="popover" id="pop"></div>
+  <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<script>
+/* ================= Model (mirrors data-model.md) ================= */
+const STATUSES=[
+  {id:'toRead',label:'To read',dot:'var(--s-toread)'},
+  {id:'inReview',label:'In review',dot:'var(--s-inreview)'},
+  {id:'analysed',label:'Analysed',dot:'var(--s-analysed)'},
+  {id:'usedInOutput',label:'Used in output',dot:'var(--s-used)'},
+];
+const sBy=id=>STATUSES.find(s=>s.id===id);
+
+const PROJECTS=[
+  {id:'p1',name:'Urban Heat & Mortality',sub:'Systematic review',style:'APA 7th',
+   sections:['Literature','Methods','Data','Report'],
+   members:[{n:'You',i:'TL',role:'Owner'},{n:'M. Okafor',i:'MO',role:'Editor'},{n:'L. Reyes',i:'LR',role:'Viewer'}]},
+  {id:'p2',name:'FOI — Air Quality Monitoring',sub:'Investigation',style:'Chicago 17th',
+   sections:['FOI','Evidence','Report'],members:[{n:'You',i:'TL',role:'Owner'}]},
+  {id:'p3',name:'Misinformation & Public Trust',sub:'Essay',style:'Harvard',
+   sections:['Literature','Argument'],members:[{n:'You',i:'TL',role:'Owner'}]},
+];
+
+const DOCS={p1:[
+  {id:'d1',status:'analysed',section:'Literature',notes:6,tags:['foundational','heat-island'],
+   authors:[{f:'Oke',g:'T. R.'}],year:1982,title:'The energetic basis of the urban heat island',
+   journal:'Quarterly Journal of the Royal Meteorological Society',vol:'108',iss:'455',pages:'1–24',doi:'10.1002/qj.49710845502',src:'extractedFromPage',usedIn:['Report §2']},
+  {id:'d2',status:'inReview',section:'Data',notes:3,tags:['mortality','multi-country'],
+   authors:[{f:'Gasparrini',g:'A.'},{f:'Guo',g:'Y.'},{f:'Hashizume',g:'M.'},{f:'Lavigne',g:'E.'}],year:2015,
+   title:'Mortality risk attributable to high and low ambient temperature: a multicountry observational study',
+   journal:'The Lancet',vol:'386',iss:'9991',pages:'369–375',doi:'10.1016/S0140-6736(14)62114-0',src:'importedFromZotero',usedIn:[]},
+  {id:'d3',status:'toRead',section:'Literature',notes:0,tags:['urban-form','vulnerability'],
+   authors:[{f:'Stone',g:'B.'},{f:'Hess',g:'J. J.'},{f:'Frumkin',g:'H.'}],year:2010,
+   title:'Urban form and extreme heat events: are sprawling cities more vulnerable to climate change than compact cities?',
+   journal:'Environmental Health Perspectives',vol:'118',iss:'10',pages:'1425–1428',doi:'10.1289/ehp.0901879',src:'extractedFromPage',usedIn:[]},
+  {id:'d4',status:'analysed',section:'Literature',notes:4,tags:['review','health'],
+   authors:[{f:'Heaviside',g:'C.'},{f:'Macintyre',g:'H.'},{f:'Vardoulakis',g:'S.'}],year:2017,
+   title:'The urban heat island: implications for health in a changing environment',
+   journal:'Current Environmental Health Reports',vol:'4',iss:'3',pages:'296–305',doi:'10.1007/s40572-017-0150-3',src:'extractedFromPage',usedIn:['Report §1']},
+  {id:'d5',status:'usedInOutput',section:'Methods',notes:5,tags:['climate','modelling'],
+   authors:[{f:'Zhao',g:'L.'},{f:'Lee',g:'X.'},{f:'Smith',g:'R. B.'},{f:'Oleson',g:'K.'}],year:2014,
+   title:'Strong contributions of local background climate to urban heat islands',
+   journal:'Nature',vol:'511',iss:'7508',pages:'216–219',doi:'10.1038/nature13462',src:'manual',usedIn:['Report §3','Methods']},
+],p2:[],p3:[]};
+
+const ANNOS={p1:[
+  {id:'a1',docId:'d1',anchor:'Fig. 4 · p. 12',content:'Canyon geometry (H/W ratio) is the dominant control on nocturnal UHI intensity — use as the framing for the methods section.',tags:['heat-island','methods'],status:'accepted'},
+  {id:'a2',docId:'d2',anchor:'Table 2 · p. 371',content:'Attributable fraction: heat 0.42% vs cold 7.29%. Heat burden is smaller than the public narrative assumes — flag for the discussion.',tags:['mortality'],status:'includedInReport'},
+  {id:'a3',docId:'d4',anchor:'§3.2 · p. 299',content:'Good synthesis of adaptation vs mitigation trade-offs; borrow the intervention taxonomy.',tags:['review','health'],status:'accepted'},
+  {id:'a4',docId:'d5',anchor:'Fig. 2 · p. 217',content:'Background climate explains ~30% of inter-city UHI variance — check whether our sample matches their humid/arid split.',tags:['modelling'],status:'draft'},
+  {id:'a5',docId:'d2',anchor:'Methods · p. 370',content:'DLNM lag structure differs from ours (21 days vs our 14). Reconcile before pooling estimates.',tags:['methods','mortality'],status:'draft'},
+  {id:'a6',docId:'d1',anchor:'Intro · p. 2',content:'Original 1982 definition still cited verbatim — note as the canonical source, not for quantitative claims.',tags:['foundational'],status:'rejected'},
+]};
+
+const ASTAT={draft:{l:'Draft',c:''},accepted:{l:'Accepted',c:'ok'},rejected:{l:'Rejected',c:'rej'},includedInReport:{l:'In report',c:'rep'}};
+const SRC={extractedFromPage:'Extracted',importedFromZotero:'Zotero',manual:'Manual'};
+
+const CITE_STYLES=[
+  {id:'apa',name:'APA 7th',base:'apa',system:'authorDate',maxAuthors:3,etAl:true,doi:true,url:false},
+  {id:'chicago',name:'Chicago 17th',base:'chicago-note',system:'footnote',maxAuthors:3,etAl:true,doi:true,url:false},
+  {id:'harvard',name:'Harvard — Inst. X',base:'harvard',system:'authorDate',maxAuthors:6,etAl:true,doi:false,url:true},
+];
+
+/* ================= State ================= */
+const state={pid:'p1',route:'overview',q:'',annoStatus:'all',docStatus:'all',styleId:'apa',flash:null,drag:null};
+const project=()=>PROJECTS.find(p=>p.id===state.pid);
+const docs=()=>DOCS[state.pid]||[];
+const annos=()=>ANNOS[state.pid]||[];
+const docById=id=>docs().find(d=>d.id===id);
+
+/* ================= Helpers ================= */
+const $=(s,r=document)=>r.querySelector(s);
+const $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const who=a=>a.length===1?a[0].f:a.length===2?`${a[0].f} & ${a[1].f}`:`${a[0].f} et al.`;
+const ICON={
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>',
+  note:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>',
+  ext:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+};
+const NAV=[
+  {id:'overview',label:'Overview',ct:d=>'',ico:'<path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/>'},
+  {id:'documents',label:'Documents',ct:d=>d.length,ico:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>'},
+  {id:'annotations',label:'Annotations',ct:d=>annos().length,ico:'<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>'},
+  {id:'references',label:'References',ct:d=>d.length,ico:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>'},
+  {id:'styles',label:'Citation styles',ct:d=>CITE_STYLES.length,ico:'<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'},
+  {id:'members',label:'Team',ct:d=>project().members.length,ico:'<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><path d="M16 3.6a4 4 0 0 1 0 6.8M22 21v-2a4 4 0 0 0-3-3.9"/>'},
+];
+
+/* ================= Citation formatter ================= */
+function formatCite(ref,st){
+  const a=ref.authors,max=st.maxAuthors,trunc=st.etAl&&a.length>max;
+  let inText;
+  if(st.system==='footnote') inText='¹ (footnote)';
+  else if(a.length===1) inText=`(${a[0].f}, ${ref.year})`;
+  else if(a.length===2) inText=`(${a[0].f} & ${a[1].f}, ${ref.year})`;
+  else inText=`(${(trunc?[a[0].f,'et al.']:a.map(x=>x.f)).join(trunc?' ':', ')}, ${ref.year})`;
+  const doi=st.doi?` https://doi.org/${ref.doi}`:'';
+  const url=st.url&&!st.doi?` Retrieved from journal site.`:'';
+  const iss=ref.iss?`(${ref.iss})`:'';
+  let biblio;
+  if(st.system==='footnote'){
+    const names=(trunc?a.slice(0,max):a).map(p=>`${p.g} ${p.f}`).join(', ')+(trunc?', et al.':'');
+    biblio=`¹ ${names}, “${ref.title},” ${ref.journal} ${ref.vol}, no. ${ref.iss} (${ref.year}): ${ref.pages}.${doi}`;
+  }else{
+    const names=(trunc?a.slice(0,max):a).map(p=>`${p.f}, ${p.g}`).join(', ')+(trunc?', et al.':'');
+    biblio=`${names} (${ref.year}). ${ref.title}. ${ref.journal}, ${ref.vol}${iss}, ${ref.pages}.${doi}${url}`;
+  }
+  return {inText,biblio};
+}
+
+/* ================= Sidebar ================= */
+function renderNav(){
+  const nav=$('#nav'); const d=docs();
+  nav.innerHTML=`<div class="nav-lbl">Workspace</div>`+NAV.map(n=>{
+    const ct=n.ct(d); const active=state.route===n.id;
+    return `<button class="nav-item${active?' active':''}" data-route="${n.id}" ${active?'aria-current="page"':''}>
+      <svg class="ni-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${n.ico}</svg>
+      <span>${n.label}</span>${ct!==''?`<span class="ni-ct">${ct}</span>`:''}</button>`;
+  }).join('');
+  $$('#nav .nav-item').forEach(b=>b.onclick=()=>{go(b.dataset.route);closeSidebar();});
+}
+function renderProjMenu(){
+  const m=$('#projMenu');
+  m.innerHTML=PROJECTS.map(p=>`<button class="pmi${p.id===state.pid?' active':''}" role="menuitem" data-p="${p.id}">
+    <span class="dot"></span><span class="nm">${esc(p.name)}</span><span class="ct">${(DOCS[p.id]||[]).length} src</span></button>`).join('')
+    +`<div class="pm-sep"></div><button class="pmi" data-new="1"><span class="dot" style="background:var(--accent)"></span><span class="nm" style="color:var(--accent);font-weight:560">New project…</span></button>`;
+  $$('#projMenu [data-p]').forEach(b=>b.onclick=()=>{switchProject(b.dataset.p);toggleProjMenu(false);});
+  $('#projMenu [data-new]').onclick=()=>{toggleProjMenu(false);toast('Projects are created here — opening the new-project form…');};
+}
+function switchProject(id){
+  state.pid=id;state.q='';state.annoStatus='all';state.docStatus='all';
+  const p=project(); $('#pName').textContent=p.name; $('#pSub').textContent=p.sub;
+  render();
+}
+function toggleProjMenu(on){const m=$('#projMenu'),b=$('#projBtn');const o=on??!m.classList.contains('open');m.classList.toggle('open',o);b.setAttribute('aria-expanded',String(o));}
+
+/* ================= Router ================= */
+const TITLES={overview:['Overview','Project workspace'],documents:['Documents','Sources in this project'],annotations:['Annotations','Notes across the project'],references:['References','Bibliographic records'],styles:['Citation styles','Style profiles & rules'],members:['Team','People & roles']};
+function go(route){state.route=route;render();$('#view').scrollTop=0;}
+function render(){
+  renderProjMenu();renderNav();
+  const [t,s]=TITLES[state.route]; $('#viewTitle').textContent=t; $('#viewSub').textContent=`${project().name} · ${s}`;
+  const view=$('#view'),act=$('#viewActions');
+  ({overview:renderOverview,documents:renderDocuments,annotations:renderAnnotations,references:renderReferences,styles:renderStyles,members:renderMembers}[state.route])(view,act);
+}
+
+/* ================= Overview + Kanban ================= */
+function renderOverview(view,act){
+  act.innerHTML=`<button class="btn btn--sm" id="aExport">${ICON.down} Export bibliography</button><button class="btn btn--primary btn--sm" id="aAdd">${ICON.plus} Add source</button>`;
+  const p=project(),d=docs();
+  const c=Object.fromEntries(STATUSES.map(s=>[s.id,d.filter(x=>x.status===s.id).length]));
+  const done=c.analysed+c.usedInOutput;
+  view.innerHTML=`
+    <div class="stats">
+      <div class="tile"><div class="tl">Sources</div><div class="tv">${d.length}</div><div class="tsub">${p.sections.length} sections · ${p.members.length} member${p.members.length>1?'s':''}</div></div>
+      <div class="tile"><div class="tl"><span class="d" style="background:var(--s-analysed)"></span>Analysed</div><div class="tv">${done}</div><div class="tsub">${d.length?Math.round(done/d.length*100):0}% of the corpus reviewed</div></div>
+      <div class="tile"><div class="tl">${ICON.note.replace('<svg','<svg style="width:11px;height:11px;color:var(--muted)"')} Annotations</div><div class="tv">${annos().length}</div><div class="tsub">${annos().filter(a=>a.status==='includedInReport').length} included in the report</div></div>
+      <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${p.style.split(' ')[0]}</div><div class="tsub">${p.style} · ${p.members.map(m=>m.i).join(' · ')}</div></div>
+    </div>
+    <div class="sec-h"><h2>Workflow</h2><span class="ln"></span><span class="cnt">drag · or focus a card and press ← →</span></div>
+    <div class="kanban" id="kanban"></div>`;
+  $('#aAdd').onclick=openCapture;
+  $('#aExport').onclick=exportBib;
+  renderKanban();
+}
+function renderKanban(){
+  const board=$('#kanban');if(!board)return;
+  const d=docs();
+  board.innerHTML=STATUSES.map(s=>{
+    const items=d.filter(x=>x.status===s.id);
+    return `<section class="kcol" data-col="${s.id}" aria-label="${s.label}">
+      <div class="kcol-h"><span class="d" style="background:${s.dot}"></span><span class="knm">${s.label}</span><span class="kct">${items.length}</span></div>
+      <div class="kcards" data-drop="${s.id}" role="list">${items.map(kanbanCard).join('')||`<div class="kempty">Drop a source here</div>`}</div>
+    </section>`;
+  }).join('');
+  $$('#kanban .kcard').forEach(el=>{
+    el.addEventListener('dragstart',e=>{state.drag=el.dataset.id;el.classList.add('dragging');e.dataTransfer.effectAllowed='move';});
+    el.addEventListener('dragend',()=>{el.classList.remove('dragging');state.drag=null;$$('.kcol').forEach(c=>c.classList.remove('drop'));});
+    el.querySelector('.spill').addEventListener('click',e=>{e.stopPropagation();openStatusPop(e.currentTarget,docById(el.dataset.id));});
+    el.addEventListener('keydown',e=>{
+      if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft'&&e.key!=='Enter')return;
+      e.preventDefault();
+      const id=el.dataset.id,doc=docById(id);
+      if(e.key==='Enter'){openStatusPop(el.querySelector('.spill'),doc);return;}
+      const cur=STATUSES.findIndex(s=>s.id===doc.status);
+      const ni=e.key==='ArrowRight'?Math.min(STATUSES.length-1,cur+1):Math.max(0,cur-1);
+      if(ni===cur)return;
+      setStatus(doc,STATUSES[ni].id);
+      requestAnimationFrame(()=>{const c=document.querySelector('#kanban .kcard[data-id="'+id+'"]');if(c)c.focus();});
+    });
+  });
+  $$('#kanban .kcol').forEach(col=>{
+    const zone=col.querySelector('[data-drop]');
+    col.addEventListener('dragover',e=>{e.preventDefault();col.classList.add('drop');});
+    col.addEventListener('dragleave',e=>{if(!col.contains(e.relatedTarget))col.classList.remove('drop');});
+    col.addEventListener('drop',e=>{e.preventDefault();col.classList.remove('drop');const id=state.drag;if(id)setStatus(docById(id),zone.dataset.drop);});
+  });
+}
+function kanbanCard(d){
+  const s=sBy(d.status);
+  return `<article class="kcard${state.flash===d.id?' flash':''}" draggable="true" data-id="${d.id}" tabindex="0" role="listitem" aria-label="${esc(d.title)} — ${s.label}. Arrow keys move between stages, Enter to change status.">
+    <div class="kt">${esc(d.title)}</div>
+    <div class="km">${esc(who(d.authors))} · ${d.year}</div>
+    <div class="kf">
+      <button class="spill" aria-label="Change status"><span class="d" style="background:${s.dot}"></span>${s.label}</button>
+      <span class="chip chip--sec">${d.section}</span>
+      ${d.notes?`<span class="kn">${ICON.note}${d.notes}</span>`:''}
+    </div></article>`;
+}
+
+/* ================= Documents ================= */
+function renderDocuments(view,act){
+  act.innerHTML=`<button class="btn btn--primary btn--sm" id="aAdd">${ICON.plus} Add source</button>`;
+  $('#aAdd').onclick=openCapture;
+  if(!docs().length)return void(view.innerHTML=emptyState('No documents yet','Sources you capture with the extension appear here, grouped by status and section.'));
+  view.innerHTML=`
+    <div class="toolbar">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" placeholder="Search title, author, DOI…" value="${esc(state.q)}" aria-label="Search documents"></div>
+      <div class="filters" id="dfilters"></div>
+    </div>
+    <div id="dtbl"></div>`;
+  $('#q').addEventListener('input',e=>{state.q=e.target.value;drawDocs();});
+  drawFilters('#dfilters','docStatus',()=>drawDocs());
+  drawDocs();
+}
+function drawDocs(){
+  const q=state.q.trim().toLowerCase();
+  const rows=docs().filter(d=>(state.docStatus==='all'||d.status===state.docStatus)&&(!q||(d.title+' '+d.authors.map(a=>a.f).join(' ')+' '+d.doi).toLowerCase().includes(q)));
+  const box=$('#dtbl');
+  if(!rows.length)return void(box.innerHTML=`<div class="empty" style="padding:40px"><div class="et">Nothing matches</div><div class="ed">Clear the search or status filter.</div></div>`);
+  box.innerHTML=`<table class="tbl"><thead><tr><th>Source</th><th>Section</th><th>Status</th><th class="num">Notes</th><th></th></tr></thead><tbody>${rows.map(d=>{
+    const s=sBy(d.status);
+    return `<tr data-id="${d.id}">
+      <td><div class="ttl">${esc(d.title)}</div><div class="sub">${esc(who(d.authors))} · ${d.year} · ${esc(d.journal)}</div></td>
+      <td><span class="chip chip--sec">${d.section}</span></td>
+      <td><button class="spill" aria-label="Change status"><span class="d" style="background:${s.dot}"></span>${s.label}</button></td>
+      <td class="num">${d.notes||'—'}</td>
+      <td><a href="https://doi.org/${d.doi}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a></td></tr>`;
+  }).join('')}</tbody></table>`;
+  $$('#dtbl .spill').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();openStatusPop(e.currentTarget,docById(b.closest('tr').dataset.id));}));
+}
+
+/* ================= Annotations ================= */
+function renderAnnotations(view,act){
+  act.innerHTML='';
+  if(!annos().length)return void(view.innerHTML=emptyState('No annotations yet','Highlight passages on a page with the extension and your notes collect here.'));
+  view.innerHTML=`<div class="toolbar">
+      <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qa" placeholder="Search notes, tags…" value="${esc(state.q)}" aria-label="Search annotations"></div>
+      <div class="filters" id="afilters"></div></div>
+    <div id="alist"></div>`;
+  $('#qa').addEventListener('input',e=>{state.q=e.target.value;drawAnnos();});
+  const f=$('#afilters');
+  const opts=[['all','All'],['draft','Draft'],['accepted','Accepted'],['includedInReport','In report'],['rejected','Rejected']];
+  f.innerHTML=opts.map(([v,l])=>`<button class="fchip" data-v="${v}" aria-pressed="${state.annoStatus===v}">${l}</button>`).join('');
+  $$('#afilters .fchip').forEach(b=>b.onclick=()=>{state.annoStatus=b.dataset.v;$$('#afilters .fchip').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===state.annoStatus)));drawAnnos();});
+  drawAnnos();
+}
+function drawAnnos(){
+  const q=state.q.trim().toLowerCase();
+  const rows=annos().filter(a=>(state.annoStatus==='all'||a.status===state.annoStatus)&&(!q||(a.content+' '+a.tags.join(' ')).toLowerCase().includes(q)));
+  const box=$('#alist');
+  if(!rows.length)return void(box.innerHTML=`<div class="empty" style="padding:40px"><div class="et">No annotations match</div><div class="ed">Try another tag or status.</div></div>`);
+  box.innerHTML=rows.map(a=>{
+    const d=docById(a.docId),st=ASTAT[a.status];
+    return `<article class="anno" data-od-id="anno-${a.id}">
+      <div class="anno-top"><span class="anno-anchor">${esc(a.anchor)}</span><span class="anno-src">${d?esc(who(d.authors)+' · '+d.year+' · '+d.journal):''}</span></div>
+      <div class="anno-body">${esc(a.content)}</div>
+      <div class="anno-foot">
+        <span class="stat-tag ${st.c}">${st.l}</span>
+        ${a.tags.map(t=>`<span class="chip">#${t}</span>`).join('')}
+        <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-cite="${a.docId}">${ICON.copy} Cite</button>
+      </div></article>`;
+  }).join('');
+  $$('#alist [data-cite]').forEach(b=>b.onclick=()=>copyCite(b.dataset.cite));
+}
+
+/* ================= References ================= */
+function renderReferences(view,act){
+  act.innerHTML=`<button class="btn btn--sm" id="rImp">${ICON.up} Import</button><button class="btn btn--sm" id="rExp">${ICON.down} Export</button>`;
+  $('#rImp').onclick=()=>openImport($('#rImp'));
+  $('#rExp').onclick=exportBib;
+  if(!docs().length)return void(view.innerHTML=emptyState('No references yet','Bibliographic records are created automatically when you capture a source.'));
+  view.innerHTML=`<table class="tbl"><thead><tr><th>Reference</th><th>Type</th><th>Origin</th><th>Used in</th><th></th></tr></thead><tbody>${docs().map(d=>`
+    <tr><td><div class="ttl">${esc(d.title)}</div><div class="sub">${esc(who(d.authors))} (${d.year}). ${esc(d.journal)}${d.vol?`, ${d.vol}${d.iss?`(${d.iss})`:''}`:''}${d.pages?`, ${d.pages}`:''}.</div>${d.doi?`<div class="mono" style="margin-top:4px">doi:${d.doi}</div>`:''}</td>
+      <td><span class="chip chip--sec">Article</span></td>
+      <td><span class="stat-tag">${SRC[d.src]}</span></td>
+      <td>${d.usedIn.length?d.usedIn.map(u=>`<span class="chip">${esc(u)}</span>`).join(' '):'<span class="mono">—</span>'}</td>
+      <td><button class="btn btn--ghost btn--sm" data-cite="${d.id}" aria-label="Copy citation">${ICON.copy}</button></td></tr>`).join('')}</tbody></table>`;
+  $$('#view [data-cite]').forEach(b=>b.onclick=()=>copyCite(b.dataset.cite));
+}
+function openImport(anchor){
+  const pop=$('#pop');
+  pop.innerHTML=`<div class="pl">Import from</div>`+['Zotero library','BibTeX (.bib) file','RIS (.ris) file','DOI / identifier'].map(x=>`<button class="pi" data-imp="${x}"><span>${x}</span></button>`).join('');
+  $$('#pop [data-imp]').forEach(b=>b.onclick=()=>{closePop();toast('Import from '+b.dataset.imp+' — mapping fields to CSL…');});
+  placePop(anchor);
+}
+
+/* ================= Citation styles ================= */
+function renderStyles(view,act){
+  act.innerHTML=`<a class="btn btn--sm" href="citation-style-editor.html" style="text-decoration:none">Open full editor</a><button class="btn btn--primary btn--sm" id="sSave">${ICON.check} Save profile</button>`;
+  view.innerHTML=`<div class="styles-grid">
+    <div><div class="sec-h" style="margin-top:0"><h2 style="font-size:14px">Profiles</h2></div>
+      <div class="style-list" id="slist"></div>
+      <button class="btn btn--sm" style="margin-top:11px;width:100%" id="sNew">${ICON.plus} New style</button></div>
+    <div><div class="editor" id="editor"></div></div>
+  </div>`;
+  $('#sSave').onclick=()=>toast('Style profile saved · rules translated to CSL overrides');
+  $('#sNew').onclick=()=>toast('New style — pick a base CSL style to fork');
+  drawStyleList();drawEditor();
+}
+function drawStyleList(){
+  $('#slist').innerHTML=CITE_STYLES.map(s=>`<button class="style-card${s.id===state.styleId?' sel':''}" data-s="${s.id}">
+    <div class="snm">${s.name}</div><div class="sb">${s.system==='footnote'?'Footnote':'Author–date'} · base ${s.base}</div></button>`).join('');
+  $$('#slist [data-s]').forEach(b=>b.onclick=()=>{state.styleId=b.dataset.s;drawStyleList();drawEditor();});
+}
+function drawEditor(){
+  const st=CITE_STYLES.find(s=>s.id===state.styleId);
+  $('#editor').innerHTML=`
+    <div class="ed-row"><div class="ed-lbl"><b>Citation system</b><span>Author–date in text, or numbered footnotes</span></div>
+      <div class="seg" id="sysSeg"><button data-v="authorDate" aria-pressed="${st.system==='authorDate'}">Author–date</button><button data-v="footnote" aria-pressed="${st.system==='footnote'}">Footnote</button></div></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Maximum authors</b><span>Before the list is truncated</span></div>
+      <div class="stepper"><button data-step="-1" aria-label="Fewer">−</button><span class="val" id="maVal">${st.maxAuthors}</span><button data-step="1" aria-label="More">+</button></div></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Use “et al.”</b><span>Shorten long author lists past the maximum</span></div>
+      <button class="sw" role="switch" id="swEtal" aria-checked="${st.etAl}" aria-label="Use et al."></button></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Include DOI</b><span>Append the DOI to bibliography entries</span></div>
+      <button class="sw" role="switch" id="swDoi" aria-checked="${st.doi}" aria-label="Include DOI"></button></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Include URL</b><span>When no DOI is present</span></div>
+      <button class="sw" role="switch" id="swUrl" aria-checked="${st.url}" aria-label="Include URL"></button></div>
+    <div class="preview" id="cpreview"></div>`;
+  $$('#sysSeg button').forEach(b=>b.onclick=()=>{st.system=b.dataset.v;drawEditor();});
+  $$('#editor .stepper [data-step]').forEach(b=>b.onclick=()=>{st.maxAuthors=Math.max(1,Math.min(10,st.maxAuthors+(+b.dataset.step)));drawEditor();});
+  $('#swEtal').onclick=()=>{st.etAl=!st.etAl;drawEditor();};
+  $('#swDoi').onclick=()=>{st.doi=!st.doi;drawEditor();};
+  $('#swUrl').onclick=()=>{st.url=!st.url;drawEditor();};
+  const samples=[
+    {lbl:'1 author',ref:DOCS.p1[0]},
+    {lbl:'3 authors',ref:DOCS.p1[2]},
+    {lbl:'4 authors — triggers “et al.”',ref:DOCS.p1[1]},
+  ];
+  $('#cpreview').innerHTML=`<div class="pl">Live preview · ${esc(st.name)} · ${st.system==='footnote'?'footnote':'author–date'}</div>`
+    +samples.map(s=>{const f=formatCite(s.ref,st);return `<div class="pex">
+      <div class="pex-l">${s.lbl}</div>
+      <div class="intxt">${esc(f.inText)}</div>
+      <div class="pv">${esc(f.biblio)}</div></div>`;}).join('');
+}
+
+/* ================= Capture flow (first source → Kanban) ================= */
+const CAPTURE={
+  p1:{type:'Article',title:'The urban heat island and its impact on heat waves and human health in Shanghai',authors:[{f:'Tan',g:'J.'},{f:'Zheng',g:'Y.'},{f:'Tang',g:'X.'}],year:2010,journal:'International Journal of Biometeorology',vol:'54',iss:'1',pages:'75–84',doi:'10.1007/s00484-009-0256-x',tags:['case-study','heat-wave']},
+  p2:{type:'Dataset',title:'UK-AIR: Air Quality Data Archive — automatic urban & rural monitoring',authors:[{f:'Defra',g:''}],year:2024,journal:'UK-AIR, Department for Environment, Food & Rural Affairs',vol:'',iss:'',pages:'',doi:'',tags:['open-data','monitoring']},
+  p3:{type:'Article',title:'Misinformation and its correction: continued influence and successful debiasing',authors:[{f:'Lewandowsky',g:'S.'},{f:'Ecker',g:'U. K. H.'},{f:'Seifert',g:'C. M.'}],year:2012,journal:'Psychological Science in the Public Interest',vol:'13',iss:'3',pages:'106–131',doi:'10.1177/1529100612451018',tags:['debiasing','trust']},
+};
+function openCapture(){
+  const p=project(),c=CAPTURE[state.pid]||CAPTURE.p1;
+  $('#capModal').innerHTML=`
+    <div class="cap-h"><span class="cap-kick">Capturing current tab</span><button class="btn btn--ghost btn--sm" id="capX" aria-label="Close">${ICON.x}</button></div>
+    <div class="cap-type">${c.type} · metadata extracted</div>
+    <div class="cap-title">${esc(c.title)}</div>
+    <div class="cap-meta">${esc(who(c.authors))}${c.year?' · '+c.year:''}${c.journal?' · '+esc(c.journal):''}</div>
+    ${c.doi?`<div class="mono" style="margin-top:6px">doi:${c.doi}</div>`:''}
+    <div class="cap-fields">
+      <label class="fld"><span>Section</span><select class="sel" id="capSec">${p.sections.map(s=>`<option>${esc(s)}</option>`).join('')}</select></label>
+      <label class="fld"><span>Status</span><select class="sel" id="capStat">${STATUSES.map(s=>`<option value="${s.id}">${s.label}</option>`).join('')}</select></label>
+    </div>
+    <div class="cap-actions"><button class="btn" id="capCancel">Cancel</button><button class="btn btn--primary" id="capFile">${ICON.check} File into ${esc(p.name.split(/[ —&]/)[0])}</button></div>`;
+  $('#capScrim').classList.add('open');
+  $('#capX').onclick=closeCapture; $('#capCancel').onclick=closeCapture; $('#capFile').onclick=doCapture;
+  setTimeout(()=>$('#capSec')?.focus(),30);
+}
+function doCapture(){
+  const p=project(),c=CAPTURE[state.pid]||CAPTURE.p1;
+  const doc={id:'c_'+Math.random().toString(36).slice(2,7),status:$('#capStat').value,section:$('#capSec').value,notes:0,
+    tags:[...(c.tags||[])],authors:c.authors,year:c.year,title:c.title,journal:c.journal,vol:c.vol,iss:c.iss,pages:c.pages,doi:c.doi,src:'extractedFromPage',usedIn:[]};
+  DOCS[state.pid]=[doc,...docs()]; state.flash=doc.id;
+  closeCapture(); go('overview'); setTimeout(()=>state.flash=null,900);
+  toast('Filed into '+p.name+' → '+doc.section,ICON.check);
+}
+function closeCapture(){$('#capScrim').classList.remove('open');}
+window.openCapture=openCapture;
+
+/* ================= Members / collaboration ================= */
+function renderMembers(view,act){
+  act.innerHTML='<a class="btn btn--sm" href="collaboration-sync.html" style="text-decoration:none">Activity &amp; sync</a>';
+  const p=project();
+  view.innerHTML=`
+    <div class="sec-h" style="margin-top:0"><h2>Members</h2><span class="ln"></span><span class="cnt">${p.members.length} · roles per project</span></div>
+    <div id="mlist"></div>
+    <div class="invite">
+      <div class="search" style="max-width:none;flex:1;min-width:220px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+        <input id="mEmail" type="email" placeholder="colleague@institution.edu" aria-label="Invite by email"></div>
+      <select class="sel" id="mRole" aria-label="Invite role"><option>Editor</option><option>Viewer</option></select>
+      <button class="btn btn--primary btn--sm" id="mAdd">Send invite</button>
+    </div>
+    <div class="perm-note"><b>Owner</b> — full control, billing &amp; deletion. &nbsp; <b>Editor</b> — capture sources, edit notes &amp; workflow status. &nbsp; <b>Viewer</b> — read the project and export citations. Roles are stored per project (<span class="mono">rolesPerProject</span> in the data model).</div>`;
+  drawMembers();
+  const add=()=>{
+    const email=$('#mEmail').value.trim();
+    if(!/.+@.+\..+/.test(email))return void toast('Enter a valid email address',ICON.warn,null,true);
+    const nm=email.split('@')[0].replace(/[._-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const init=(nm.split(' ').map(w=>w[0]).join('')||'?').slice(0,2).toUpperCase();
+    p.members.push({n:nm,i:init,role:$('#mRole').value,pending:true});
+    $('#mEmail').value=''; drawMembers(); renderNav();
+    toast('Invitation sent to '+email,ICON.check);
+  };
+  $('#mAdd').onclick=add;
+  $('#mEmail').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();add();}});
+}
+function drawMembers(){
+  const p=project();
+  $('#mlist').innerHTML=p.members.map((m,i)=>`
+    <div class="mem-row">
+      <div class="mem-av">${esc(m.i)}</div>
+      <div class="mem-info"><div class="mn">${esc(m.n)}${m.pending?'<span class="stat-tag">Pending</span>':''}</div>
+        <div class="ms">${m.role==='Owner'?'Full access · billing &amp; deletion':m.role==='Editor'?'Edit sources, notes &amp; status':'Read &amp; export only'}</div></div>
+      ${m.role==='Owner'?`<span class="role-fixed">Owner</span>`:`<select class="sel" data-mr="${i}" aria-label="Role for ${esc(m.n)}"><option${m.role==='Editor'?' selected':''}>Editor</option><option${m.role==='Viewer'?' selected':''}>Viewer</option></select><button class="btn btn--ghost btn--sm" data-mx="${i}" aria-label="Remove ${esc(m.n)}">${ICON.x}</button>`}
+    </div>`).join('');
+  $$('#mlist [data-mr]').forEach(s=>s.onchange=()=>{p.members[+s.dataset.mr].role=s.value;drawMembers();toast('Role updated to '+s.value);});
+  $$('#mlist [data-mx]').forEach(b=>b.onclick=()=>{const nm=p.members[+b.dataset.mx].n;p.members.splice(+b.dataset.mx,1);drawMembers();renderNav();toast('Removed '+nm);});
+}
+
+/* ================= Status popover ================= */
+function openStatusPop(anchor,doc){
+  const pop=$('#pop');
+  pop.innerHTML=`<div class="pl">Move to</div>`+STATUSES.map(s=>`<button class="pi${s.id===doc.status?' cur':''}" data-set="${s.id}"><span class="d" style="background:${s.dot}"></span>${s.label}<span class="ck">${ICON.check}</span></button>`).join('');
+  $$('#pop [data-set]').forEach(b=>b.onclick=()=>{setStatus(doc,b.dataset.set);closePop();});
+  placePop(anchor);
+}
+function placePop(anchor){
+  const pop=$('#pop'),r=anchor.getBoundingClientRect();pop.classList.add('open');
+  const pw=pop.offsetWidth,ph=pop.offsetHeight;
+  let left=Math.min(r.left,innerWidth-pw-12),top=r.bottom+6;
+  if(top+ph>innerHeight-12)top=r.top-ph-6;
+  pop.style.left=Math.max(12,left)+'px';pop.style.top=top+'px';
+}
+function closePop(){$('#pop').classList.remove('open');}
+function setStatus(doc,ns){
+  if(doc.status===ns)return;
+  doc.status=ns;state.flash=doc.id;
+  render();
+  setTimeout(()=>state.flash=null,900);
+  toast(`Moved to “${sBy(ns).label}”`,ICON.check);
+}
+
+/* ================= Shared bits ================= */
+function drawFilters(sel,key,cb){
+  const el=$(sel);const d=docs();
+  const opts=[{id:'all',label:'All',n:d.length},...STATUSES.map(s=>({id:s.id,label:s.label,n:d.filter(x=>x.status===s.id).length,dot:s.dot}))];
+  el.innerHTML=opts.map(o=>`<button class="fchip" data-v="${o.id}" aria-pressed="${state[key]===o.id}">${o.dot?`<span class="d" style="background:${o.dot}"></span>`:''}${o.label} ${o.n}</button>`).join('');
+  $$(sel+' .fchip').forEach(b=>b.onclick=()=>{state[key]=b.dataset.v;$$(sel+' .fchip').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.v===state[key])));cb();});
+}
+function emptyState(t,d){return `<div class="empty"><div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div><div class="et">${t}</div><div class="ed">${d}</div><button class="btn btn--primary btn--sm" onclick="openCapture()">${ICON.plus} Add the first source</button></div>`;}
+async function copyCite(docId){
+  const d=docById(docId);if(!d)return;
+  const st=CITE_STYLES.find(s=>s.id===state.styleId)||CITE_STYLES[0];
+  const text=formatCite(d,st).biblio;
+  try{await navigator.clipboard.writeText(text);}catch(_){return void toast('Couldn’t copy — clipboard blocked',ICON.warn,null,true);}
+  toast('Citation copied · '+st.name,ICON.copy,text.length>46?text.slice(0,46)+'…':text);
+}
+async function exportBib(){
+  const d=docs();if(!d.length)return void toast('No references to export yet',ICON.warn,null,true);
+  const st=CITE_STYLES.find(s=>s.id===state.styleId)||CITE_STYLES[0];
+  const bib=d.slice().sort((a,b)=>a.authors[0].f.localeCompare(b.authors[0].f)).map(x=>formatCite(x,st).biblio).join('\n\n');
+  try{await navigator.clipboard.writeText(bib);}catch(_){return void toast('Couldn’t copy — clipboard blocked',ICON.warn,null,true);}
+  toast(`Bibliography copied · ${d.length} entries · ${st.name}`,ICON.copy);
+}
+let toastTimer;
+function toast(msg,icon,code,err){
+  const w=$('#toastWrap');w.innerHTML='';
+  const t=document.createElement('div');t.className='toast'+(err?' toast--error':'');t.setAttribute('role',err?'alert':'status');
+  t.innerHTML=`${icon||ICON.check}<span>${msg}</span>${code?`<code>${esc(code)}</code>`:''}`;
+  w.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),240);},err?3600:2600);
+}
+window.toast=toast;
+
+/* ================= Sidebar (mobile) ================= */
+function openSidebar(){$('#sidebar').classList.add('open');$('#scrim').classList.add('on');}
+function closeSidebar(){$('#sidebar').classList.remove('open');$('#scrim').classList.remove('on');}
+
+/* ================= Init ================= */
+function init(){
+  $('#projBtn').onclick=e=>{e.stopPropagation();toggleProjMenu();};
+  $('#menuToggle').onclick=openSidebar;
+  $('#scrim').onclick=closeSidebar;
+  document.addEventListener('click',e=>{
+    if(!e.target.closest('.proj-switch'))toggleProjMenu(false);
+    if(!e.target.closest('#pop')&&!e.target.closest('.spill')&&!e.target.closest('#rImp'))closePop();
+  });
+  addEventListener('scroll',closePop,true);
+  $('#capScrim').addEventListener('click',e=>{if(e.target===$('#capScrim'))closeCapture();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){toggleProjMenu(false);closePop();closeSidebar();closeCapture();}});
+  render();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

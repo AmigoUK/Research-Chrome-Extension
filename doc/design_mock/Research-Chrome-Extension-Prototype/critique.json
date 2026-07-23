@@ -1,0 +1,13 @@
+{
+  "kind": "critique-panel",
+  "target": "research-companion-panel.html",
+  "score": 5,
+  "axes": {
+    "clarity":    { "score": 5, "notes": "One job — file & move sources through the To read → In review → Analysed → Used pipeline — is unmistakable. Capture card, filtered list, and progress footer read top-to-bottom without instruction." },
+    "hierarchy":  { "score": 5, "notes": "Serif titles carry weight, mono metadata recedes, one terracotta accent rationed to brand mark + active spine + primary CTA + semantic status. Neutral-dominant per color layers." },
+    "typography": { "score": 5, "notes": "Editorial-monocle bound verbatim; ALL-CAPS labels tracked 0.06–0.14em, serif headlines negative-tracked, 2 faces + mono for metadata only. Switcher subtitle stacking bug fixed prior turn." },
+    "motion":     { "score": 4, "notes": "Added shared easing language, grid-rows animated disclosure, terracotta flash on file/move, cubic count-up on progress, staggered row entrance. Honest 4: no FLIP reparent animation when a row changes group (deferred — complexity vs. calm)." },
+    "brand":      { "score": 5, "notes": "Print-scholarly posture held: flat surfaces, borders + whitespace, no gradient/emoji/indigo. Restraint call: no generated imagery, which would break the instrument-like calm." }
+  },
+  "notes": "Elevation pass = behaviour, not chrome. A11y hardened by hand (role=button rows, Enter/Space, focus-visible, aria-expanded groups, reduced-motion guard) because the chrome-devtools a11y MCP was disconnected during the edit."
+}

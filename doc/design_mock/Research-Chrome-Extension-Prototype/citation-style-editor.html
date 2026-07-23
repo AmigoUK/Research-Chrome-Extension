@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Notes — Citation Style Editor</title>
+<style>
+  :root{
+    --bg:oklch(98% 0.004 95); --surface:oklch(100% 0.002 95); --surface-2:oklch(96.5% 0.005 95);
+    --fg:oklch(20% 0.018 70); --muted:oklch(45% 0.014 70); --border:oklch(90% 0.006 95);
+    --accent:oklch(52% 0.10 28); --accent-soft:oklch(52% 0.10 28 / 0.10);
+    --danger:oklch(53% 0.17 27); --success:oklch(52% 0.09 155);
+    --code-bg:oklch(23% 0.014 260); --code-fg:oklch(90% 0.02 260); --code-key:oklch(74% 0.11 40); --code-val:oklch(78% 0.10 200); --code-bool:oklch(76% 0.12 150);
+    --font-display:'Iowan Old Style','Charter',Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --ease:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+    --nav-w:246px; --panel-w:430px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  html,body{height:100%}
+  body{font-family:var(--font-body);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+  .app{display:grid;grid-template-columns:var(--nav-w) 1fr;height:100vh;overflow:hidden}
+
+  /* Sidebar */
+  .side{background:var(--surface-2);border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+  .side-h{padding:14px 16px 10px}
+  .back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:12px;font-weight:520;padding:6px 9px;margin:-6px -9px 8px;border-radius:8px;transition:.12s}
+  .back:hover{background:var(--surface);color:var(--fg)}.back svg{width:14px;height:14px}
+  .side-lbl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 4px}
+  .plist{flex:1;overflow-y:auto;padding:4px 12px}
+  .pcard{width:100%;text-align:left;border:1px solid var(--border);border-radius:10px;background:var(--surface);padding:11px 12px;margin-bottom:8px;cursor:pointer;font:inherit;transition:border-color .12s,background .12s}
+  .pcard:hover{border-color:oklch(82% .01 95)}
+  .pcard.sel{border-color:var(--fg)}
+  .pcard .pn{font-family:var(--font-display);font-size:14.5px;font-weight:600;letter-spacing:-.01em;line-height:1.15}
+  .pcard .pb{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:6px}
+  .pcard .pb .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .side-f{padding:12px}
+
+  /* Main */
+  .main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+  .head{padding:16px 24px 14px;border-bottom:1px solid var(--border);background:var(--surface);display:flex;gap:18px;align-items:flex-end;flex-wrap:wrap}
+  .h-name{min-width:220px;flex:1}
+  .h-name label{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:5px}
+  .name-in{font-family:var(--font-display);font-size:24px;font-weight:600;letter-spacing:-.02em;color:var(--fg);border:0;border-bottom:1.5px solid transparent;background:none;width:100%;padding:2px 0}
+  .name-in:focus{outline:none;border-bottom-color:var(--accent)}
+  .h-field label{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:6px}
+  .h-actions{display:flex;gap:8px;align-items:center;margin-left:auto}
+
+  .work{flex:1;display:grid;grid-template-columns:1fr var(--panel-w);min-height:0}
+  .rules{overflow-y:auto;padding:22px 24px 50px;animation:fadeIn .2s var(--ease)}
+  .rules::-webkit-scrollbar{width:11px}.rules::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--bg)}
+  .panel{border-left:1px solid var(--border);background:var(--surface-2);display:flex;flex-direction:column;min-height:0}
+
+  /* Rule groups */
+  .grp{margin-bottom:26px}
+  .grp-h{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+  .grp-h h2{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-.01em}
+  .grp-h .ln{flex:1;height:1px;background:var(--border)}
+  .grp-h .gi{width:16px;height:16px;color:var(--accent)}
+  .row{display:flex;align-items:center;gap:16px;padding:14px 2px;border-bottom:1px solid var(--border)}
+  .row:last-child{border-bottom:0}
+  .rl{flex:1;min-width:0}.rl b{font-size:13.5px;font-weight:540;display:block}.rl span{font-size:11.5px;color:var(--muted);display:block;margin-top:2px;line-height:1.45}
+  .rl code{font-family:var(--font-mono);font-size:10.5px;color:var(--accent);background:var(--accent-soft);padding:1px 5px;border-radius:4px}
+
+  /* Controls */
+  .seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:3px;flex:0 0 auto}
+  .seg button{font:inherit;font-size:12px;font-weight:520;border:0;background:none;color:var(--muted);cursor:pointer;padding:6px 13px;border-radius:6px;min-height:32px;white-space:nowrap}
+  .seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px oklch(20% .02 70/.1)}
+  .sw{position:relative;width:42px;height:24px;border-radius:20px;background:var(--border);border:0;cursor:pointer;transition:background .16s;flex:0 0 auto}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:var(--surface);box-shadow:0 1px 3px oklch(20% .02 70/.4);transition:transform .16s var(--ease)}
+  .sw[aria-checked="true"]{background:var(--accent)}.sw[aria-checked="true"]::after{transform:translateX(18px)}
+  .sw[disabled]{opacity:.4;cursor:not-allowed}
+  .stepper{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex:0 0 auto}
+  .stepper button{width:32px;height:32px;border:0;background:var(--surface);color:var(--fg);cursor:pointer;font-size:16px;line-height:1}.stepper button:hover{background:var(--surface-2)}
+  .stepper button[disabled]{opacity:.35;cursor:not-allowed}
+  .stepper .v{min-width:36px;text-align:center;font-family:var(--font-mono);font-size:13px;border-left:1px solid var(--border);border-right:1px solid var(--border);padding:6px 0}
+  .sel{font:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--fg);cursor:pointer;min-height:36px}
+  .sel:focus{outline:none;border-color:var(--fg)}
+  .btn{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--fg);padding:8px 13px;font-size:12.5px;font-weight:540;display:inline-flex;align-items:center;gap:7px;min-height:36px;transition:background .12s,border-color .12s,transform .06s}
+  .btn:hover{background:var(--surface-2);border-color:oklch(80% .01 95)}.btn:active{transform:translateY(1px)}.btn svg{width:14px;height:14px}
+  .btn--primary{background:var(--accent);border-color:var(--accent);color:oklch(99% .01 95);box-shadow:0 1px 0 oklch(42% .10 28),0 6px 14px -9px oklch(52% .10 28/.7)}
+  .btn--primary:hover{background:oklch(48% .10 28);border-color:oklch(48% .10 28)}
+  .btn--sm{min-height:32px;padding:6px 10px;font-size:12px}
+  .btn--ghost{border-color:transparent;background:none;color:var(--muted)}.btn--ghost:hover{background:var(--surface-2);color:var(--fg)}
+
+  /* Panel: preview / csl */
+  .ptabs{display:flex;gap:2px;padding:12px 14px 0;border-bottom:1px solid var(--border)}
+  .ptab{font:inherit;font-size:12.5px;font-weight:540;border:0;background:none;color:var(--muted);cursor:pointer;padding:9px 13px;border-radius:8px 8px 0 0;position:relative;top:1px;border-bottom:2px solid transparent}
+  .ptab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+  .pbody{flex:1;overflow-y:auto;padding:16px 16px 40px}
+  .pbody::-webkit-scrollbar{width:9px}.pbody::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--surface-2)}
+
+  .ex{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin-bottom:12px}
+  .ex-h{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+  .ex-type{font-family:var(--font-mono);font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:5px;padding:2px 7px}
+  .ex-t{font-size:11px;color:var(--muted)}
+  .ex-lbl{font-family:var(--font-mono);font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:9px 0 5px}
+  .ex-intext{font-family:var(--font-mono);font-size:12.5px;color:var(--fg)}
+  .ex-bib{font-family:var(--font-display);font-size:13.5px;line-height:1.55;color:var(--fg)}
+  .ex-bib .em{color:var(--muted);font-style:italic}
+
+  .code{background:var(--code-bg);border-radius:12px;padding:16px;overflow-x:auto}
+  .code pre{font-family:var(--font-mono);font-size:11.5px;line-height:1.65;color:var(--code-fg);white-space:pre;tab-size:2}
+  .code .k{color:var(--code-key)}.code .s{color:var(--code-val)}.code .b{color:var(--code-bool)}.code .p{color:oklch(60% .02 260)}
+  .csl-note{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:14px;padding:12px 13px;background:var(--surface);border:1px solid var(--border);border-radius:10px}
+  .csl-note b{color:var(--fg)}
+  .code-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .code-head .ct{font-family:var(--font-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+
+  /* toast */
+  .toast-wrap{position:fixed;bottom:18px;left:var(--nav-w);right:0;display:flex;justify-content:center;z-index:90;pointer-events:none}
+  .toast{background:var(--fg);color:var(--bg);font-size:12.5px;padding:10px 15px;border-radius:9px;box-shadow:0 12px 26px -12px oklch(20% .02 70/.6);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(10px);transition:.2s;max-width:440px}
+  .toast.show{opacity:1;transform:none}.toast svg{width:15px;height:15px;flex:0 0 auto}
+
+  @media (max-width:1100px){:root{--panel-w:360px}}
+  @media (max-width:920px){
+    :root{--nav-w:0px}
+    .app{grid-template-columns:1fr}
+    .side{position:fixed;left:0;top:0;bottom:0;width:246px;z-index:60;transform:translateX(-100%);transition:transform .2s}
+    .side.open{transform:none}
+    .work{grid-template-columns:1fr;grid-template-rows:1fr auto}
+    .panel{border-left:0;border-top:1px solid var(--border);max-height:44vh}
+    .menu-t{display:inline-flex!important}
+    .toast-wrap{left:0}
+  }
+  .menu-t{display:none}
+</style>
+</head>
+<body>
+  <div class="app" data-od-id="style-editor">
+    <!-- Sidebar: profiles -->
+    <aside class="side" id="side" data-od-id="profiles">
+      <div class="side-h">
+        <a class="back" href="research-dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>Dashboard</a>
+        <div class="side-lbl">Style profiles</div>
+      </div>
+      <div class="plist" id="plist"></div>
+      <div class="side-f"><button class="btn btn--sm" id="newBtn" style="width:100%"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>New style</button></div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <header class="head">
+        <button class="btn btn--ghost btn--sm menu-t" id="menuT" aria-label="Profiles"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" width="18" height="18"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+        <div class="h-name">
+          <label for="nameIn">Style name</label>
+          <input class="name-in" id="nameIn" aria-label="Style name">
+        </div>
+        <div class="h-field">
+          <label for="baseSel">Base CSL style</label>
+          <select class="sel" id="baseSel"></select>
+        </div>
+        <div class="h-actions">
+          <button class="btn btn--sm" id="dupBtn">Duplicate</button>
+          <button class="btn btn--sm" id="expBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export .csl</button>
+          <button class="btn btn--primary btn--sm" id="saveBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6 9 17l-5-5"/></svg>Save</button>
+        </div>
+      </header>
+
+      <div class="work">
+        <div class="rules" id="rules"></div>
+        <aside class="panel" data-od-id="preview-panel">
+          <div class="ptabs" role="tablist">
+            <button class="ptab" id="tabPrev" role="tab" aria-selected="true">Live preview</button>
+            <button class="ptab" id="tabCsl" role="tab" aria-selected="false">CSL override</button>
+          </div>
+          <div class="pbody" id="pbody"></div>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Phase 4 — Citation Style Editor.
+   User-facing rules → CSL overrides (citations.md). Rules drive
+   both the live citation preview and the generated CSL override
+   object, across article / dataset / FOI / legal reference types.
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const BASES=[
+  {id:'apa',name:'APA 7th edition'},
+  {id:'chicago-note',name:'Chicago 17th (note)'},
+  {id:'chicago-author-date',name:'Chicago 17th (author-date)'},
+  {id:'harvard-cite-them-right',name:'Harvard — Cite Them Right'},
+  {id:'vancouver',name:'Vancouver'},
+  {id:'ieee',name:'IEEE'},
+  {id:'mhra',name:'MHRA'},
+];
+
+let STYLES=[
+  {id:'apa',name:'APA 7th',base:'apa',system:'authorDate',maxAuthors:20,etAlFirst:19,nameAnd:'symbol',includeIssue:true,pagePrefix:false,includeDOI:true,doiAsUri:true,includeURL:false,foi:false,legal:false},
+  {id:'chi',name:'Chicago 17th',base:'chicago-note',system:'footnote',maxAuthors:3,etAlFirst:1,nameAnd:'text',includeIssue:true,pagePrefix:false,includeDOI:true,doiAsUri:true,includeURL:false,foi:false,legal:false},
+  {id:'harv',name:'Harvard — Institution X',base:'harvard-cite-them-right',system:'authorDate',maxAuthors:3,etAlFirst:1,nameAnd:'text',includeIssue:true,pagePrefix:true,includeDOI:false,doiAsUri:false,includeURL:true,foi:false,legal:false},
+  {id:'vanc',name:'Vancouver',base:'vancouver',system:'numeric',maxAuthors:6,etAlFirst:6,nameAnd:'text',includeIssue:false,pagePrefix:false,includeDOI:true,doiAsUri:false,includeURL:false,foi:false,legal:false},
+  {id:'inv',name:'Investigations (FOI + legal)',base:'harvard-cite-them-right',system:'authorDate',maxAuthors:3,etAlFirst:1,nameAnd:'text',includeIssue:true,pagePrefix:true,includeDOI:false,doiAsUri:false,includeURL:true,foi:true,legal:true},
+];
+let cur='apa';
+const style=()=>STYLES.find(s=>s.id===cur);
+const state={tab:'prev'};
+
+/* ---- sample references (multiple types) ---- */
+const SAMPLES=[
+  {type:'article',t:'Journal article · 4 authors',authors:[{f:'Gasparrini',g:'A.'},{f:'Guo',g:'Y.'},{f:'Hashizume',g:'M.'},{f:'Lavigne',g:'E.'}],year:2015,title:'Mortality risk attributable to high and low ambient temperature',journal:'The Lancet',vol:'386',iss:'9991',pages:'369–375',doi:'10.1016/S0140-6736(14)62114-0'},
+  {type:'article',t:'Journal article · 1 author',authors:[{f:'Oke',g:'T. R.'}],year:1982,title:'The energetic basis of the urban heat island',journal:'Q. J. R. Meteorol. Soc.',vol:'108',iss:'455',pages:'1–24',doi:'10.1002/qj.49710845502'},
+  {type:'dataset',t:'Dataset',authors:[{f:'Defra',g:''}],year:2024,title:'UK-AIR: Air Quality Data Archive',publisher:'Department for Environment, Food & Rural Affairs',url:'uk-air.defra.gov.uk'},
+  {type:'foi',t:'FOI request',authority:'Environment Agency',ref:'EA/2023/0456',requested:'2 March 2023',responded:'12 May 2023',title:'Automatic monitoring station metadata'},
+  {type:'legal',t:'Legal case',case:'R (ClientEarth) v Secretary of State',cite:'[2021] EWHC 1234 (Admin)',court:'High Court',year:2021},
+];
+
+/* ---- author formatting ---- */
+function authorList(a,st,inv){
+  const j=st.nameAnd==='symbol'?' & ':' and ';
+  const nm=p=>inv?`${p.f}${p.g?', '+p.g:''}`:`${p.g?p.g+' ':''}${p.f}`;
+  if(a.length>st.maxAuthors){
+    return a.slice(0,st.etAlFirst).map(nm).join(', ')+', et al.';
+  }
+  if(a.length===1)return nm(a[0]);
+  return a.slice(0,-1).map(nm).join(', ')+j+nm(a[a.length-1]);
+}
+function inText(ref,st){
+  if(st.system==='numeric')return '[1]';
+  if(st.system==='footnote')return '¹';
+  const a=ref.authors||[];
+  const who=ref.type==='foi'?`${ref.authority} FOI`
+    :ref.type==='legal'?ref.case.replace(/^R \(([^)]+)\).*/, '$1')
+    :a.length===1?a[0].f:a.length===2?`${a[0].f}${st.nameAnd==='symbol'?' & ':' and '}${a[1].f}`:`${a[0].f} et al.`;
+  return `(${who}, ${ref.year||ref.responded?.slice(-4)||''})`;
+}
+function page(ref,st){return st.pagePrefix?`pp. ${ref.pages}`:ref.pages;}
+function ident(ref,st){
+  if(ref.type!=='article'&&ref.type!=='dataset')return '';
+  if(ref.doi&&st.includeDOI)return st.doiAsUri?` https://doi.org/${ref.doi}`:` doi:${ref.doi}`;
+  if(st.includeURL&&(ref.url||ref.doi))return ` Available at: ${ref.url||'https://doi.org/'+ref.doi}`;
+  return '';
+}
+function biblio(ref,st){
+  const num=st.system==='numeric'?'1. ':st.system==='footnote'?'¹ ':'';
+  if(ref.type==='foi'){
+    if(st.foi)return `${num}Freedom of Information request to ${ref.authority} (ref. ${ref.ref}). Submitted ${ref.requested}; response received ${ref.responded}. “${ref.title}.”`;
+    return `${num}${ref.authority} (${ref.responded.slice(-4)}). ${ref.title}. [Correspondence].`;
+  }
+  if(ref.type==='legal'){
+    if(st.legal)return `${num}${ref.case} ${ref.cite}, ${ref.court}.`;
+    return `${num}${ref.case} (${ref.year}).`;
+  }
+  const authInv=st.system!=='numeric'&&st.system!=='footnote';
+  const names=authorList(ref.authors,st,authInv);
+  const iss=st.includeIssue&&ref.iss?`(${ref.iss})`:'';
+  if(ref.type==='dataset'){
+    return `${num}${names} (${ref.year}). ${ref.title} [Dataset]. ${ref.publisher}.${ident(ref,st)}`;
+  }
+  if(st.system==='footnote'){
+    return `${num}${authorList(ref.authors,st,false)}, “${ref.title},” ${ref.journal} ${ref.vol}, no. ${ref.iss} (${ref.year}): ${page(ref,st)}.${ident(ref,st)}`;
+  }
+  if(st.system==='numeric'){
+    return `${num}${authorList(ref.authors,st,true)}. ${ref.title}. ${ref.journal}. ${ref.year};${ref.vol}${iss}:${ref.pages}.${ident(ref,st)}`;
+  }
+  return `${names} (${ref.year}). ${ref.title}. ${ref.journal}, ${ref.vol}${iss}, ${page(ref,st)}.${ident(ref,st)}`;
+}
+
+/* ---- CSL override ---- */
+function cslObject(st){
+  return {
+    info:{'base-style':st.base,title:st.name},
+    citation:{format:st.system,'et-al-min':st.maxAuthors+1,'et-al-use-first':st.etAlFirst,'name-and':st.nameAnd},
+    bibliography:{'include-issue':st.includeIssue,'page-range-prefix':st.pagePrefix,'include-doi':st.includeDOI,'doi-as-uri':st.doiAsUri,'url-if-no-doi':st.includeURL},
+    'custom-templates':{'foi-request':st.foi,'legal-case':st.legal},
+  };
+}
+function cslHtml(obj,ind){
+  ind=ind||1; const pad='  '.repeat(ind);
+  const lines=Object.entries(obj).map(([k,v])=>{
+    if(v&&typeof v==='object'){return `${pad}<span class="k">"${k}"</span><span class="p">: {</span>\n${cslHtml(v,ind+1)}\n${pad}<span class="p">}</span>`;}
+    const val=typeof v==='boolean'?`<span class="b">${v}</span>`:typeof v==='number'?`<span class="b">${v}</span>`:`<span class="s">"${esc(v)}"</span>`;
+    return `${pad}<span class="k">"${k}"</span><span class="p">:</span> ${val}`;
+  });
+  return lines.join('<span class="p">,</span>\n');
+}
+
+/* ---- render: sidebar ---- */
+function renderProfiles(){
+  $('#plist').innerHTML=STYLES.map(s=>{
+    const b=BASES.find(x=>x.id===s.base);
+    return `<button class="pcard${s.id===cur?' sel':''}" data-p="${s.id}">
+      <div class="pn">${esc(s.name)}</div>
+      <div class="pb"><span class="dot"></span>${s.system==='footnote'?'Footnote':s.system==='numeric'?'Numeric':'Author–date'} · ${esc(b?b.name.split(' ')[0]:s.base)}</div></button>`;
+  }).join('');
+  $$('#plist [data-p]').forEach(b=>b.onclick=()=>{cur=b.dataset.p;renderAll();closeSide();});
+}
+
+/* ---- render: header ---- */
+function renderHead(){
+  const st=style();
+  $('#nameIn').value=st.name;
+  $('#baseSel').innerHTML=BASES.map(b=>`<option value="${b.id}"${b.id===st.base?' selected':''}>${b.name}</option>`).join('');
+}
+
+/* ---- render: rule editor ---- */
+function sw(id,on,dis){return `<button class="sw" role="switch" id="${id}" aria-checked="${on}" ${dis?'disabled':''} aria-label="toggle"></button>`;}
+function renderRules(){
+  const st=style();
+  const gi=p=>`<svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${p}</svg>`;
+  $('#rules').innerHTML=`
+    <div class="grp">
+      <div class="grp-h">${gi('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>')}<h2>Citation system</h2><span class="ln"></span></div>
+      <div class="row"><div class="rl"><b>Format</b><span>How references appear in the text body</span></div>
+        <div class="seg" id="segSys">
+          <button data-v="authorDate" aria-pressed="${st.system==='authorDate'}">Author–date</button>
+          <button data-v="footnote" aria-pressed="${st.system==='footnote'}">Footnote</button>
+          <button data-v="numeric" aria-pressed="${st.system==='numeric'}">Numeric</button>
+        </div></div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-h">${gi('<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>')}<h2>Authors</h2><span class="ln"></span></div>
+      <div class="row"><div class="rl"><b>Maximum authors</b><span>Show every name up to this count, then truncate → <code>et-al-min: ${st.maxAuthors+1}</code></span></div>
+        <div class="stepper"><button data-st="maxAuthors" data-d="-1" aria-label="Fewer">−</button><span class="v">${st.maxAuthors}</span><button data-st="maxAuthors" data-d="1" aria-label="More">+</button></div></div>
+      <div class="row"><div class="rl"><b>Names before “et al.”</b><span>How many names to keep when truncating</span></div>
+        <div class="stepper"><button data-st="etAlFirst" data-d="-1" aria-label="Fewer">−</button><span class="v">${st.etAlFirst}</span><button data-st="etAlFirst" data-d="1" aria-label="More">+</button></div></div>
+      <div class="row"><div class="rl"><b>Final name joiner</b><span>Between the last two authors</span></div>
+        <div class="seg" id="segAnd"><button data-v="symbol" aria-pressed="${st.nameAnd==='symbol'}">Ampersand&nbsp;&amp;</button><button data-v="text" aria-pressed="${st.nameAnd==='text'}">Word “and”</button></div></div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-h">${gi('<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>')}<h2>Identifiers</h2><span class="ln"></span></div>
+      <div class="row"><div class="rl"><b>Include DOI</b><span>Append the DOI to bibliography entries</span></div>${sw('swDoi',st.includeDOI)}</div>
+      <div class="row"><div class="rl"><b>DOI as full URL</b><span><code>https://doi.org/…</code> vs <code>doi:…</code></span></div>${sw('swUri',st.doiAsUri,!st.includeDOI)}</div>
+      <div class="row"><div class="rl"><b>Include URL when no DOI</b><span>Fallback “Available at:” for datasets & web sources</span></div>${sw('swUrl',st.includeURL)}</div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-h">${gi('<path d="M4 7V4h16v3M9 20h6M12 4v16"/>')}<h2>Formatting</h2><span class="ln"></span></div>
+      <div class="row"><div class="rl"><b>Include issue number</b><span>Show <code>vol(issue)</code> vs volume only</span></div>${sw('swIss',st.includeIssue)}</div>
+      <div class="row"><div class="rl"><b>Page range prefix</b><span>Prepend <code>pp.</code> to page ranges</span></div>${sw('swPp',st.pagePrefix)}</div>
+    </div>
+
+    <div class="grp">
+      <div class="grp-h">${gi('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>')}<h2>Special sources</h2><span class="ln"></span></div>
+      <div class="row"><div class="rl"><b>FOI request template</b><span>Custom fields: authority, reference, request &amp; response dates</span></div>${sw('swFoi',st.foi)}</div>
+      <div class="row"><div class="rl"><b>Legal case template</b><span>Neutral citation, court &amp; year formatting</span></div>${sw('swLegal',st.legal)}</div>
+    </div>`;
+
+  $$('#segSys button').forEach(b=>b.onclick=()=>{st.system=b.dataset.v;renderAll();});
+  $$('#segAnd button').forEach(b=>b.onclick=()=>{st.nameAnd=b.dataset.v;renderAll();});
+  $$('#rules .stepper [data-st]').forEach(b=>b.onclick=()=>{
+    const k=b.dataset.st,d=+b.dataset.d; st[k]=Math.max(1,Math.min(30,st[k]+d));
+    if(st.etAlFirst>st.maxAuthors)st.etAlFirst=st.maxAuthors; renderAll();
+  });
+  const tog=(id,k,after)=>{const el=$('#'+id);if(el&&!el.disabled)el.onclick=()=>{st[k]=!st[k];after&&after();renderAll();};};
+  tog('swDoi','includeDOI'); tog('swUri','doiAsUri'); tog('swUrl','includeURL');
+  tog('swIss','includeIssue'); tog('swPp','pagePrefix'); tog('swFoi','foi'); tog('swLegal','legal');
+}
+
+/* ---- render: panel ---- */
+function renderPanel(){
+  const st=style(),body=$('#pbody');
+  $('#tabPrev').setAttribute('aria-selected',String(state.tab==='prev'));
+  $('#tabCsl').setAttribute('aria-selected',String(state.tab==='csl'));
+  if(state.tab==='prev'){
+    body.innerHTML=SAMPLES.map(r=>{
+      const it=inText(r,st);
+      return `<div class="ex">
+        <div class="ex-h"><span class="ex-type">${r.type}</span><span class="ex-t">${esc(r.t)}</span></div>
+        <div class="ex-lbl">In-text</div><div class="ex-intext">${esc(it)}</div>
+        <div class="ex-lbl">Bibliography</div><div class="ex-bib">${esc(biblio(r,st))}</div>
+      </div>`;
+    }).join('');
+  }else{
+    body.innerHTML=`<div class="code"><div class="code-head"><span class="ct">${esc(st.base)}.overrides.json</span></div><pre>${'<span class="p">{</span>\n'+cslHtml(cslObject(st))+'\n<span class="p">}</span>'}</pre></div>
+      <div class="csl-note"><b>How this works.</b> Your rules compile to a small override layer on top of the base CSL style. The service worker applies them through citeproc when formatting — no hand-editing of CSL XML required (<span class="mono">citations.md</span>).</div>`;
+  }
+}
+
+function renderAll(){renderProfiles();renderHead();renderRules();renderPanel();}
+
+/* ---- toast ---- */
+let tt;
+function toast(msg,ok){
+  const w=$('#toastWrap');w.innerHTML='';
+  const t=document.createElement('div');t.className='toast';
+  t.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg><span>${esc(msg)}</span>`;
+  w.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(tt);tt=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),220);},2400);
+}
+function closeSide(){$('#side').classList.remove('open');}
+
+/* ---- init ---- */
+function init(){
+  renderAll();
+  $('#nameIn').addEventListener('input',e=>{style().name=e.target.value;renderProfiles();});
+  $('#baseSel').onchange=e=>{style().base=e.target.value;renderPanel();renderProfiles();};
+  $('#tabPrev').onclick=()=>{state.tab='prev';renderPanel();};
+  $('#tabCsl').onclick=()=>{state.tab='csl';renderPanel();};
+  $('#saveBtn').onclick=()=>toast('Style saved · rules compiled to CSL overrides');
+  $('#expBtn').onclick=()=>toast('Exported '+style().base+'.csl');
+  $('#dupBtn').onclick=()=>{const s={...style(),id:'s'+Math.random().toString(36).slice(2,6),name:style().name+' (copy)'};STYLES.push(s);cur=s.id;renderAll();toast('Duplicated “'+s.name+'”');};
+  $('#newBtn').onclick=()=>{const s={id:'s'+Math.random().toString(36).slice(2,6),name:'New style',base:'apa',system:'authorDate',maxAuthors:3,etAlFirst:1,nameAnd:'symbol',includeIssue:true,pagePrefix:false,includeDOI:true,doiAsUri:true,includeURL:false,foi:false,legal:false};STYLES.push(s);cur=s.id;renderAll();closeSide();toast('New style created');};
+  $('#menuT').onclick=()=>$('#side').classList.toggle('open');
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSide();});
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>

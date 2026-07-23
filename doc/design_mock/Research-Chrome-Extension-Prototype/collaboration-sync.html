@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Context Notes — Collaboration &amp; Sync</title>
+<style>
+  :root{
+    --bg:oklch(98% 0.004 95); --surface:oklch(100% 0.002 95); --surface-2:oklch(96.5% 0.005 95);
+    --fg:oklch(20% 0.018 70); --muted:oklch(45% 0.014 70); --border:oklch(90% 0.006 95);
+    --accent:oklch(52% 0.10 28); --accent-soft:oklch(52% 0.10 28 / 0.10);
+    --danger:oklch(53% 0.17 27); --success:oklch(52% 0.09 155); --warn:oklch(68% 0.095 70);
+    --font-display:'Iowan Old Style','Charter',Georgia,serif;
+    --font-body:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+    --font-mono:'iA Writer Mono',ui-monospace,'SF Mono',Menlo,monospace;
+    --ease:cubic-bezier(.4,0,.2,1); --ease-out:cubic-bezier(.16,1,.3,1);
+    --rail:344px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  a{color:inherit}
+  a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes ping{0%{transform:scale(.6);opacity:.7}80%,100%{transform:scale(1.9);opacity:0}}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important}}
+  html,body{height:100%}
+  body{font-family:var(--font-body);color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+  .app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+
+  /* Topbar */
+  .bar{display:flex;align-items:center;gap:16px;padding:13px 24px;border-bottom:1px solid var(--border);background:var(--surface);z-index:20}
+  .back{display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:var(--muted);font-size:12.5px;font-weight:520;padding:7px 10px;border-radius:8px;transition:.12s}
+  .back:hover{background:var(--surface-2);color:var(--fg)}.back svg{width:15px;height:15px}
+  .ttl{min-width:0}
+  .ttl h1{font-family:var(--font-display);font-size:19px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+  .ttl .sub{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:7px}
+  .pro{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:4px;padding:1px 5px}
+  .bar-grow{flex:1}
+  .sync-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:520;padding:7px 12px;border:1px solid var(--border);border-radius:20px;background:var(--surface-2)}
+  .sd{width:9px;height:9px;border-radius:50%;position:relative}
+  .sd.synced{background:var(--success)}.sd.pending{background:var(--warn)}.sd.offline{background:var(--muted)}
+  .sd.pending::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--warn);animation:ping 1.6s var(--ease) infinite}
+
+  .btn{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--fg);padding:8px 13px;font-size:12.5px;font-weight:540;display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;transition:background .12s,border-color .12s,transform .06s;text-decoration:none}
+  .btn:hover{background:var(--surface-2);border-color:oklch(80% .01 95)}.btn:active{transform:translateY(1px)}.btn svg{width:15px;height:15px}
+  .btn--primary{background:var(--accent);border-color:var(--accent);color:oklch(99% .01 95);box-shadow:0 1px 0 oklch(42% .10 28),0 6px 14px -9px oklch(52% .10 28/.7)}
+  .btn--primary:hover{background:oklch(48% .10 28);border-color:oklch(48% .10 28)}
+  .btn--sm{min-height:32px;padding:6px 10px;font-size:12px}
+  .btn--ghost{border-color:transparent;background:none;color:var(--muted)}.btn--ghost:hover{background:var(--surface-2);color:var(--fg)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  /* Split */
+  .split{flex:1;display:grid;grid-template-columns:1fr var(--rail);min-height:0}
+  .main{display:flex;flex-direction:column;min-width:0;overflow:hidden}
+
+  /* Presence */
+  .presence{display:flex;align-items:center;gap:12px;padding:13px 24px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .pl{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  .avs{display:flex}
+  .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:11px;font-weight:600;border:2px solid var(--surface);margin-left:-7px;position:relative}
+  .av:first-child{margin-left:0}
+  .av.on::after{content:"";position:absolute;right:-1px;bottom:-1px;width:9px;height:9px;border-radius:50%;background:var(--success);border:2px solid var(--surface)}
+  .av.off{opacity:.5}
+  .pcount{font-size:12px;color:var(--muted)}
+
+  /* Tabs */
+  .tabs{display:flex;gap:2px;padding:10px 24px 0;border-bottom:1px solid var(--border);background:var(--surface)}
+  .tab{font:inherit;font-size:13px;font-weight:540;border:0;background:none;color:var(--muted);cursor:pointer;padding:10px 14px;border-radius:8px 8px 0 0;position:relative;top:1px;border-bottom:2px solid transparent;display:inline-flex;align-items:center;gap:7px}
+  .tab .n{font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:0 6px}
+  .tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+  .tab[aria-selected="true"] .n{color:var(--accent)}
+
+  .content{flex:1;overflow-y:auto;padding:20px 24px 46px;animation:fadeIn .2s var(--ease)}
+  .content::-webkit-scrollbar{width:11px}.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--bg)}
+  .maxw{max-width:640px}
+
+  /* filters */
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px}
+  .fchip{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.02em;min-height:30px;display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--muted);cursor:pointer;transition:.12s}
+  .fchip:hover{border-color:var(--fg);color:var(--fg)}
+  .fchip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:var(--bg)}
+
+  /* Activity feed */
+  .day{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:20px 0 12px;display:flex;align-items:center;gap:10px}
+  .day:first-child{margin-top:0}.day .ln{flex:1;height:1px;background:var(--border)}
+  .feed{position:relative;padding-left:34px}
+  .feed::before{content:"";position:absolute;left:14px;top:4px;bottom:4px;width:1.5px;background:var(--border)}
+  .ev{position:relative;padding:0 0 18px;animation:rise .3s var(--ease-out) both}
+  .ev-dot{position:absolute;left:-27px;top:1px;width:26px;height:26px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:grid;place-items:center;color:var(--muted)}
+  .ev-dot svg{width:14px;height:14px}
+  .ev-dot.status{color:var(--accent)}.ev-dot.comment{color:var(--warn)}.ev-dot.sync{color:var(--success)}
+  .ev-b{font-size:13px;line-height:1.5}
+  .ev-b .who{font-weight:600}
+  .ev-b .ent{font-family:var(--font-display);font-weight:600}
+  .ev-t{font-family:var(--font-mono);font-size:10px;color:var(--muted);margin-top:3px}
+  .diff{display:inline-flex;align-items:center;gap:7px;margin-top:6px}
+  .diff .c{font-family:var(--font-mono);font-size:10px;padding:2px 8px;border-radius:5px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted)}
+  .diff .c.to{color:var(--fg);border-color:oklch(84% .01 95)}
+  .diff .ar{color:var(--muted)}
+
+  /* Comment threads */
+  .thread{border:1px solid var(--border);border-radius:13px;background:var(--surface);margin-bottom:14px;overflow:hidden;animation:rise .3s var(--ease-out) both}
+  .thread.resolved{opacity:.72}
+  .th-h{display:flex;align-items:center;gap:10px;padding:12px 15px;background:var(--surface-2);border-bottom:1px solid var(--border)}
+  .anchor{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;color:var(--accent);border:1px solid oklch(82% .08 28);border-radius:5px;padding:2px 7px;flex:0 0 auto}
+  .th-q{font-size:11.5px;color:var(--muted);font-style:italic;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+  .resolve{margin-left:auto;font-family:var(--font-mono);font-size:9.5px;letter-spacing:.03em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);background:var(--surface);border-radius:20px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .resolve:hover{border-color:var(--fg);color:var(--fg)}
+  .resolve.done{color:var(--success);border-color:oklch(80% .06 155)}
+  .resolve svg{width:12px;height:12px}
+  .comments{padding:6px 15px}
+  .cm{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid var(--border)}
+  .cm:last-child{border-bottom:0}
+  .cm-av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-family:var(--font-mono);font-size:10px;font-weight:600;flex:0 0 auto}
+  .cm-b{min-width:0;flex:1}
+  .cm-h{display:flex;align-items:baseline;gap:8px}
+  .cm-h b{font-size:12.5px;font-weight:560}.cm-h .t{font-family:var(--font-mono);font-size:9.5px;color:var(--muted)}
+  .cm-txt{font-size:13px;line-height:1.5;margin-top:3px}
+  .reply{display:flex;gap:9px;padding:12px 15px;border-top:1px solid var(--border);background:var(--surface-2)}
+  .reply input{flex:1;font:inherit;font-size:13px;padding:8px 11px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--fg)}
+  .reply input:focus{outline:none;border-color:var(--fg)}
+  .reply input::placeholder{color:var(--muted)}
+
+  /* Members / roles matrix */
+  .matrix{border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:22px;background:var(--surface)}
+  .matrix table{width:100%;border-collapse:collapse;font-size:12px}
+  .matrix th,.matrix td{padding:11px 13px;border-bottom:1px solid var(--border);text-align:center}
+  .matrix th:first-child,.matrix td:first-child{text-align:left}
+  .matrix thead th{font-family:var(--font-mono);font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface-2)}
+  .matrix tbody tr:last-child td{border-bottom:0}
+  .matrix .rname{font-weight:560}
+  .matrix .yes{color:var(--success)}.matrix .no{color:oklch(85% .01 90)}
+  .matrix svg{width:14px;height:14px}
+  .mem{display:flex;align-items:center;gap:13px;padding:12px 15px;border:1px solid var(--border);border-radius:12px;background:var(--surface);margin-bottom:10px}
+  .mem .who2{flex:1;min-width:0}.mem .who2 b{font-size:14px;font-weight:550;display:flex;align-items:center;gap:8px}.mem .who2 span{font-size:11.5px;color:var(--muted)}
+  .sel{font:inherit;font-size:12px;font-family:var(--font-mono);padding:6px 9px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--fg);cursor:pointer;min-height:32px}
+  .badge-pend{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.04em;text-transform:uppercase;color:var(--warn);border:1px solid oklch(85% .08 70);border-radius:5px;padding:1px 6px}
+
+  /* Rail */
+  .rail{border-left:1px solid var(--border);background:var(--surface-2);overflow-y:auto;padding:18px 16px 40px}
+  .rail::-webkit-scrollbar{width:9px}.rail::-webkit-scrollbar-thumb{background:var(--border);border-radius:9px;border:3px solid var(--surface-2)}
+  .rcard{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+  .rcard h3{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:13px;display:flex;align-items:center;gap:8px}
+  .sync-status{display:flex;align-items:center;gap:11px;margin-bottom:15px}
+  .sync-status .big{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;flex:0 0 auto}
+  .sync-status .big svg{width:20px;height:20px}
+  .sync-status .st b{font-family:var(--font-display);font-size:16px;font-weight:600;display:block}
+  .sync-status .st span{font-size:11.5px;color:var(--muted)}
+  .kv{display:flex;justify-content:space-between;font-size:12px;padding:8px 0;border-top:1px solid var(--border)}
+  .kv .k{color:var(--muted)}.kv .v{font-family:var(--font-mono);font-size:11.5px}
+  .conflict{display:flex;gap:10px;align-items:flex-start;font-size:11.5px;line-height:1.5;background:oklch(96% .04 70);border:1px solid oklch(85% .08 70);border-radius:9px;padding:10px 11px;margin:12px 0}
+  .conflict svg{width:15px;height:15px;color:var(--warn);flex:0 0 auto;margin-top:1px}
+  .modes{display:flex;flex-direction:column;gap:7px;margin-bottom:8px}
+  .mode{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border:1px solid var(--border);border-radius:9px;background:var(--surface);cursor:pointer;text-align:left;font:inherit;transition:border-color .12s}
+  .mode:hover{border-color:oklch(82% .01 95)}
+  .mode.on{border-color:var(--accent);background:var(--accent-soft)}
+  .mode .radio{width:16px;height:16px;border-radius:50%;border:1.6px solid var(--border);flex:0 0 auto;margin-top:1px;position:relative}
+  .mode.on .radio{border-color:var(--accent)}.mode.on .radio::after{content:"";position:absolute;inset:3px;border-radius:50%;background:var(--accent)}
+  .mode .mb b{font-size:12.5px;font-weight:540;display:block}.mode .mb span{font-size:11px;color:var(--muted);display:block;margin-top:2px;line-height:1.4}
+
+  /* toast */
+  .toast-wrap{position:fixed;bottom:18px;left:0;right:var(--rail);display:flex;justify-content:center;z-index:90;pointer-events:none}
+  .toast{background:var(--fg);color:var(--bg);font-size:12.5px;padding:10px 15px;border-radius:9px;box-shadow:0 12px 26px -12px oklch(20% .02 70/.6);display:flex;align-items:center;gap:9px;opacity:0;transform:translateY(10px);transition:.2s;max-width:440px}
+  .toast.show{opacity:1;transform:none}.toast svg{width:15px;height:15px;flex:0 0 auto}
+
+  @media (max-width:980px){
+    :root{--rail:0px}
+    .split{grid-template-columns:1fr}
+    .rail{position:fixed;right:0;top:0;bottom:0;width:344px;transform:translateX(100%);transition:transform .2s;z-index:50;border-left:1px solid var(--border)}
+    .rail.open{transform:none}
+    .rail-t{display:inline-flex!important}
+    .toast-wrap{right:0}
+  }
+  .rail-t{display:none}
+</style>
+</head>
+<body>
+  <div class="app" data-od-id="collab">
+    <header class="bar">
+      <a class="back" href="research-dashboard.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6"/></svg>Dashboard</a>
+      <div class="ttl">
+        <h1>Collaboration &amp; Sync</h1>
+        <div class="sub"><span class="pro">Pro</span> Urban Heat &amp; Mortality · shared workspace</div>
+      </div>
+      <div class="bar-grow"></div>
+      <span class="sync-pill" id="syncPill"><span class="sd synced" id="syncDot"></span><span id="syncLbl">Synced</span></span>
+      <button class="btn btn--sm" id="inviteBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Invite</button>
+      <button class="btn btn--primary btn--sm rail-t" id="railT" aria-label="Sync panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></button>
+    </header>
+
+    <div class="split">
+      <div class="main">
+        <div class="presence" data-od-id="presence">
+          <span class="pl">Online</span>
+          <div class="avs" id="avs"></div>
+          <span class="pcount" id="pcount"></span>
+        </div>
+
+        <div class="tabs" role="tablist" id="tabs">
+          <button class="tab" role="tab" data-tab="activity" aria-selected="true">Activity <span class="n" id="nAct"></span></button>
+          <button class="tab" role="tab" data-tab="comments" aria-selected="false">Comments <span class="n" id="nCom"></span></button>
+          <button class="tab" role="tab" data-tab="members" aria-selected="false">Members <span class="n" id="nMem"></span></button>
+        </div>
+
+        <div class="content" id="content"><div class="maxw" id="view"></div></div>
+      </div>
+
+      <!-- Rail: sync -->
+      <aside class="rail" id="rail" data-od-id="sync-panel">
+        <div class="rcard">
+          <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:14px;height:14px"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>Synchronisation</h3>
+          <div id="syncCard"></div>
+        </div>
+        <div class="rcard">
+          <h3>Sync mechanism</h3>
+          <div class="modes" id="modes"></div>
+        </div>
+        <div class="rcard">
+          <h3>Snapshot</h3>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn--sm" id="expBtn" style="flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Export</button>
+            <button class="btn btn--sm" id="impBtn" style="flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Import</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:11px">Portable JSON snapshot of projects, annotations, references &amp; styles — for backup or moving between machines.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================
+   Phase 5 — Collaboration & Sync (Pro).
+   Change tracking + annotation comments + multi-user roles,
+   unified by a pending-change counter that the sync engine
+   clears. Sync is file-based or self-hosted (architecture.md).
+   ============================================================ */
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const USERS=[
+  {id:'u1',n:'You',i:'TL',role:'Owner',on:true,c:'var(--accent)'},
+  {id:'u2',n:'M. Okafor',i:'MO',role:'Editor',on:true,c:'oklch(55% 0.09 250)'},
+  {id:'u3',n:'L. Reyes',i:'LR',role:'Viewer',on:false,c:'oklch(55% 0.08 150)'},
+  {id:'u4',n:'j.park@lab.edu',i:'JP',role:'Editor',on:false,pending:true,c:'oklch(60% 0.02 70)'},
+];
+const uById=id=>USERS.find(u=>u.id===id);
+
+const CAPS=[
+  {k:'Read & export',o:1,e:1,v:1},
+  {k:'Annotate',o:1,e:1,v:0},
+  {k:'Edit status',o:1,e:1,v:0},
+  {k:'Manage references',o:1,e:1,v:0},
+  {k:'Manage members',o:1,e:0,v:0},
+  {k:'Delete project',o:1,e:0,v:0},
+];
+
+let ACTIVITY=[
+  {day:'Today',ev:[
+    {who:'u2',kind:'status',txt:'moved <span class="ent">Gasparrini et&nbsp;al. 2015</span> forward',from:'In review',to:'Analysed',t:'14:32'},
+    {who:'u1',kind:'annotation',txt:'added an annotation on <span class="ent">Oke 1982</span>',t:'13:05'},
+    {who:'u3',kind:'comment',txt:'commented on <span class="ent">Figure 1</span>',t:'11:48'},
+  ]},
+  {day:'Yesterday',ev:[
+    {who:'u2',kind:'reference',txt:'imported <span class="ent">3 references</span> from Zotero',t:'17:20'},
+    {who:'u1',kind:'member',txt:'changed <span class="ent">L. Reyes</span> role',from:'Editor',to:'Viewer',t:'16:02'},
+    {who:'u1',kind:'sync',txt:'synced <span class="ent">12 changes</span> to the shared backend',t:'16:01'},
+  ]},
+];
+const AF=[['all','All'],['status','Status'],['annotation','Annotations'],['comment','Comments'],['reference','References'],['member','Members']];
+let actFilter='all';
+
+let THREADS=[
+  {id:'t1',anchor:'p.1 · abstract',quote:'nocturnal UHI intensity above roughly four degrees…',resolved:false,cm:[
+    {who:'u2',txt:'Should we cite Gasparrini here for the lag structure?',t:'2h ago'},
+    {who:'u1',txt:'Yes — added it to the reference list and linked §Data.',t:'1h ago'},
+  ]},
+  {id:'t2',anchor:'p.1 · Figure 1',quote:'Mortality odds ratio by nocturnal UHI band',resolved:false,cm:[
+    {who:'u3',txt:'The >6 °C band only has three basin cities — worth a caveat in the caption?',t:'3h ago'},
+  ]},
+  {id:'t3',anchor:'p.2 · Table 1',quote:'Panel composition by geographic band',resolved:true,cm:[
+    {who:'u2',txt:'Population threshold for inclusion confirmed at 500k.',t:'yesterday'},
+  ]},
+];
+
+let SYNC={status:'synced',mode:'backend',last:'just now',pending:0,endpoint:'notes.lab.internal'};
+const MODES=[
+  {id:'backend',b:'Self-hosted backend',s:'Real-time sync to your institution’s server. Roles & presence enabled.'},
+  {id:'file',b:'File-based (shared drive)',s:'Encrypted snapshot synced through Dropbox / network share. Manual merge on conflict.'},
+  {id:'local',b:'Local only',s:'No sync. Data stays in this browser’s IndexedDB.'},
+];
+
+const state={tab:'activity'};
+const ICON={
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>',
+  x:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  status:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  annotation:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
+  comment:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  reference:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  member:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>',
+  sync:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+};
+const av=(u,cls)=>`<span class="av ${cls||''} ${u.on?'on':'off'}" style="background:${u.c};color:oklch(99% .01 95)" title="${esc(u.n)} · ${u.role}">${u.i}</span>`;
+const avSm=u=>`<span class="cm-av" style="background:${u.c};color:oklch(99% .01 95)" title="${esc(u.n)}">${u.i}</span>`;
+
+/* ---- presence ---- */
+function renderPresence(){
+  const on=USERS.filter(u=>u.on&&!u.pending);
+  $('#avs').innerHTML=USERS.filter(u=>!u.pending).map(u=>av(u)).join('');
+  $('#pcount').textContent=`${on.length} of ${USERS.filter(u=>!u.pending).length} editing now`;
+}
+
+/* ---- tabs ---- */
+function counts(){
+  const a=ACTIVITY.reduce((n,d)=>n+d.ev.length,0);
+  $('#nAct').textContent=a;
+  $('#nCom').textContent=THREADS.filter(t=>!t.resolved).length;
+  $('#nMem').textContent=USERS.length;
+}
+function setTab(t){
+  state.tab=t;
+  $$('#tabs .tab').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  render();
+}
+
+/* ---- activity ---- */
+function renderActivity(v){
+  v.innerHTML=`<div class="filters" id="afilters">${AF.map(([k,l])=>`<button class="fchip" data-f="${k}" aria-pressed="${actFilter===k}">${l}</button>`).join('')}</div>`;
+  ACTIVITY.forEach(d=>{
+    const evs=d.ev.filter(e=>actFilter==='all'||e.kind===actFilter);
+    if(!evs.length)return;
+    v.insertAdjacentHTML('beforeend',`<div class="day">${d.day}<span class="ln"></span></div><div class="feed">${evs.map(e=>{
+      const u=uById(e.who);
+      const diff=e.from?`<div class="diff"><span class="c">${esc(e.from)}</span><span class="ar">→</span><span class="c to">${esc(e.to)}</span></div>`:'';
+      return `<div class="ev"><div class="ev-dot ${e.kind}">${ICON[e.kind]||ICON.status}</div>
+        <div class="ev-b"><span class="who">${esc(u.n)}</span> ${e.txt}${diff}<div class="ev-t">${e.t}</div></div></div>`;
+    }).join('')}</div>`);
+  });
+  $$('#afilters .fchip').forEach(b=>b.onclick=()=>{actFilter=b.dataset.f;render();});
+}
+
+/* ---- comments ---- */
+function renderComments(v){
+  const open=THREADS.filter(t=>!t.resolved), done=THREADS.filter(t=>t.resolved);
+  v.innerHTML=[...open,...done].map(t=>{
+    const cm=t.cm.map(c=>{const u=uById(c.who);return `<div class="cm">${avSm(u)}
+      <div class="cm-b"><div class="cm-h"><b>${esc(u.n)}</b><span class="t">${esc(c.t)}</span></div><div class="cm-txt">${esc(c.txt)}</div></div></div>`;}).join('');
+    return `<div class="thread${t.resolved?' resolved':''}" data-t="${t.id}">
+      <div class="th-h"><span class="anchor">${esc(t.anchor)}</span><span class="th-q">“${esc(t.quote)}”</span>
+        <button class="resolve${t.resolved?' done':''}" data-res="${t.id}">${t.resolved?ICON.check+'Resolved':'Resolve'}</button></div>
+      <div class="comments">${cm}</div>
+      ${t.resolved?'':`<div class="reply"><input data-reply="${t.id}" placeholder="Reply to the thread…" aria-label="Reply"><button class="btn btn--primary btn--sm" data-post="${t.id}">Post</button></div>`}
+    </div>`;
+  }).join('');
+  $$('#view [data-res]').forEach(b=>b.onclick=()=>{const t=THREADS.find(x=>x.id===b.dataset.res);t.resolved=!t.resolved;bump();render();toast(t.resolved?'Thread resolved':'Thread reopened');});
+  $$('#view [data-post]').forEach(b=>b.onclick=()=>postReply(b.dataset.post));
+  $$('#view [data-reply]').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')postReply(i.dataset.reply);}));
+}
+function postReply(id){
+  const inp=$(`#view [data-reply="${id}"]`); const txt=inp.value.trim(); if(!txt)return;
+  THREADS.find(t=>t.id===id).cm.push({who:'u1',txt,t:'just now'});
+  ACTIVITY[0].ev.unshift({who:'u1',kind:'comment',txt:'replied on a thread',t:'just now'});
+  bump(); render(); toast('Comment posted');
+  const ni=$(`#view [data-reply="${id}"]`); if(ni)ni.focus();
+}
+
+/* ---- members ---- */
+function renderMembers(v){
+  const yes=`<span class="yes">${ICON.check}</span>`, no=`<span class="no">${ICON.x}</span>`;
+  v.innerHTML=`<div class="matrix"><table><thead><tr><th>Capability</th><th>Owner</th><th>Editor</th><th>Viewer</th></tr></thead><tbody>
+    ${CAPS.map(c=>`<tr><td class="rname">${c.k}</td><td>${c.o?yes:no}</td><td>${c.e?yes:no}</td><td>${c.v?yes:no}</td></tr>`).join('')}
+  </tbody></table></div>
+  ${USERS.map((u,i)=>`<div class="mem">${avSm(u)}
+    <div class="who2"><b>${esc(u.n)}${u.pending?'<span class="badge-pend">Pending</span>':''}</b><span>${u.role==='Owner'?'Full access':u.role==='Editor'?'Edit sources, notes & status':'Read & export'}</span></div>
+    ${u.role==='Owner'?`<span class="sel" style="color:var(--accent);border-color:oklch(82% .08 28)">Owner</span>`:`<select class="sel" data-role="${i}"><option${u.role==='Editor'?' selected':''}>Editor</option><option${u.role==='Viewer'?' selected':''}>Viewer</option></select>`}
+  </div>`).join('')}`;
+  $$('#view [data-role]').forEach(s=>s.onchange=()=>{const u=USERS[+s.dataset.role];const old=u.role;u.role=s.value;ACTIVITY[0].ev.unshift({who:'u1',kind:'member',txt:`changed <span class="ent">${esc(u.n)}</span> role`,from:old,to:s.value,t:'just now'});bump();render();toast('Role updated to '+s.value);});
+}
+
+/* ---- rail: sync ---- */
+function renderSync(){
+  const S=SYNC, cfg={synced:{c:'var(--success)',bg:'oklch(95% .05 155)',lbl:'Up to date'},pending:{c:'var(--warn)',bg:'oklch(96% .06 70)',lbl:'Changes pending'},offline:{c:'var(--muted)',bg:'var(--surface-2)',lbl:'Offline'}}[S.status];
+  $('#syncCard').innerHTML=`
+    <div class="sync-status"><div class="big" style="background:${cfg.bg};color:${cfg.c}">${S.status==='pending'?ICON.sync:S.status==='offline'?ICON.warn:ICON.check}</div>
+      <div class="st"><b>${cfg.lbl}</b><span>${S.mode==='backend'?S.endpoint:S.mode==='file'?'Shared drive snapshot':'This device only'}</span></div></div>
+    ${S.status==='pending'?`<div class="conflict">${ICON.warn}<div><b>${S.pending} local change${S.pending>1?'s':''}</b> not yet pushed. Reyes edited Table 1 offline — review before sync.</div></div>`:''}
+    <div class="kv"><span class="k">Last sync</span><span class="v">${esc(S.last)}</span></div>
+    <div class="kv"><span class="k">Pending</span><span class="v">${S.pending} change${S.pending===1?'':'s'}</span></div>
+    <div class="kv"><span class="k">Collaborators</span><span class="v">${USERS.filter(u=>!u.pending).length}</span></div>
+    <button class="btn ${S.status==='synced'?'':'btn--primary'}" id="syncNow" ${S.status==='synced'||S.mode==='local'?'disabled':''} style="width:100%;margin-top:14px">${ICON.sync}${S.status==='synced'?'All synced':'Sync now · '+S.pending}</button>`;
+  $('#syncNow')?.addEventListener('click',doSync);
+  // top pill
+  $('#syncDot').className='sd '+S.status;
+  $('#syncLbl').textContent={synced:'Synced',pending:S.pending+' pending',offline:'Offline'}[S.status];
+}
+function renderModes(){
+  $('#modes').innerHTML=MODES.map(m=>`<button class="mode${SYNC.mode===m.id?' on':''}" data-m="${m.id}"><span class="radio"></span><span class="mb"><b>${m.b}</b><span>${m.s}</span></span></button>`).join('');
+  $$('#modes [data-m]').forEach(b=>b.onclick=()=>{
+    SYNC.mode=b.dataset.m;
+    if(b.dataset.m==='local'){SYNC.status='offline';} else if(SYNC.pending>0){SYNC.status='pending';} else {SYNC.status='synced';}
+    renderSync();renderModes();toast('Sync mechanism · '+MODES.find(m=>m.id===b.dataset.m).b);
+  });
+}
+function doSync(){
+  SYNC.status='synced';SYNC.pending=0;SYNC.last='just now';
+  ACTIVITY[0].ev.unshift({who:'u1',kind:'sync',txt:'synced <span class="ent">local changes</span> to the shared backend',t:'just now'});
+  render();toast('Synced to '+(SYNC.mode==='backend'?SYNC.endpoint:'shared drive'));
+}
+function bump(){ if(SYNC.mode!=='local'){SYNC.pending++;SYNC.status='pending';SYNC.last='moments ago';} }
+
+/* ---- render dispatch ---- */
+function render(){
+  counts(); renderPresence();
+  const v=$('#view');
+  if(state.tab==='activity')renderActivity(v);
+  else if(state.tab==='comments')renderComments(v);
+  else renderMembers(v);
+  renderSync(); renderModes();
+}
+
+/* ---- toast ---- */
+let tt;
+function toast(msg){
+  const w=$('#toastWrap');w.innerHTML='';
+  const t=document.createElement('div');t.className='toast';
+  t.innerHTML=`${ICON.check}<span>${esc(msg)}</span>`;
+  w.appendChild(t);requestAnimationFrame(()=>t.classList.add('show'));
+  clearTimeout(tt);tt=setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),220);},2400);
+}
+
+/* ---- init ---- */
+function init(){
+  $$('#tabs .tab').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+  $('#inviteBtn').onclick=()=>{setTab('members');toast('Invite a collaborator from the Members tab');};
+  $('#expBtn').onclick=()=>toast('Snapshot exported · context-notes.json');
+  $('#impBtn').onclick=()=>toast('Import a .json snapshot to merge');
+  $('#railT').onclick=()=>$('#rail').classList.toggle('open');
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')$('#rail').classList.remove('open');});
+  render();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
