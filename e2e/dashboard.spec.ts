@@ -100,6 +100,53 @@ test('Documents view filters rows by search text', async () => {
   await page.close();
 });
 
+test('References view lists stored references and offers a DOI import form', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'references/put',
+      reference: {
+        id: 'e2e-ref-1',
+        projectId,
+        cslData: {
+          type: 'article-journal',
+          title: 'Reference under test',
+          author: [{ family: 'Oke', given: 'T. R.' }],
+          issued: { 'date-parts': [[1982]] },
+          'container-title': 'QJRMS',
+          DOI: '10.1002/qj.49710845502',
+        },
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  await page.locator('#nav .nav-item[data-route="references"]').click();
+  await expect(page.locator('.tbl tbody tr[data-id="e2e-ref-1"] .ttl')).toHaveText(
+    'Reference under test',
+  );
+
+  // Import popover: DOI is actionable, BibTeX/RIS/Zotero are disabled "Soon".
+  await page.locator('#rImport').click();
+  await expect(page.locator('#pop .imp-src[data-doi]')).toBeVisible();
+  await expect(page.locator('#pop .imp-src[disabled]').first()).toBeVisible();
+
+  await page.locator('#pop .imp-src[data-doi]').click();
+  await expect(page.locator('#pop #doiInput')).toBeVisible();
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

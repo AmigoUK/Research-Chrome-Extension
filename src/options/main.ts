@@ -10,7 +10,7 @@
  */
 import './dashboard.css';
 import { sendRequest } from '../adapters/chrome/messaging';
-import type { Project, Document, Annotation, CitationStyle, Id } from '../core/model/types';
+import type { Project, Document, Annotation, Reference, CitationStyle, Id } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import { templateFor } from '../core/citation/styles';
 import {
@@ -40,6 +40,7 @@ const ICON = {
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
   ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
 };
 
 interface NavDef {
@@ -71,7 +72,7 @@ const NAV: NavDef[] = [
   {
     id: 'references',
     label: 'References',
-    count: () => state.documents.length,
+    count: () => (state.references.length > 0 ? state.references.length : undefined),
     icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',
   },
   {
@@ -88,6 +89,7 @@ interface DashState {
   activeProjectId: Id | null;
   documents: Document[];
   annotations: Annotation[];
+  references: Reference[];
   styles: CitationStyle[];
   route: Route;
   flash: Id | null;
@@ -99,6 +101,7 @@ const state: DashState = {
   activeProjectId: null,
   documents: [],
   annotations: [],
+  references: [],
   styles: [],
   route: 'overview',
   flash: null,
@@ -157,13 +160,15 @@ async function loadProjectData(): Promise<void> {
     return;
   }
   const projectId = state.activeProjectId;
-  const [documents, annotations, styles] = await Promise.all([
+  const [documents, annotations, references, styles] = await Promise.all([
     sendRequest({ type: 'documents/listByProject', projectId }),
     sendRequest({ type: 'annotations/listByProject', projectId }),
+    sendRequest({ type: 'references/listByProject', projectId }),
     sendRequest({ type: 'citationStyles/list' }),
   ]);
   state.documents = documents;
   state.annotations = annotations;
+  state.references = references;
   state.styles = styles;
 }
 
@@ -246,7 +251,7 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   overview: renderOverview,
   documents: renderDocuments,
   annotations: (v) => placeholder(v, 'Annotations', 'Notes across the project will collect here.'),
-  references: (v) => placeholder(v, 'References', 'Bibliographic records and DOI import arrive soon.'),
+  references: renderReferences,
   styles: (v) => placeholder(v, 'Citation styles', 'Style profiles and the rule editor arrive soon.'),
 };
 function render(): void {
@@ -521,6 +526,188 @@ function drawDocuments(): void {
       if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
     });
   });
+}
+
+/* ---- References ---- */
+interface CslName {
+  family?: string;
+  given?: string;
+  literal?: string;
+}
+interface Csl {
+  title?: string;
+  author?: CslName[];
+  issued?: { 'date-parts'?: number[][] };
+  'container-title'?: string;
+  volume?: string;
+  issue?: string;
+  page?: string;
+  DOI?: string;
+  type?: string;
+}
+const SOURCE_LABEL: Record<Reference['source'], string> = {
+  extractedFromPage: 'Extracted',
+  importedFromZotero: 'Zotero',
+  manual: 'Manual',
+};
+function cslNameLabel(n: CslName): string {
+  if (n.literal) return n.literal;
+  return [n.family, n.given].filter(Boolean).join(', ');
+}
+function referenceLine(csl: Csl): { title: string; sub: string; doi?: string } {
+  const authors = (csl.author ?? []).map(cslNameLabel).filter(Boolean);
+  const year = csl.issued?.['date-parts']?.[0]?.[0];
+  const authorPart =
+    authors.length === 0
+      ? 'Unknown author'
+      : authors.length <= 3
+        ? authors.join('; ')
+        : `${authors[0]} et al.`;
+  const journal = csl['container-title'];
+  const vol = csl.volume ? `, ${csl.volume}${csl.issue ? `(${csl.issue})` : ''}` : '';
+  const pages = csl.page ? `, ${csl.page}` : '';
+  const sub = `${authorPart}${year ? ` (${year})` : ''}.${journal ? ` ${journal}${vol}${pages}.` : ''}`;
+  const result: { title: string; sub: string; doi?: string } = {
+    title: csl.title ?? 'Untitled reference',
+    sub,
+  };
+  if (csl.DOI) result.doi = csl.DOI;
+  return result;
+}
+function cslTypeLabel(type?: string): string {
+  if (!type) return 'Reference';
+  const map: Record<string, string> = {
+    'article-journal': 'Article',
+    article: 'Article',
+    'paper-conference': 'Paper',
+    book: 'Book',
+    chapter: 'Chapter',
+    dataset: 'Dataset',
+    report: 'Report',
+    webpage: 'Web page',
+  };
+  return map[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function renderReferences(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = `<button class="btn btn--sm" id="rImport">${ICON.up} Import</button><button class="btn btn--sm" id="rExport">${ICON.down} Export</button>`;
+  $('#rImport', actions).onclick = (e) => {
+    e.stopPropagation();
+    openImportPopover(e.currentTarget as HTMLElement);
+  };
+  $('#rExport', actions).onclick = () => void exportBibliography();
+
+  if (state.references.length === 0) {
+    view.innerHTML = emptyState(
+      'No references yet',
+      'Import a reference by DOI, or capture a source with the side panel to build your bibliography.',
+    );
+    return;
+  }
+  view.innerHTML = `<table class="tbl"><thead><tr><th>Reference</th><th>Type</th><th>Origin</th><th>Used in</th><th></th></tr></thead><tbody>${state.references
+    .map((ref) => {
+      const csl = ref.cslData as Csl;
+      const line = referenceLine(csl);
+      const used = ref.usedInOutputs.length
+        ? ref.usedInOutputs.map((u) => `<span class="chip">${esc(u)}</span>`).join(' ')
+        : '<span class="mono">—</span>';
+      return `<tr data-id="${ref.id}">
+        <td><div class="ttl">${esc(line.title)}</div><div class="sub">${esc(line.sub)}</div>${line.doi ? `<div class="mono" style="margin-top:4px">doi:${esc(line.doi)}</div>` : ''}</td>
+        <td><span class="chip chip--sec">${esc(cslTypeLabel(csl.type))}</span></td>
+        <td><span class="stat-tag">${SOURCE_LABEL[ref.source]}</span></td>
+        <td>${used}</td>
+        <td><button class="btn btn--ghost btn--sm" data-cite="${ref.id}" aria-label="Copy citation">${ICON.copy}</button></td>
+      </tr>`;
+    })
+    .join('')}</tbody></table>`;
+  $$('[data-cite]', view).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.cite;
+      if (id) void copyReferenceCitation(id);
+    };
+  });
+}
+
+const IMPORT_SOURCES: Array<{ label: string; doi?: boolean }> = [
+  { label: 'DOI / identifier', doi: true },
+  { label: 'Zotero library' },
+  { label: 'BibTeX (.bib) file' },
+  { label: 'RIS (.ris) file' },
+];
+function openImportPopover(anchor: HTMLElement): void {
+  const pop = $('#pop');
+  pop.innerHTML =
+    `<div class="pl">Import from</div>` +
+    IMPORT_SOURCES.map((s) =>
+      s.doi
+        ? `<button class="pi imp-src" data-doi="1"><span>${esc(s.label)}</span></button>`
+        : `<button class="pi imp-src" disabled><span>${esc(s.label)}</span><span class="soon">Soon</span></button>`,
+    ).join('');
+  $('[data-doi]', pop).onclick = () => showDoiForm();
+  placePop(anchor);
+}
+function showDoiForm(): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">Import by DOI</div>
+    <div class="pop-form">
+      <input id="doiInput" class="sel" placeholder="10.1016/j.example.2020.01.001" aria-label="DOI" style="width:240px">
+      <button class="btn btn--primary btn--sm" id="doiGo">${ICON.up} Import</button>
+    </div>`;
+  const input = $<HTMLInputElement>('#doiInput', pop);
+  const submit = (): void => void importByDoi(input.value);
+  $('#doiGo', pop).onclick = submit;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  input.focus();
+}
+async function importByDoi(raw: string): Promise<void> {
+  const doi = raw.trim();
+  if (!doi) {
+    toast('Enter a DOI to import', ICON.warn, true);
+    return;
+  }
+  if (!state.activeProjectId) return;
+  const granted = await chrome.permissions.request({
+    origins: [
+      'https://doi.org/*',
+      'https://data.crossref.org/*',
+      'https://data.datacite.org/*',
+    ],
+  });
+  if (!granted) {
+    toast('Permission is needed to fetch DOI metadata', ICON.warn, true);
+    return;
+  }
+  closePop();
+  try {
+    await sendRequest({ type: 'references/importByDoi', projectId: state.activeProjectId, doi });
+    state.references = await sendRequest({
+      type: 'references/listByProject',
+      projectId: state.activeProjectId,
+    });
+    render();
+    toast('Reference imported', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'DOI import failed', ICON.warn, true);
+  }
+}
+async function copyReferenceCitation(referenceId: Id): Promise<void> {
+  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  try {
+    const { bibliography } = await sendRequest({
+      type: 'citations/reference',
+      referenceId,
+      template,
+    });
+    await navigator.clipboard.writeText(bibliography);
+    toast('Citation copied', ICON.copy);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t copy citation', ICON.warn, true);
+  }
 }
 
 function emptyState(title: string, desc: string): string {

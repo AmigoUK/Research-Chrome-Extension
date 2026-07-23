@@ -71,6 +71,26 @@ describe('handleRequest', () => {
     expect(res.ok && Array.isArray(res.data) && res.data).toHaveLength(1);
   });
 
+  it('puts and lists references by project', async () => {
+    const now = NOW;
+    const putRes = await handleRequest(repos, {
+      type: 'references/put',
+      reference: {
+        id: 'r1',
+        projectId: 'p1',
+        cslData: { DOI: '10.1/x', title: 'A reference' },
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    expect(putRes).toEqual({ ok: true, data: null });
+
+    const listRes = await handleRequest(repos, { type: 'references/listByProject', projectId: 'p1' });
+    expect(listRes.ok && Array.isArray(listRes.data) && listRes.data).toHaveLength(1);
+  });
+
   it('lists citation styles', async () => {
     await repos.citationStyles.put({
       id: 'apa',

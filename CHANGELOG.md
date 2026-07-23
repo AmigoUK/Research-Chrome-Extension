@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 in progress. Next: References view + DOI import (M4)._
+_Phase 2 in progress. Next: Annotations view (M5)._
+
+## [0.5.0] — 2026-07-23
+
+### Added
+
+- **References view + DOI import (Phase 2, M4)**: a table of the project's bibliographic records —
+  formatted reference line, DOI, a CSL type chip, an origin tag (Extracted / Zotero / Manual), the
+  "used in" outputs, and a copy-citation action (via `citations/reference`).
+- **Import by DOI**: a use-case (`importReferenceByDoi`) resolves a DOI to CSL-JSON through doi.org
+  content negotiation and stores it as a Reference, deduping by DOI. The import popover offers DOI
+  today (gated behind an optional host-permission request for doi.org / crossref / datacite);
+  Zotero / BibTeX / RIS are shown as "Soon".
+- Messages `references/listByProject`, `references/put`, `references/importByDoi` (router + tests).
+  No schema change — the `references` store already exists.
+
+### Notes
+
+- 71 unit tests (new `references` use-case suite + router coverage) and a new E2E asserting the
+  References table renders and the DOI import form opens.
 
 ## [0.4.0] — 2026-07-23
 
@@ -164,7 +183,8 @@ _Phase 2 in progress. Next: References view + DOI import (M4)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...v0.2.0

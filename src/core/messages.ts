@@ -4,7 +4,7 @@
  * Each message type maps to a request shape and a response data type. This
  * lives in the domain core so both sides share one source of truth.
  */
-import type { Project, Document, Annotation, CitationStyle, Id } from './model/types';
+import type { Project, Document, Annotation, Reference, CitationStyle, Id } from './model/types';
 import type { CaptureInput, CaptureResult } from './usecases/capture';
 
 export interface MessageMap {
@@ -15,6 +15,9 @@ export interface MessageMap {
   'documents/put': { req: { document: Document }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
   'annotations/listByProject': { req: { projectId: Id }; res: Annotation[] };
+  'references/listByProject': { req: { projectId: Id }; res: Reference[] };
+  'references/put': { req: { reference: Reference }; res: null };
+  'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
   'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
   'citations/bibliography': { req: { projectId: Id; template: string }; res: string };

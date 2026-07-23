@@ -13,6 +13,7 @@ import {
   formatReferenceCitation,
   formatDocumentCitation,
 } from './usecases/citations';
+import { importReferenceByDoi } from './usecases/references';
 
 function ok(data: unknown): { ok: true; data: unknown } {
   return { ok: true, data };
@@ -57,6 +58,15 @@ export async function handleRequest(
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
       case 'annotations/listByProject':
         return ok(await repos.annotations.listByProject(request.projectId)) as Result;
+      case 'references/listByProject':
+        return ok(await repos.references.listByProject(request.projectId)) as Result;
+      case 'references/put':
+        await repos.references.put(request.reference);
+        return ok(null) as Result;
+      case 'references/importByDoi':
+        return ok(
+          await importReferenceByDoi(repos, { projectId: request.projectId, doi: request.doi }),
+        ) as Result;
       case 'citationStyles/list':
         return ok(await repos.citationStyles.list()) as Result;
       case 'capture/page':

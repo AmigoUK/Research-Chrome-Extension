@@ -227,6 +227,7 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 /* ---- Import popover ---- */
 .popover .imp-src { justify-content: space-between; }
 .popover .imp-src .soon { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; margin-left: auto; }
+.popover .pop-form { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; }
 
 /* ---- Credit footer (dashboard only — see project memory) ---- */
 .credit { border-top: 1px solid var(--border); background: var(--surface); padding: 9px 18px; text-align: center; font-size: 11px; color: var(--muted); line-height: 1.5; flex: 0 0 auto; }
