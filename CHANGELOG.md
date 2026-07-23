@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 1 MVP complete. Next: Phase 2 dashboard (see `doc/roadmap.md`)._
+_Phase 2 in progress. Next: Overview + Kanban board (M2)._
+
+## [0.2.0] — 2026-07-23
+
+### Added
+
+- **Dashboard app-shell (Phase 2, M1)** on the options page: sidebar with wordmark, project
+  switcher (lists projects, switches active, creates new ones) and a Workspace nav (Overview,
+  Documents, Annotations, References, Citation styles) with live count badges; sticky topbar with
+  per-route title/subtitle; a view router; and a responsive off-canvas drawer (≤880px) with scrim
+  and Escape-to-close.
+- Dashboard-local design system in `src/options/dashboard.css` — the full token + component set
+  ported from the design mock (warm-neutral light theme, terracotta accent, print-scholarly type).
+  The side panel's `panel.css` is untouched.
+- Pure, unit-tested dashboard view-model (`src/options/view-model.ts`) reusing the side-panel status
+  vocabulary; routes, titles and status colours (6 new tests, 62 total).
+- **Credit footer** on the dashboard (not the side panel): attribution segments + app version read
+  from the manifest at runtime.
+- E2E coverage: the dashboard loads in headed Chromium, the project switcher shows a seeded project,
+  and nav routing updates the topbar title.
 
 ## [0.1.1] — 2026-07-23
 
@@ -110,7 +129,8 @@ _Phase 1 MVP complete. Next: Phase 2 dashboard (see `doc/roadmap.md`)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.4...v0.0.5
