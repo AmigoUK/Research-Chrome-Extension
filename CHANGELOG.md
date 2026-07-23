@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 3 (PDF anchoring) in progress. Next: ingestion UX — Add PDF / Open in reader (M5)._
+_Phase 3 (PDF anchoring) complete. Next: Phase 4 (CSL style editor) — see `doc/roadmap.md`._
+
+## [0.12.0] — 2026-07-23
+
+### Added
+
+- **PDF ingestion UX (Phase 3, M5)** — the last Phase 3 milestone:
+  - Dashboard **"Add PDF"** (Documents view): upload a local PDF → the bytes are stored (`files/put`),
+    a `type:'pdf'` document is created (`documents/put`), and the reader opens on it.
+  - **"Open in reader"** action on any PDF-capable document row. If the document has a stored file it
+    opens straight away; if its URL is a PDF, the bytes are fetched behind an optional host-permission
+    grant, cached, and then opened.
+
+### Notes
+
+- This completes Phase 3: file storage + PDF anchoring core, a pdf.js reader, text and region
+  anchoring with a persistent annotations rail, and dashboard ingestion.
+- E2E: "Add PDF" uploads a file, creates a pdf document, and opens the reader (14 E2E specs total).
 
 ## [0.11.0] — 2026-07-23
 
@@ -290,7 +307,8 @@ _Phase 3 (PDF anchoring) in progress. Next: ingestion UX — Add PDF / Open in r
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...v0.9.0

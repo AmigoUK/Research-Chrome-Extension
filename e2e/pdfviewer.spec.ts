@@ -181,6 +181,34 @@ test('selecting text and clicking Highlight creates a persisted anchor', async (
   await page.close();
 });
 
+test('dashboard "Add PDF" uploads a file, creates a pdf document, and opens the reader', async () => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await expect(page.locator('#pName')).not.toHaveText('—');
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.locator('#addPdf').click(),
+  ]);
+  const [reader] = await Promise.all([
+    context.waitForEvent('page'),
+    chooser.setFiles(fixturePath),
+  ]);
+
+  // A reader tab opened on the new document and rendered the PDF.
+  expect(reader.url()).toContain('src/pdfviewer/index.html?documentId=');
+  await reader.waitForSelector('.pdf-page canvas');
+
+  // The dashboard Documents table now has the uploaded PDF with an Open action.
+  const row = page.locator('.tbl tbody tr', { hasText: 'sample' });
+  await expect(row).toBeVisible();
+  await expect(row.locator('[data-open]')).toBeVisible();
+
+  await reader.close();
+  await page.close();
+});
+
 test('dragging a region in Region mode anchors a rectangle that persists', async () => {
   await seedPdfDocument('e2e-region-doc');
   const page = await context.newPage();

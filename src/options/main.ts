@@ -24,6 +24,7 @@ import type {
 } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import { templateFor } from '../core/citation/styles';
+import { bytesToBase64 } from '../core/files/base64';
 import {
   computeProgress,
   filterDocuments,
@@ -53,6 +54,7 @@ const ICON = {
   ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>',
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>',
+  open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 5h7a3 3 0 0 1 3 3v11a2.5 2.5 0 0 0-2.5-2.5H2zM22 5h-7a3 3 0 0 0-3 3v11a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>',
 };
 
 interface NavDef {
@@ -497,11 +499,12 @@ function placePop(anchor: HTMLElement): void {
 
 /* ---- Documents ---- */
 function renderDocuments(view: HTMLElement, actions: HTMLElement): void {
-  actions.innerHTML = '';
+  actions.innerHTML = `<button class="btn btn--primary btn--sm" id="addPdf">${ICON.up} Add PDF</button>`;
+  $('#addPdf', actions).onclick = () => void addPdf();
   if (state.documents.length === 0) {
     view.innerHTML = emptyState(
       'No documents yet',
-      'Sources you capture with the side panel appear here, grouped by status and section.',
+      'Add a PDF to read and annotate it, or capture a source with the side panel.',
     );
     return;
   }
@@ -562,7 +565,10 @@ function drawDocuments(): void {
         <td>${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : '<span class="mono">—</span>'}</td>
         <td><button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${statusLabel(d.status)}</button></td>
         <td class="num">${notes || '—'}</td>
-        <td>${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}</td>
+        <td style="white-space:nowrap">
+          ${canOpenInReader(d) ? `<button class="btn btn--ghost btn--sm" data-open title="Open in reader" aria-label="Open in reader">${ICON.open}</button>` : ''}
+          ${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}
+        </td>
       </tr>`;
     })
     .join('')}</tbody></table>`;
@@ -574,6 +580,116 @@ function drawDocuments(): void {
       if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
     });
   });
+  $$('[data-open]', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('tr')?.getAttribute('data-id');
+      const doc = id ? docById(id) : undefined;
+      if (doc) void openInReader(doc);
+    });
+  });
+}
+
+/* ---- PDF ingestion ---- */
+function isPdfUrl(url: string): boolean {
+  return /\.pdf($|\?|#)/i.test(url);
+}
+function canOpenInReader(d: Document): boolean {
+  return d.type === 'pdf' || Boolean(d.fileId) || isPdfUrl(d.url);
+}
+function openReader(documentId: Id): void {
+  window.open(
+    chrome.runtime.getURL(`src/pdfviewer/index.html?documentId=${documentId}`),
+    '_blank',
+    'noopener',
+  );
+}
+async function addPdf(): Promise<void> {
+  if (!state.activeProjectId) return;
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/pdf,.pdf';
+  input.onchange = () => void ingestFile(input.files?.[0]);
+  input.click();
+}
+async function ingestFile(file: File | undefined): Promise<void> {
+  if (!file || !state.activeProjectId) return;
+  try {
+    const buf = await file.arrayBuffer();
+    const fileId = crypto.randomUUID();
+    await sendRequest({
+      type: 'files/put',
+      file: {
+        id: fileId,
+        name: file.name,
+        mime: file.type || 'application/pdf',
+        dataBase64: bytesToBase64(buf),
+      },
+    });
+    const now = nowIso();
+    const doc: Document = {
+      id: crypto.randomUUID(),
+      projectId: state.activeProjectId,
+      url: `file://${file.name}`,
+      fileId,
+      type: 'pdf',
+      metadata: { title: file.name.replace(/\.pdf$/i, '') },
+      status: 'toRead',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await sendRequest({ type: 'documents/put', document: doc });
+    await loadProjectData();
+    render();
+    toast('PDF added', ICON.check);
+    openReader(doc.id);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not add PDF', ICON.warn, true);
+  }
+}
+async function openInReader(d: Document): Promise<void> {
+  if (d.fileId) {
+    openReader(d.id);
+    return;
+  }
+  if (!isPdfUrl(d.url)) {
+    toast('No PDF file to open for this source', ICON.warn, true);
+    return;
+  }
+  let origin: string;
+  try {
+    origin = `${new URL(d.url).origin}/*`;
+  } catch {
+    toast('Invalid PDF URL', ICON.warn, true);
+    return;
+  }
+  const granted = await chrome.permissions.request({ origins: [origin] });
+  if (!granted) {
+    toast('Permission is needed to fetch the PDF', ICON.warn, true);
+    return;
+  }
+  try {
+    const res = await fetch(d.url);
+    if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
+    const buf = await res.arrayBuffer();
+    const fileId = crypto.randomUUID();
+    await sendRequest({
+      type: 'files/put',
+      file: {
+        id: fileId,
+        name: d.url.split('/').pop() || 'document.pdf',
+        mime: 'application/pdf',
+        dataBase64: bytesToBase64(buf),
+      },
+    });
+    const updated: Document = { ...d, fileId, type: 'pdf', updatedAt: nowIso() };
+    await sendRequest({ type: 'documents/put', document: updated });
+    state.documents = state.documents.map((x) => (x.id === d.id ? updated : x));
+    toast('PDF cached', ICON.check);
+    openReader(d.id);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not fetch PDF', ICON.warn, true);
+  }
 }
 
 /* ---- Annotations ---- */
