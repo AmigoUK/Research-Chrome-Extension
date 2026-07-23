@@ -33,6 +33,36 @@ function viewerUrl(documentId: string): string {
   return `chrome-extension://${extensionId}/${path.posix.join('src', 'pdfviewer', 'index.html')}?documentId=${documentId}`;
 }
 
+async function seedPdfDocument(docId: string): Promise<void> {
+  const seed = await context.newPage();
+  await seed.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await seed.evaluate(
+    async ([id, dataBase64]) => {
+      const now = new Date().toISOString();
+      await chrome.runtime.sendMessage({
+        type: 'files/put',
+        file: { id: `${id}-file`, name: 'sample.pdf', mime: 'application/pdf', dataBase64 },
+      });
+      await chrome.runtime.sendMessage({
+        type: 'documents/put',
+        document: {
+          id,
+          projectId: 'e2e-project',
+          url: 'file://sample.pdf',
+          fileId: `${id}-file`,
+          type: 'pdf',
+          metadata: { title: `Doc ${id}` },
+          status: 'toRead',
+          createdAt: now,
+          updatedAt: now,
+        },
+      });
+    },
+    [docId, sampleBase64] as const,
+  );
+  await seed.close();
+}
+
 test('PDF reader renders a stored PDF to a canvas', async () => {
   const seed = await context.newPage();
   // Any extension page can drive the message router; use the options page.
@@ -76,6 +106,77 @@ test('PDF reader renders a stored PDF to a canvas', async () => {
 
   // No worker/CSP errors while rendering.
   expect(errors.join('\n')).not.toMatch(/worker|Content Security Policy|Failed to fetch/i);
+
+  await page.close();
+});
+
+test('a stored PDF text anchor renders as an overlay and rail card, and edits persist', async () => {
+  await seedPdfDocument('e2e-anno-doc');
+  // Seed a PDF text annotation on page 1 directly.
+  const seed = await context.newPage();
+  await seed.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await seed.evaluate(async () => {
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-pdf-anno',
+        projectId: 'e2e-project',
+        documentId: 'e2e-anno-doc',
+        anchor: {
+          kind: 'pdf',
+          selectors: [
+            { type: 'pdfRegion', page: 1, rects: [{ page: 1, left: 0.1, top: 0.1, width: 0.5, height: 0.06 }], quote: 'Hello Context Notes' },
+          ],
+        },
+        content: '',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await seed.close();
+
+  const page = await context.newPage();
+  await page.goto(viewerUrl('e2e-anno-doc'));
+  await expect(page.locator('.pdf-page canvas')).toBeVisible();
+
+  // Overlay resolved from fraction rects, and a rail card with the quote.
+  await expect(page.locator('.anno-layer .ov.text')).toBeVisible();
+  const card = page.locator('.ac[data-id="e2e-pdf-anno"]');
+  await expect(card.locator('.quote')).toHaveText('Hello Context Notes');
+
+  // Edit note + status, then verify persistence after reload.
+  await card.locator('.note-ta').fill('a persisted note');
+  await card.locator('[data-stat]').selectOption('accepted');
+  await page.waitForTimeout(700); // debounced note save
+
+  await page.reload();
+  const card2 = page.locator('.ac[data-id="e2e-pdf-anno"]');
+  await expect(card2.locator('.note-ta')).toHaveValue('a persisted note');
+  await expect(card2.locator('[data-stat]')).toHaveValue('accepted');
+
+  await page.close();
+});
+
+test('selecting text and clicking Highlight creates a persisted anchor', async () => {
+  await seedPdfDocument('e2e-select-doc');
+  const page = await context.newPage();
+  await page.goto(viewerUrl('e2e-select-doc'));
+  await expect(page.locator('.textLayer span')).not.toHaveCount(0);
+
+  // Select the first text span and fire mouseup (as a real drag-select would).
+  await page.locator('.textLayer span').first().selectText();
+  await page.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
+
+  await expect(page.locator('#seltool.on')).toBeVisible();
+  await page.locator('#seltool button', { hasText: 'Highlight' }).click();
+
+  await expect(page.locator('.anno-layer .ov.text')).toBeVisible();
+  await expect(page.locator('#railList .ac')).not.toHaveCount(0);
 
   await page.close();
 });

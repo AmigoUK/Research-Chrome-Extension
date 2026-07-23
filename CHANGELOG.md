@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 3 (PDF anchoring) in progress. Next: text anchoring + annotations rail (M3)._
+_Phase 3 (PDF anchoring) in progress. Next: region (rectangle) anchoring (M4)._
+
+## [0.10.0] — 2026-07-23
+
+### Added
+
+- **PDF text anchoring + annotations rail (Phase 3, M3)**:
+  - A pdf.js **text layer** over each page makes text selectable; selecting text pops a floating
+    toolbar (Highlight / Note) that anchors the selection via `createPdfAnchor` and persists it
+    (`annotations/put`).
+  - **Overlays**: anchored highlights render as positioned overlays resolved from the stored fraction
+    rects, so they track zoom and page size; clicking one focuses its rail card (and vice-versa).
+  - **Annotations rail**: per-page / all-pages scope, cards showing the locator, quoted text, a live
+    **note** textarea (debounced save), a review-**status** select, tags, and delete — wired to
+    `annotations/listByDocument` / `annotations/put` / `annotations/delete`.
+
+### Notes
+
+- Per-annotation "section" and the link-to-section popover from the mock are omitted — the domain
+  `Annotation` has no section field (unchanged this milestone).
+- E2E: a stored anchor renders as an overlay + rail card and note/status edits persist across reload;
+  a real text selection → Highlight creates a persisted anchor (12 E2E specs total).
 
 ## [0.9.0] — 2026-07-23
 
@@ -255,7 +276,8 @@ _Phase 3 (PDF anchoring) in progress. Next: text anchoring + annotations rail (M
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...v0.7.0
