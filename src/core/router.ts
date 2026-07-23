@@ -14,6 +14,7 @@ import {
   formatDocumentCitation,
 } from './usecases/citations';
 import { importReferenceByDoi } from './usecases/references';
+import { bytesToBase64, base64ToBytes } from './files/base64';
 
 function ok(data: unknown): { ok: true; data: unknown } {
   return { ok: true, data };
@@ -58,9 +59,35 @@ export async function handleRequest(
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
       case 'annotations/listByProject':
         return ok(await repos.annotations.listByProject(request.projectId)) as Result;
+      case 'annotations/listByDocument':
+        return ok(await repos.annotations.listByDocument(request.documentId)) as Result;
       case 'annotations/put':
         await repos.annotations.put(request.annotation);
         return ok(null) as Result;
+      case 'annotations/delete':
+        await repos.annotations.delete(request.id);
+        return ok(null) as Result;
+      case 'files/put': {
+        const { id, name, mime, dataBase64 } = request.file;
+        await repos.files.put({
+          id,
+          name,
+          mime,
+          bytes: base64ToBytes(dataBase64),
+          createdAt: capture.now(),
+        });
+        return ok(null) as Result;
+      }
+      case 'files/get': {
+        const file = await repos.files.get(request.id);
+        if (!file) return ok(undefined) as Result;
+        return ok({
+          id: file.id,
+          name: file.name,
+          mime: file.mime,
+          dataBase64: bytesToBase64(file.bytes),
+        }) as Result;
+      }
       case 'references/listByProject':
         return ok(await repos.references.listByProject(request.projectId)) as Result;
       case 'references/put':

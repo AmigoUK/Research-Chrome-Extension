@@ -14,10 +14,11 @@ import type {
   Reference,
   CitationStyle,
   User,
+  StoredFile,
 } from '../../core/model/types';
 
 export const DB_NAME = 'context-notes';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export interface ContextNotesDB extends DBSchema {
   projects: { key: string; value: Project };
@@ -38,6 +39,8 @@ export interface ContextNotesDB extends DBSchema {
   };
   citationStyles: { key: string; value: CitationStyle };
   users: { key: string; value: User };
+  /** Binary payloads (PDF bytes), keyed by id and referenced by Document.fileId. */
+  files: { key: string; value: StoredFile };
 }
 
 type UpgradeTx = IDBPTransaction<
@@ -69,6 +72,10 @@ export const migrations: Record<number, (db: IDBPDatabase<ContextNotesDB>, tx: U
 
       db.createObjectStore('citationStyles', { keyPath: 'id' });
       db.createObjectStore('users', { keyPath: 'id' });
+    },
+    2(db) {
+      // Phase 3: binary payload store for PDF bytes (Document.fileId → files).
+      db.createObjectStore('files', { keyPath: 'id' });
     },
   };
 

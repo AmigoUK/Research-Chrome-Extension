@@ -7,6 +7,14 @@
 import type { Project, Document, Annotation, Reference, CitationStyle, Id } from './model/types';
 import type { CaptureInput, CaptureResult } from './usecases/capture';
 
+/** File bytes cross the messaging boundary as base64 (JSON-safe). */
+export interface FilePayload {
+  id: Id;
+  name: string;
+  mime: string;
+  dataBase64: string;
+}
+
 export interface MessageMap {
   ping: { req: Record<never, never>; res: 'pong' };
   'projects/list': { req: Record<never, never>; res: Project[] };
@@ -15,7 +23,11 @@ export interface MessageMap {
   'documents/put': { req: { document: Document }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
   'annotations/listByProject': { req: { projectId: Id }; res: Annotation[] };
+  'annotations/listByDocument': { req: { documentId: Id }; res: Annotation[] };
   'annotations/put': { req: { annotation: Annotation }; res: null };
+  'annotations/delete': { req: { id: Id }; res: null };
+  'files/put': { req: { file: FilePayload }; res: null };
+  'files/get': { req: { id: Id }; res: FilePayload | undefined };
   'references/listByProject': { req: { projectId: Id }; res: Reference[] };
   'references/put': { req: { reference: Reference }; res: null };
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };

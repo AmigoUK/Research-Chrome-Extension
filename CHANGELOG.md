@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 (Dashboard & Workflow) core complete. Next: Phase 3 (PDF anchoring) — see `doc/roadmap.md`._
+_Phase 3 (PDF anchoring) in progress. Next: pdf.js viewer surface (M2)._
+
+## [0.8.0] — 2026-07-23
+
+### Added
+
+- **PDF anchoring foundation (Phase 3, M1)** — no UI yet:
+  - IndexedDB **schema v2**: a new `files` store for binary payloads (PDF bytes), reached via a new
+    `FileRepository`. `migrations[1]` is untouched; `migrations[2]` appends the store.
+  - Pure **PDF anchoring core** (`src/core/anchoring/pdf.ts`) mirroring the web anchoring module:
+    `createPdfAnchor` / `resolvePdfAnchor` store rectangles as **fractions (0–1) of the page box**, so
+    anchors are invariant to zoom and render DPR. Unit-tested (round-trip + zoom-invariance).
+  - Messages `files/put` / `files/get` (bytes cross the messaging boundary as **base64**, since
+    `chrome.runtime.sendMessage` is JSON-serialised), plus `annotations/listByDocument` and
+    `annotations/delete`. Router cases + tests.
+  - `'pdf'` added to `DocumentType`; a `StoredFile` model type.
+
+### Notes
+
+- 83 unit tests (base64 round-trip, PDF anchoring, new router routes, schema-v2 store list).
 
 ## [0.7.0] — 2026-07-23
 
@@ -218,7 +237,8 @@ _Phase 2 (Dashboard & Workflow) core complete. Next: Phase 3 (PDF anchoring) —
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...v0.5.0

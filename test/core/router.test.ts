@@ -122,6 +122,55 @@ describe('handleRequest', () => {
     expect(res.ok && Array.isArray(res.data) && res.data).toHaveLength(1);
   });
 
+  it('puts, lists by document, and deletes annotations', async () => {
+    const now = NOW;
+    const annotation = {
+      id: 'an-doc',
+      projectId: 'p1',
+      documentId: 'doc-9',
+      anchor: { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] },
+      content: 'note',
+      tags: [],
+      status: 'draft' as const,
+      author: 'me',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await handleRequest(repos, { type: 'annotations/put', annotation });
+    const listed = await handleRequest(repos, {
+      type: 'annotations/listByDocument',
+      documentId: 'doc-9',
+    });
+    expect(listed.ok && Array.isArray(listed.data) && listed.data).toHaveLength(1);
+
+    const del = await handleRequest(repos, { type: 'annotations/delete', id: 'an-doc' });
+    expect(del).toEqual({ ok: true, data: null });
+    const after = await handleRequest(repos, {
+      type: 'annotations/listByDocument',
+      documentId: 'doc-9',
+    });
+    expect(after.ok && Array.isArray(after.data) && after.data).toHaveLength(0);
+  });
+
+  it('stores and reads back file bytes as base64 (write→read round trip)', async () => {
+    // "%PDF-1.7" → base64
+    const dataBase64 = 'JVBERi0xLjc=';
+    const putRes = await handleRequest(repos, {
+      type: 'files/put',
+      file: { id: 'f1', name: 'paper.pdf', mime: 'application/pdf', dataBase64 },
+    });
+    expect(putRes).toEqual({ ok: true, data: null });
+
+    const getRes = await handleRequest(repos, { type: 'files/get', id: 'f1' });
+    expect(getRes.ok).toBe(true);
+    const file = getRes.ok ? (getRes.data as { name: string; dataBase64: string }) : null;
+    expect(file?.name).toBe('paper.pdf');
+    expect(file?.dataBase64).toBe(dataBase64);
+
+    const missing = await handleRequest(repos, { type: 'files/get', id: 'nope' });
+    expect(missing).toEqual({ ok: true, data: undefined });
+  });
+
   it('reports an error result for unknown message types', async () => {
     // Cast through unknown to simulate a malformed message off the wire.
     const res = await handleRequest(repos, { type: 'nope' } as unknown as never);

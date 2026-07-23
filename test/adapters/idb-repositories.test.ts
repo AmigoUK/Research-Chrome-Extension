@@ -54,11 +54,11 @@ beforeEach(async () => {
   repos = createRepositories(db);
 });
 
-describe('schema migration (v0 → v1)', () => {
+describe('schema migration (v0 → current)', () => {
   it('creates every object store on first open', async () => {
     const db = await openContextNotesDB(`stores-${dbCounter++}`);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['annotations', 'citationStyles', 'documents', 'projects', 'references', 'users'].sort(),
+      ['annotations', 'citationStyles', 'documents', 'files', 'projects', 'references', 'users'].sort(),
     );
   });
 });

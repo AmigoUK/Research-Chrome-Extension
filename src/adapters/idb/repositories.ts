@@ -12,6 +12,7 @@ import type {
   ReferenceRepository,
   CitationStyleRepository,
   UserRepository,
+  FileRepository,
   RepositorySet,
 } from '../../core/ports/repositories';
 import type {
@@ -21,6 +22,7 @@ import type {
   Reference,
   CitationStyle,
   User,
+  StoredFile,
   Id,
 } from '../../core/model/types';
 import type { ContextNotesDatabase } from './db';
@@ -132,6 +134,19 @@ class IdbUserRepository implements UserRepository {
   }
 }
 
+class IdbFileRepository implements FileRepository {
+  constructor(private readonly db: ContextNotesDatabase) {}
+  get(id: Id): Promise<StoredFile | undefined> {
+    return this.db.get('files', id);
+  }
+  async put(file: StoredFile): Promise<void> {
+    await this.db.put('files', file);
+  }
+  async delete(id: Id): Promise<void> {
+    await this.db.delete('files', id);
+  }
+}
+
 function normaliseDoi(doi: unknown): string | undefined {
   if (typeof doi !== 'string') return undefined;
   return doi
@@ -148,5 +163,6 @@ export function createRepositories(db: ContextNotesDatabase): RepositorySet {
     references: new IdbReferenceRepository(db),
     citationStyles: new IdbCitationStyleRepository(db),
     users: new IdbUserRepository(db),
+    files: new IdbFileRepository(db),
   };
 }

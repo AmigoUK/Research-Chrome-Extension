@@ -44,7 +44,7 @@ export interface PdfRect {
   height: number;
 }
 
-/** Percent-coordinate rectangles on a PDF page, plus an optional quote. */
+/** Fraction-coordinate (0–1) rectangles on a PDF page, plus an optional quote. */
 export interface PdfRegionSelector {
   type: 'pdfRegion';
   page: number;
@@ -91,7 +91,16 @@ export interface Project {
   updatedAt: IsoDateTime;
 }
 
-export type DocumentType = 'article' | 'report' | 'dataset' | 'foi' | 'case' | 'webPage';
+export type DocumentType = 'article' | 'report' | 'dataset' | 'foi' | 'case' | 'webPage' | 'pdf';
+
+/** Stored binary payload (e.g. a PDF), referenced by `Document.fileId`. */
+export interface StoredFile {
+  id: Id;
+  name: string;
+  mime: string;
+  bytes: ArrayBuffer;
+  createdAt: IsoDateTime;
+}
 
 export interface DocumentMetadata {
   title?: string;

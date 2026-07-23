@@ -11,6 +11,7 @@ import type {
   Reference,
   CitationStyle,
   User,
+  StoredFile,
   Id,
 } from '../model/types';
 
@@ -60,6 +61,12 @@ export interface UserRepository {
   delete(id: Id): Promise<void>;
 }
 
+export interface FileRepository {
+  get(id: Id): Promise<StoredFile | undefined>;
+  put(file: StoredFile): Promise<void>;
+  delete(id: Id): Promise<void>;
+}
+
 export interface RepositorySet {
   projects: ProjectRepository;
   documents: DocumentRepository;
@@ -67,4 +74,5 @@ export interface RepositorySet {
   references: ReferenceRepository;
   citationStyles: CitationStyleRepository;
   users: UserRepository;
+  files: FileRepository;
 }
