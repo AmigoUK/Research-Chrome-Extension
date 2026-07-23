@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 1 MVP in progress — see `doc/build-plan.md`._
+_Phase 1 MVP complete. Next: Phase 2 dashboard (see `doc/roadmap.md`)._
+
+## [0.1.1] — 2026-07-23
+
+### Added
+
+- End-to-end tests (Playwright) that load the built extension into a headed Chromium: the side
+  panel renders and seeds a default project, and a filed document flows through
+  messaging → router → IndexedDB → UI with updated progress.
+- CI job running the E2E suite under xvfb.
+
+### Notes
+
+- Credit-footer decision: placed on the Phase 2 Dashboard only, not the space-constrained side
+  panel.
 
 ## [0.1.0] — 2026-07-23
 
@@ -96,7 +110,8 @@ _Phase 1 MVP in progress — see `doc/build-plan.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.3...v0.0.4
