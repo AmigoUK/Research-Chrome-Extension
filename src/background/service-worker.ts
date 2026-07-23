@@ -2,9 +2,20 @@
  * Background service worker (MV3).
  *
  * The worker is ephemeral — Chrome terminates it after ~30s of inactivity —
- * so every handler assumes a cold start and holds no critical state in memory.
- * Persistent state lives in IndexedDB (added in a later milestone).
+ * so every handler assumes a cold start. Persistent state lives in IndexedDB;
+ * the database handle is opened lazily and cached for the worker's lifetime.
  */
+import { openContextNotesDB } from '../adapters/idb/db';
+import { createRepositories } from '../adapters/idb/repositories';
+import { registerMessageRouter } from '../adapters/chrome/messaging';
+import type { RepositorySet } from '../core/ports/repositories';
+
+let reposPromise: Promise<RepositorySet> | undefined;
+
+function getRepositories(): Promise<RepositorySet> {
+  reposPromise ??= openContextNotesDB().then(createRepositories);
+  return reposPromise;
+}
 
 // Clicking the toolbar action opens the side panel — the primary surface.
 chrome.runtime.onInstalled.addListener(() => {
@@ -13,16 +24,5 @@ chrome.runtime.onInstalled.addListener(() => {
     .catch((err: unknown) => console.error('[context-notes] setPanelBehavior failed', err));
 });
 
-// Placeholder message router. The typed contract and use-case dispatch
-// are introduced with the domain core (milestone M2).
-chrome.runtime.onMessage.addListener((message: unknown, _sender, sendResponse) => {
-  if (
-    typeof message === 'object' &&
-    message !== null &&
-    'type' in message &&
-    message.type === 'PING'
-  ) {
-    sendResponse({ type: 'PONG' });
-  }
-  return false;
-});
+// Route typed messages from the UI to the pure domain router.
+registerMessageRouter(getRepositories);

@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Phase 1 MVP in progress — see `doc/build-plan.md`._
 
+## [0.0.3] — 2026-07-23
+
+### Added
+
+- Typed message contract (`MessageMap`) shared by UI and service worker.
+- Pure message router (`handleRequest`) dispatching requests to repository operations,
+  unit-tested independently of `chrome.*`.
+- `chrome.runtime` messaging adapter: typed `sendRequest` client and `registerMessageRouter`
+  server binding, with lazy cold-start repository resolution.
+- Service worker wired to the router with a cached IndexedDB handle.
+- Round-trip tests over a mocked `chrome.runtime` (write→read a document end to end); 17 tests total.
+
 ## [0.0.2] — 2026-07-23
 
 ### Added
@@ -31,6 +43,7 @@ _Phase 1 MVP in progress — see `doc/build-plan.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.2...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.3...HEAD
+[0.0.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.2...v0.0.3
 [0.0.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/AmigoUK/Research-Chrome-Extension/releases/tag/v0.0.1
