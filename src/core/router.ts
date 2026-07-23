@@ -58,6 +58,9 @@ export async function handleRequest(
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
       case 'annotations/listByProject':
         return ok(await repos.annotations.listByProject(request.projectId)) as Result;
+      case 'annotations/put':
+        await repos.annotations.put(request.annotation);
+        return ok(null) as Result;
       case 'references/listByProject':
         return ok(await repos.references.listByProject(request.projectId)) as Result;
       case 'references/put':

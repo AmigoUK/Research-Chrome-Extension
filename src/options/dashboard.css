@@ -160,6 +160,8 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 .stat-tag.ok { color: var(--success); border-color: oklch(80% .06 155); }
 .stat-tag.rej { color: var(--danger); border-color: oklch(82% .09 27); }
 .stat-tag.rep { color: var(--accent); border-color: oklch(80% .08 28); }
+button.stat-tag { background: none; cursor: pointer; transition: border-color .12s, color .12s; }
+button.stat-tag:hover { border-color: var(--fg); }
 
 /* ---- Annotations ---- */
 .anno { border: 1px solid var(--border); border-radius: 11px; background: var(--surface); padding: 15px 16px; margin-bottom: 11px; animation: rowIn .3s var(--ease-out) both; }

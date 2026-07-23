@@ -7,7 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 in progress. Next: Annotations view (M5)._
+_Phase 2 in progress. Next: Citation styles view (M6)._
+
+## [0.6.0] — 2026-07-23
+
+### Added
+
+- **Annotations view (Phase 2, M5)**: a searchable, filterable list of the project's notes — each
+  card shows the anchor locator (a quote snippet or PDF page), the source document line, the quoted
+  note body, a review-status tag, and its tags, plus a **Cite** action that copies the source's
+  citation.
+- **Review workflow**: the status tag opens a popover to move a note through
+  draft → accepted → in report → rejected, persisted via the new `annotations/put` message.
+- Filter chips for All / Draft / Accepted / In report / Rejected.
+
+### Notes
+
+- 71 unit tests (router `annotations/put` round-trip) and a new E2E asserting a review-status change
+  persists across a reload.
 
 ## [0.5.0] — 2026-07-23
 
@@ -183,7 +200,8 @@ _Phase 2 in progress. Next: Annotations view (M5)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...v0.3.0

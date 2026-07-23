@@ -147,6 +147,48 @@ test('References view lists stored references and offers a DOI import form', asy
   await page.close();
 });
 
+test('Annotations view changes a note review status and persists it', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-anno-1',
+        projectId,
+        documentId: 'nope',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'a quoted passage' }] },
+        content: 'A note to reclassify',
+        tags: ['review'],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  const card = page.locator('.anno[data-id="e2e-anno-1"]');
+  await expect(card.locator('[data-status]')).toHaveText('Draft');
+
+  await card.locator('[data-status]').click();
+  await page.locator('#pop [data-set="accepted"]').click();
+  await expect(card.locator('[data-status]')).toHaveText('Accepted');
+
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  await expect(page.locator('.anno[data-id="e2e-anno-1"] [data-status]')).toHaveText('Accepted');
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

@@ -10,7 +10,16 @@
  */
 import './dashboard.css';
 import { sendRequest } from '../adapters/chrome/messaging';
-import type { Project, Document, Annotation, Reference, CitationStyle, Id } from '../core/model/types';
+import type {
+  Project,
+  Document,
+  Annotation,
+  AnnotationStatus,
+  Anchor,
+  Reference,
+  CitationStyle,
+  Id,
+} from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import { templateFor } from '../core/citation/styles';
 import {
@@ -95,6 +104,7 @@ interface DashState {
   flash: Id | null;
   drag: Id | null;
   docFilter: ListFilter;
+  annoFilter: { search: string; status: AnnotationStatus | 'all' };
 }
 const state: DashState = {
   projects: [],
@@ -107,6 +117,7 @@ const state: DashState = {
   flash: null,
   drag: null,
   docFilter: { search: '', status: 'all' },
+  annoFilter: { search: '', status: 'all' },
 };
 
 const activeProject = (): Project | undefined =>
@@ -221,6 +232,7 @@ async function switchProject(id: Id): Promise<void> {
   if (id === state.activeProjectId) return;
   state.activeProjectId = id;
   state.docFilter = { search: '', status: 'all' };
+  state.annoFilter = { search: '', status: 'all' };
   await loadProjectData();
   render();
 }
@@ -250,7 +262,7 @@ function go(route: Route): void {
 const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = {
   overview: renderOverview,
   documents: renderDocuments,
-  annotations: (v) => placeholder(v, 'Annotations', 'Notes across the project will collect here.'),
+  annotations: renderAnnotations,
   references: renderReferences,
   styles: (v) => placeholder(v, 'Citation styles', 'Style profiles and the rule editor arrive soon.'),
 };
@@ -526,6 +538,180 @@ function drawDocuments(): void {
       if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
     });
   });
+}
+
+/* ---- Annotations ---- */
+const ANNO_STATUS: Record<AnnotationStatus, { label: string; cls: string }> = {
+  draft: { label: 'Draft', cls: '' },
+  accepted: { label: 'Accepted', cls: 'ok' },
+  rejected: { label: 'Rejected', cls: 'rej' },
+  includedInReport: { label: 'In report', cls: 'rep' },
+};
+const ANNO_STATUSES = Object.keys(ANNO_STATUS) as AnnotationStatus[];
+
+function anchorLabel(anchor: Anchor): string {
+  if (anchor.kind === 'pdf') {
+    const first = anchor.selectors[0];
+    return first ? `p. ${first.page}` : 'PDF region';
+  }
+  for (const sel of anchor.selectors) {
+    if (sel.type === 'textQuote' && sel.exact) {
+      const q = sel.exact.trim();
+      return q.length > 40 ? `“${q.slice(0, 40)}…”` : `“${q}”`;
+    }
+  }
+  return 'Web selection';
+}
+
+function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = '';
+  if (state.annotations.length === 0) {
+    view.innerHTML = emptyState(
+      'No annotations yet',
+      'Highlight a passage on a page with the side panel and your notes collect here.',
+    );
+    return;
+  }
+  view.innerHTML = `
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="qa" placeholder="Search notes, tags…" value="${esc(state.annoFilter.search)}" aria-label="Search annotations">
+      </div>
+      <div class="filters" id="afilters"></div>
+    </div>
+    <div id="alist"></div>`;
+  $<HTMLInputElement>('#qa', view).addEventListener('input', (e) => {
+    state.annoFilter = { ...state.annoFilter, search: (e.target as HTMLInputElement).value };
+    drawAnnotations();
+  });
+  renderAnnoFilters($('#afilters', view));
+  drawAnnotations();
+}
+
+function renderAnnoFilters(host: HTMLElement): void {
+  const opts: Array<{ id: DashState['annoFilter']['status']; label: string }> = [
+    { id: 'all', label: 'All' },
+    { id: 'draft', label: 'Draft' },
+    { id: 'accepted', label: 'Accepted' },
+    { id: 'includedInReport', label: 'In report' },
+    { id: 'rejected', label: 'Rejected' },
+  ];
+  host.innerHTML = opts
+    .map(
+      (o) =>
+        `<button class="fchip" data-v="${o.id}" aria-pressed="${state.annoFilter.status === o.id}">${o.label}</button>`,
+    )
+    .join('');
+  $$('.fchip', host).forEach((b) => {
+    b.onclick = () => {
+      state.annoFilter = {
+        ...state.annoFilter,
+        status: b.dataset.v as DashState['annoFilter']['status'],
+      };
+      $$('.fchip', host).forEach((x) =>
+        x.setAttribute('aria-pressed', String(x.dataset.v === state.annoFilter.status)),
+      );
+      drawAnnotations();
+    };
+  });
+}
+
+function filterAnnotations(): Annotation[] {
+  const q = state.annoFilter.search.trim().toLowerCase();
+  return state.annotations.filter((a) => {
+    if (state.annoFilter.status !== 'all' && a.status !== state.annoFilter.status) return false;
+    if (q && !(a.content + ' ' + a.tags.join(' ')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
+function drawAnnotations(): void {
+  const box = $('#alist');
+  const rows = filterAnnotations();
+  if (rows.length === 0) {
+    box.innerHTML = `<div class="empty" style="padding:40px"><div class="et">No annotations match</div><div class="ed">Try another tag or status.</div></div>`;
+    return;
+  }
+  box.innerHTML = rows
+    .map((a) => {
+      const doc = docById(a.documentId);
+      const m = doc?.metadata;
+      const srcLine = m
+        ? [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ')
+        : '';
+      const st = ANNO_STATUS[a.status];
+      return `<article class="anno" data-id="${a.id}">
+        <div class="anno-top"><span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
+        <div class="anno-body">${esc(a.content)}</div>
+        <div class="anno-foot">
+          <button class="stat-tag ${st.cls}" data-status aria-label="Change review status">${st.label}</button>
+          ${a.tags.map((t) => `<span class="chip">#${esc(t)}</span>`).join('')}
+          <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-cite="${a.documentId}">${ICON.copy} Cite</button>
+        </div></article>`;
+    })
+    .join('');
+  $$('[data-status]', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('.anno')?.getAttribute('data-id');
+      const anno = id ? state.annotations.find((a) => a.id === id) : undefined;
+      if (anno) openAnnoStatusPop(e.currentTarget as HTMLElement, anno);
+    });
+  });
+  $$('[data-cite]', box).forEach((b) => {
+    b.onclick = () => {
+      const docId = b.dataset.cite;
+      if (docId) void citeDocument(docId);
+    };
+  });
+}
+
+function openAnnoStatusPop(anchor: HTMLElement, anno: Annotation): void {
+  const pop = $('#pop');
+  pop.innerHTML =
+    `<div class="pl">Review status</div>` +
+    ANNO_STATUSES.map(
+      (s) =>
+        `<button class="pi${s === anno.status ? ' cur' : ''}" data-set="${s}">${ANNO_STATUS[s].label}<span class="ck">${ICON.check}</span></button>`,
+    ).join('');
+  $$('[data-set]', pop).forEach((b) => {
+    b.onclick = () => {
+      const ns = b.dataset.set as AnnotationStatus | undefined;
+      closePop();
+      if (ns) void setAnnotationStatus(anno, ns);
+    };
+  });
+  placePop(anchor);
+}
+
+async function setAnnotationStatus(anno: Annotation, status: AnnotationStatus): Promise<void> {
+  if (anno.status === status) return;
+  const updated: Annotation = { ...anno, status, updatedAt: nowIso() };
+  try {
+    await sendRequest({ type: 'annotations/put', annotation: updated });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not update note', ICON.warn, true);
+    return;
+  }
+  state.annotations = state.annotations.map((a) => (a.id === anno.id ? updated : a));
+  render();
+  toast(`Note set to “${ANNO_STATUS[status].label}”`, ICON.check);
+}
+
+async function citeDocument(documentId: Id): Promise<void> {
+  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  try {
+    const { bibliography } = await sendRequest({
+      type: 'citations/document',
+      documentId,
+      template,
+    });
+    await navigator.clipboard.writeText(bibliography);
+    toast('Citation copied', ICON.copy);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t copy citation', ICON.warn, true);
+  }
 }
 
 /* ---- References ---- */

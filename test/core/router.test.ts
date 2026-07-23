@@ -53,20 +53,24 @@ describe('handleRequest', () => {
     expect(listRes.ok && (listRes.data as Document[])).toHaveLength(1);
   });
 
-  it('lists annotations by project', async () => {
+  it('puts and lists annotations by project', async () => {
     const now = NOW;
-    await repos.annotations.put({
-      id: 'an1',
-      projectId: 'p1',
-      documentId: 'd1',
-      anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'note' }] },
-      content: 'note',
-      tags: [],
-      status: 'draft',
-      author: 'me',
-      createdAt: now,
-      updatedAt: now,
+    const putRes = await handleRequest(repos, {
+      type: 'annotations/put',
+      annotation: {
+        id: 'an1',
+        projectId: 'p1',
+        documentId: 'd1',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'note' }] },
+        content: 'note',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
     });
+    expect(putRes).toEqual({ ok: true, data: null });
     const res = await handleRequest(repos, { type: 'annotations/listByProject', projectId: 'p1' });
     expect(res.ok && Array.isArray(res.data) && res.data).toHaveLength(1);
   });

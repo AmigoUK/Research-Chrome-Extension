@@ -15,6 +15,7 @@ export interface MessageMap {
   'documents/put': { req: { document: Document }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
   'annotations/listByProject': { req: { projectId: Id }; res: Annotation[] };
+  'annotations/put': { req: { annotation: Annotation }; res: null };
   'references/listByProject': { req: { projectId: Id }; res: Reference[] };
   'references/put': { req: { reference: Reference }; res: null };
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
