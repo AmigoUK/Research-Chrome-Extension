@@ -13,7 +13,12 @@ import { sendRequest } from '../adapters/chrome/messaging';
 import type { Project, Document, Annotation, CitationStyle, Id } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import { templateFor } from '../core/citation/styles';
-import { computeProgress } from '../sidepanel/view-model';
+import {
+  computeProgress,
+  filterDocuments,
+  statusCounts,
+  type ListFilter,
+} from '../sidepanel/view-model';
 import { ROUTE_TITLES, STATUS_META, isRoute, statusDot, statusLabel, type Route } from './view-model';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T =>
@@ -34,6 +39,7 @@ const ICON = {
   note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
   copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
+  ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>',
 };
 
 interface NavDef {
@@ -86,6 +92,7 @@ interface DashState {
   route: Route;
   flash: Id | null;
   drag: Id | null;
+  docFilter: ListFilter;
 }
 const state: DashState = {
   projects: [],
@@ -96,6 +103,7 @@ const state: DashState = {
   route: 'overview',
   flash: null,
   drag: null,
+  docFilter: { search: '', status: 'all' },
 };
 
 const activeProject = (): Project | undefined =>
@@ -207,6 +215,7 @@ function renderProjSwitch(): void {
 async function switchProject(id: Id): Promise<void> {
   if (id === state.activeProjectId) return;
   state.activeProjectId = id;
+  state.docFilter = { search: '', status: 'all' };
   await loadProjectData();
   render();
 }
@@ -235,8 +244,7 @@ function go(route: Route): void {
 }
 const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = {
   overview: renderOverview,
-  documents: (v) =>
-    placeholder(v, 'Workflow board', 'The Kanban board and project stats land in the next milestone.'),
+  documents: renderDocuments,
   annotations: (v) => placeholder(v, 'Annotations', 'Notes across the project will collect here.'),
   references: (v) => placeholder(v, 'References', 'Bibliographic records and DOI import arrive soon.'),
   styles: (v) => placeholder(v, 'Citation styles', 'Style profiles and the rule editor arrive soon.'),
@@ -432,6 +440,95 @@ function placePop(anchor: HTMLElement): void {
   if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
   pop.style.left = `${Math.max(12, left)}px`;
   pop.style.top = `${top}px`;
+}
+
+/* ---- Documents ---- */
+function renderDocuments(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = '';
+  if (state.documents.length === 0) {
+    view.innerHTML = emptyState(
+      'No documents yet',
+      'Sources you capture with the side panel appear here, grouped by status and section.',
+    );
+    return;
+  }
+  view.innerHTML = `
+    <div class="toolbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input id="q" placeholder="Search title, author, DOI…" value="${esc(state.docFilter.search)}" aria-label="Search documents">
+      </div>
+      <div class="filters" id="dfilters"></div>
+    </div>
+    <div id="dtbl"></div>`;
+  $<HTMLInputElement>('#q', view).addEventListener('input', (e) => {
+    state.docFilter = { ...state.docFilter, search: (e.target as HTMLInputElement).value };
+    drawDocuments();
+  });
+  renderDocFilters($('#dfilters', view));
+  drawDocuments();
+}
+
+function renderDocFilters(host: HTMLElement): void {
+  const counts = statusCounts(state.documents);
+  const opts: Array<{ id: ListFilter['status']; label: string; dot?: string }> = [
+    { id: 'all', label: 'All' },
+    ...STATUS_META.map((s) => ({ id: s.id, label: s.label, dot: statusDot(s.id) })),
+  ];
+  host.innerHTML = opts
+    .map(
+      (o) =>
+        `<button class="fchip" data-v="${o.id}" aria-pressed="${state.docFilter.status === o.id}">${o.dot ? `<span class="d" style="background:${o.dot}"></span>` : ''}${o.label} ${counts[o.id]}</button>`,
+    )
+    .join('');
+  $$('.fchip', host).forEach((b) => {
+    b.onclick = () => {
+      state.docFilter = { ...state.docFilter, status: b.dataset.v as ListFilter['status'] };
+      $$('.fchip', host).forEach((x) =>
+        x.setAttribute('aria-pressed', String(x.dataset.v === state.docFilter.status)),
+      );
+      drawDocuments();
+    };
+  });
+}
+
+function drawDocuments(): void {
+  const box = $('#dtbl');
+  const rows = filterDocuments(state.documents, state.docFilter);
+  if (rows.length === 0) {
+    box.innerHTML = `<div class="empty" style="padding:40px"><div class="et">Nothing matches</div><div class="ed">Clear the search or status filter.</div></div>`;
+    return;
+  }
+  box.innerHTML = `<table class="tbl"><thead><tr><th>Source</th><th>Section</th><th>Status</th><th class="num">Notes</th><th></th></tr></thead><tbody>${rows
+    .map((d) => {
+      const m = d.metadata;
+      const sub = [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ');
+      const notes = notesFor(d.id);
+      return `<tr data-id="${d.id}">
+        <td><div class="ttl">${esc(m.title ?? d.url)}</div><div class="sub">${esc(sub)}</div></td>
+        <td>${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : '<span class="mono">—</span>'}</td>
+        <td><button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${statusLabel(d.status)}</button></td>
+        <td class="num">${notes || '—'}</td>
+        <td>${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}</td>
+      </tr>`;
+    })
+    .join('')}</tbody></table>`;
+  $$('.spill', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('tr')?.getAttribute('data-id');
+      const doc = id ? docById(id) : undefined;
+      if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
+    });
+  });
+}
+
+function emptyState(title: string, desc: string): string {
+  return `<div class="empty">
+    <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
+    <div class="et">${esc(title)}</div>
+    <div class="ed">${esc(desc)}</div>
+  </div>`;
 }
 
 function placeholder(view: HTMLElement, title: string, desc: string): void {

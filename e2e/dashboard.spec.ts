@@ -65,6 +65,41 @@ test('nav routes update the topbar title', async () => {
   await page.close();
 });
 
+test('Documents view filters rows by search text', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    const mk = (id: string, title: string) => ({
+      id,
+      projectId,
+      url: `https://example.org/${id}`,
+      type: 'article',
+      metadata: { title, authors: ['Doe, J.'], year: 2024, journal: 'Journal' },
+      status: 'toRead',
+      section: 'Literature',
+      createdAt: now,
+      updatedAt: now,
+    });
+    await chrome.runtime.sendMessage({ type: 'documents/put', document: mk('e2e-docs-heat', 'Urban heat island effects') });
+    await chrome.runtime.sendMessage({ type: 'documents/put', document: mk('e2e-docs-air', 'Air quality monitoring dataset') });
+  });
+  await page.reload();
+
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+  await expect(page.locator('.tbl tbody tr')).not.toHaveCount(0);
+
+  await page.locator('#q').fill('heat island');
+  await expect(page.locator('.tbl tbody tr[data-id="e2e-docs-heat"]')).toBeVisible();
+  await expect(page.locator('.tbl tbody tr[data-id="e2e-docs-air"]')).toHaveCount(0);
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

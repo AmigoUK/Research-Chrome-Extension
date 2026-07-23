@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 in progress. Next: Documents view (M3)._
+_Phase 2 in progress. Next: References view + DOI import (M4)._
+
+## [0.4.0] — 2026-07-23
+
+### Added
+
+- **Documents view (Phase 2, M3)**: a searchable, filterable table of the project's sources — live
+  search over title/author/DOI, status filter chips with live counts, per-row Section chip, a Status
+  pill that opens the shared "Move to" popover, a notes count, and an external-link action to the
+  source's DOI. Empty and no-match states included.
+
+### Notes
+
+- Reuses the side-panel pure view-model (`filterDocuments`, `statusCounts`) — no duplicated logic.
+- New E2E asserting the Documents search filters the table.
 
 ## [0.3.0] — 2026-07-23
 
@@ -150,7 +164,8 @@ _Phase 2 in progress. Next: Documents view (M3)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...v0.1.1
