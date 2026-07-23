@@ -10,8 +10,11 @@
  */
 import './dashboard.css';
 import { sendRequest } from '../adapters/chrome/messaging';
-import type { Project, Document, Id } from '../core/model/types';
-import { ROUTE_TITLES, isRoute, type Route } from './view-model';
+import type { Project, Document, Annotation, CitationStyle, Id } from '../core/model/types';
+import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
+import { templateFor } from '../core/citation/styles';
+import { computeProgress } from '../sidepanel/view-model';
+import { ROUTE_TITLES, STATUS_META, isRoute, statusDot, statusLabel, type Route } from './view-model';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T =>
   root.querySelector(sel) as T;
@@ -28,6 +31,9 @@ const ICON = {
   check:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5"/></svg>',
   warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
 };
 
 interface NavDef {
@@ -53,7 +59,7 @@ const NAV: NavDef[] = [
   {
     id: 'annotations',
     label: 'Annotations',
-    count: () => undefined,
+    count: () => state.annotations.length,
     icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   },
   {
@@ -65,7 +71,7 @@ const NAV: NavDef[] = [
   {
     id: 'styles',
     label: 'Citation styles',
-    count: () => undefined,
+    count: () => (state.styles.length > 0 ? state.styles.length : undefined),
     icon: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   },
 ];
@@ -75,12 +81,41 @@ interface DashState {
   projects: Project[];
   activeProjectId: Id | null;
   documents: Document[];
+  annotations: Annotation[];
+  styles: CitationStyle[];
   route: Route;
+  flash: Id | null;
+  drag: Id | null;
 }
-const state: DashState = { projects: [], activeProjectId: null, documents: [], route: 'overview' };
+const state: DashState = {
+  projects: [],
+  activeProjectId: null,
+  documents: [],
+  annotations: [],
+  styles: [],
+  route: 'overview',
+  flash: null,
+  drag: null,
+};
 
 const activeProject = (): Project | undefined =>
   state.projects.find((p) => p.id === state.activeProjectId);
+const docById = (id: Id): Document | undefined => state.documents.find((d) => d.id === id);
+const activeStyle = (): CitationStyle | undefined =>
+  state.styles.find((s) => s.id === activeProject()?.defaultCitationStyleId) ?? state.styles[0];
+const notesFor = (documentId: Id): number =>
+  state.annotations.filter((a) => a.documentId === documentId).length;
+
+function firstSurname(name: string): string {
+  return name.split(',')[0]?.trim() || name;
+}
+function authorLabel(authors?: string[]): string {
+  const a = (authors ?? []).map(firstSurname);
+  if (a.length === 0) return 'Unknown author';
+  if (a.length === 1) return a[0]!;
+  if (a.length === 2) return `${a[0]} & ${a[1]}`;
+  return `${a[0]} et al.`;
+}
 
 /* ---- Data ---- */
 function nowIso(): string {
@@ -106,10 +141,22 @@ async function loadProjects(): Promise<void> {
   }
   if (!activeProject()) state.activeProjectId = state.projects[0]?.id ?? null;
 }
-async function loadDocuments(): Promise<void> {
-  state.documents = state.activeProjectId
-    ? await sendRequest({ type: 'documents/listByProject', projectId: state.activeProjectId })
-    : [];
+async function loadProjectData(): Promise<void> {
+  if (!state.activeProjectId) {
+    state.documents = [];
+    state.annotations = [];
+    state.styles = [];
+    return;
+  }
+  const projectId = state.activeProjectId;
+  const [documents, annotations, styles] = await Promise.all([
+    sendRequest({ type: 'documents/listByProject', projectId }),
+    sendRequest({ type: 'annotations/listByProject', projectId }),
+    sendRequest({ type: 'citationStyles/list' }),
+  ]);
+  state.documents = documents;
+  state.annotations = annotations;
+  state.styles = styles;
 }
 
 /* ---- Sidebar ---- */
@@ -160,7 +207,7 @@ function renderProjSwitch(): void {
 async function switchProject(id: Id): Promise<void> {
   if (id === state.activeProjectId) return;
   state.activeProjectId = id;
-  await loadDocuments();
+  await loadProjectData();
   render();
 }
 async function createProject(): Promise<void> {
@@ -168,7 +215,7 @@ async function createProject(): Promise<void> {
   await sendRequest({ type: 'projects/put', project });
   state.projects = [...state.projects, project];
   state.activeProjectId = project.id;
-  await loadDocuments();
+  await loadProjectData();
   render();
   toast('New project created', ICON.check);
 }
@@ -206,16 +253,187 @@ function render(): void {
   VIEWS[state.route]($('#view'), actions);
 }
 
-/* ---- Views (M1 scaffolds) ---- */
-function renderOverview(view: HTMLElement): void {
+/* ---- Overview + Kanban ---- */
+function renderOverview(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = `<button class="btn btn--sm" id="aExport">${ICON.down} Export bibliography</button>`;
+  $('#aExport', actions).onclick = () => void exportBibliography();
+
   const p = activeProject();
-  const n = state.documents.length;
-  view.innerHTML = `<div class="empty">
-    <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M3 3h7v9H3zM14 3h7v5h-7zM14 12h7v9h-7zM3 16h7v5H3z"/></svg></div>
-    <div class="et">${esc(p?.name ?? 'Your research project')}</div>
-    <div class="ed">${n} source${n === 1 ? '' : 's'} · ${p?.sections.length ?? 0} sections. The workflow board and project stats arrive in the next milestone.</div>
-  </div>`;
+  const progress = computeProgress(state.documents);
+  const inReport = state.annotations.filter((a) => a.status === 'includedInReport').length;
+  const members = p?.members.length ?? 0;
+  const style = activeStyle();
+  const styleValue = style ? esc(style.name.split(' ')[0]) : '—';
+  const styleSub = style ? esc(style.name) : 'No style profile yet';
+
+  view.innerHTML = `
+    <div class="stats">
+      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${p?.sections.length ?? 0} sections · ${members} member${members === 1 ? '' : 's'}</div></div>
+      <div class="tile"><div class="tl"><span class="d" style="background:var(--s-analysed)"></span>Analysed</div><div class="tv">${progress.reviewed}</div><div class="tsub">${progress.percent}% of the corpus reviewed</div></div>
+      <div class="tile"><div class="tl">Annotations</div><div class="tv">${state.annotations.length}</div><div class="tsub">${inReport} included in the report</div></div>
+      <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${styleValue}</div><div class="tsub">${styleSub}</div></div>
+    </div>
+    <div class="sec-h"><h2>Workflow</h2><span class="ln"></span><span class="cnt">drag · or focus a card and press ← →</span></div>
+    <div class="kanban" id="kanban"></div>`;
+  renderKanban($('#kanban', view));
 }
+
+function renderKanban(board: HTMLElement): void {
+  board.innerHTML = STATUS_META.map((s) => {
+    const items = state.documents.filter((d) => d.status === s.id);
+    return `<section class="kcol" data-col="${s.id}" aria-label="${s.label}">
+      <div class="kcol-h"><span class="d" style="background:${statusDot(s.id)}"></span><span class="knm">${s.label}</span><span class="kct">${items.length}</span></div>
+      <div class="kcards" data-drop="${s.id}" role="list">${items.map(kanbanCard).join('') || `<div class="kempty">Drop a source here</div>`}</div>
+    </section>`;
+  }).join('');
+  wireKanban(board);
+}
+
+function kanbanCard(d: Document): string {
+  const label = statusLabel(d.status);
+  const title = d.metadata.title ?? d.url;
+  const notes = notesFor(d.id);
+  return `<article class="kcard${state.flash === d.id ? ' flash' : ''}" draggable="true" data-id="${d.id}" tabindex="0" role="listitem" aria-label="${esc(title)} — ${label}. Arrow keys move between stages, Enter to change status.">
+    <div class="kt">${esc(title)}</div>
+    <div class="km">${esc(authorLabel(d.metadata.authors))}${d.metadata.year ? ` · ${d.metadata.year}` : ''}</div>
+    <div class="kf">
+      <button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${label}</button>
+      ${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : ''}
+      ${notes ? `<span class="kn">${ICON.note}${notes}</span>` : ''}
+    </div></article>`;
+}
+
+function wireKanban(board: HTMLElement): void {
+  $$('.kcard', board).forEach((el) => {
+    const id = el.dataset.id;
+    if (!id) return;
+    el.addEventListener('dragstart', (e) => {
+      state.drag = id;
+      el.classList.add('dragging');
+      (e as DragEvent).dataTransfer!.effectAllowed = 'move';
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      state.drag = null;
+      $$('.kcol', board).forEach((c) => c.classList.remove('drop'));
+    });
+    $('.spill', el).addEventListener('click', (e) => {
+      e.stopPropagation();
+      const doc = docById(id);
+      if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Enter') return;
+      e.preventDefault();
+      const doc = docById(id);
+      if (!doc) return;
+      if (e.key === 'Enter') {
+        openStatusPop($('.spill', el), doc);
+        return;
+      }
+      const cur = DOCUMENT_STATUSES.indexOf(doc.status);
+      const next =
+        e.key === 'ArrowRight'
+          ? Math.min(DOCUMENT_STATUSES.length - 1, cur + 1)
+          : Math.max(0, cur - 1);
+      const ns = DOCUMENT_STATUSES[next];
+      if (next !== cur && ns) void setStatus(doc, ns, id);
+    });
+  });
+  $$('.kcol', board).forEach((col) => {
+    const zone = $('[data-drop]', col);
+    col.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      col.classList.add('drop');
+    });
+    col.addEventListener('dragleave', (e) => {
+      if (!col.contains((e as DragEvent).relatedTarget as Node | null)) col.classList.remove('drop');
+    });
+    col.addEventListener('drop', (e) => {
+      e.preventDefault();
+      col.classList.remove('drop');
+      const id = state.drag;
+      if (!id) return;
+      const doc = docById(id);
+      const ns = zone.dataset.drop as DocumentStatus | undefined;
+      if (doc && ns) void setStatus(doc, ns);
+    });
+  });
+}
+
+async function setStatus(doc: Document, ns: DocumentStatus, refocusId?: Id): Promise<void> {
+  if (doc.status === ns) return;
+  const updated: Document = { ...doc, status: ns, updatedAt: nowIso() };
+  try {
+    await sendRequest({ type: 'documents/put', document: updated });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Could not move source', ICON.warn, true);
+    return;
+  }
+  state.documents = state.documents.map((d) => (d.id === doc.id ? updated : d));
+  state.flash = doc.id;
+  render();
+  if (refocusId) {
+    requestAnimationFrame(() => {
+      $<HTMLElement>(`#kanban .kcard[data-id="${refocusId}"]`)?.focus();
+    });
+  }
+  setTimeout(() => {
+    state.flash = null;
+  }, 900);
+  toast(`Moved to “${statusLabel(ns)}”`, ICON.check);
+}
+
+async function exportBibliography(): Promise<void> {
+  if (!state.activeProjectId || state.documents.length === 0) {
+    toast('No sources to export yet', ICON.warn, true);
+    return;
+  }
+  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  try {
+    const bibliography = await sendRequest({
+      type: 'citations/bibliography',
+      projectId: state.activeProjectId,
+      template,
+    });
+    await navigator.clipboard.writeText(bibliography);
+    toast(`Bibliography copied · ${state.documents.length} entries`, ICON.copy);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t export bibliography', ICON.warn, true);
+  }
+}
+
+/* ---- Status popover ---- */
+function openStatusPop(anchor: HTMLElement, doc: Document): void {
+  const pop = $('#pop');
+  pop.innerHTML =
+    `<div class="pl">Move to</div>` +
+    STATUS_META.map(
+      (s) =>
+        `<button class="pi${s.id === doc.status ? ' cur' : ''}" data-set="${s.id}"><span class="d" style="background:${statusDot(s.id)}"></span>${s.label}<span class="ck">${ICON.check}</span></button>`,
+    ).join('');
+  $$('[data-set]', pop).forEach((b) => {
+    b.onclick = () => {
+      const ns = b.dataset.set as DocumentStatus | undefined;
+      closePop();
+      if (ns) void setStatus(doc, ns);
+    };
+  });
+  placePop(anchor);
+}
+function placePop(anchor: HTMLElement): void {
+  const pop = $('#pop');
+  const r = anchor.getBoundingClientRect();
+  pop.classList.add('open');
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  const left = Math.min(r.left, window.innerWidth - pw - 12);
+  let top = r.bottom + 6;
+  if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
+  pop.style.left = `${Math.max(12, left)}px`;
+  pop.style.top = `${top}px`;
+}
+
 function placeholder(view: HTMLElement, title: string, desc: string): void {
   view.innerHTML = `<div class="empty">
     <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
@@ -287,7 +505,7 @@ async function init(): Promise<void> {
 
   try {
     await loadProjects();
-    await loadDocuments();
+    await loadProjectData();
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Failed to load projects', ICON.warn, true);
   }

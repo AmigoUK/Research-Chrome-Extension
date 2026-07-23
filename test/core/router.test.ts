@@ -53,6 +53,47 @@ describe('handleRequest', () => {
     expect(listRes.ok && (listRes.data as Document[])).toHaveLength(1);
   });
 
+  it('lists annotations by project', async () => {
+    const now = NOW;
+    await repos.annotations.put({
+      id: 'an1',
+      projectId: 'p1',
+      documentId: 'd1',
+      anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'note' }] },
+      content: 'note',
+      tags: [],
+      status: 'draft',
+      author: 'me',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const res = await handleRequest(repos, { type: 'annotations/listByProject', projectId: 'p1' });
+    expect(res.ok && Array.isArray(res.data) && res.data).toHaveLength(1);
+  });
+
+  it('lists citation styles', async () => {
+    await repos.citationStyles.put({
+      id: 'apa',
+      name: 'APA 7th',
+      baseStyleId: 'apa',
+      userRules: {
+        system: 'authorDate',
+        maxAuthors: 3,
+        etAlUseFirst: 1,
+        nameAnd: 'symbol',
+        includeDoi: true,
+        doiAsUri: true,
+        includeUrl: false,
+        includeIssue: true,
+        pagePrefix: false,
+        foiTemplate: false,
+        legalTemplate: false,
+      },
+    });
+    const res = await handleRequest(repos, { type: 'citationStyles/list' });
+    expect(res.ok && Array.isArray(res.data) && res.data).toHaveLength(1);
+  });
+
   it('reports an error result for unknown message types', async () => {
     // Cast through unknown to simulate a malformed message off the wire.
     const res = await handleRequest(repos, { type: 'nope' } as unknown as never);

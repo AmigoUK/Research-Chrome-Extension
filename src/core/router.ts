@@ -55,6 +55,10 @@ export async function handleRequest(
         return ok(null) as Result;
       case 'documents/listByProject':
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
+      case 'annotations/listByProject':
+        return ok(await repos.annotations.listByProject(request.projectId)) as Result;
+      case 'citationStyles/list':
+        return ok(await repos.citationStyles.list()) as Result;
       case 'capture/page':
         return ok(await capturePage(repos, request.input, capture)) as Result;
       case 'citations/bibliography':

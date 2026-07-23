@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 in progress. Next: Overview + Kanban board (M2)._
+_Phase 2 in progress. Next: Documents view (M3)._
+
+## [0.3.0] — 2026-07-23
+
+### Added
+
+- **Overview + Kanban board (Phase 2, M2)**: the Overview route now shows four project stat tiles
+  (Sources, Analysed with % of corpus reviewed, Annotations with count included in the report, and
+  the active citation Style) above a four-column workflow **Kanban board**.
+- Kanban cards move between workflow stages by **drag-and-drop** and by **keyboard** (focus a card,
+  ← / → to advance/retreat, Enter to open the status popover); moves persist via `documents/put`
+  and update the tiles, with a flash highlight and a toast.
+- Shared **status popover** ("Move to") that flips to stay on-screen, reused by later views.
+- **Export bibliography** action copies the project bibliography to the clipboard via
+  `citations/bibliography`.
+- Read-only messages `annotations/listByProject` and `citationStyles/list` (router + tests) powering
+  the annotation/style tiles and the nav count badges. No schema change — the stores already exist.
+
+### Notes
+
+- 64 unit tests (router coverage for the two new routes) and a new E2E asserting a keyboard Kanban
+  move persists across a reload.
 
 ## [0.2.0] — 2026-07-23
 
@@ -129,7 +150,8 @@ _Phase 2 in progress. Next: Overview + Kanban board (M2)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...v0.1.0

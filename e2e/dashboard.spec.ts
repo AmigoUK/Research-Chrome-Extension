@@ -64,3 +64,48 @@ test('nav routes update the topbar title', async () => {
 
   await page.close();
 });
+
+test('Kanban advances a card status with the arrow keys and persists it', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Seed a fresh source in "toRead".
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-kanban-1',
+        projectId,
+        url: 'https://example.org/kanban',
+        type: 'article',
+        metadata: { title: 'Kanban keyboard move', authors: ['Mover, K.'], year: 2026 },
+        status: 'toRead',
+        section: 'Literature',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  const card = page.locator('.kcard[data-id="e2e-kanban-1"]');
+  await card.focus();
+  await card.press('ArrowRight');
+
+  // Card moved into the "In review" column and the pill reflects it.
+  await expect(
+    page.locator('.kcol[data-col="inReview"] .kcard[data-id="e2e-kanban-1"] .spill'),
+  ).toContainText('In review');
+
+  // Persisted through a reload.
+  await page.reload();
+  await expect(
+    page.locator('.kcol[data-col="inReview"] .kcard[data-id="e2e-kanban-1"]'),
+  ).toBeVisible();
+
+  await page.close();
+});
