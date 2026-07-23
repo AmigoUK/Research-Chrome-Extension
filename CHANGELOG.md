@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Phase 1 MVP in progress — see `doc/build-plan.md`._
 
+## [0.1.0] — 2026-07-23
+
+### Added
+
+- **Side Panel UI** ported from the design prototype: capture card, reading list grouped by
+  workflow status with search and status filter, and a review-progress footer — wired to the
+  service worker and IndexedDB.
+- First-run seeding of a default project; capture the active tab into the reading list
+  (deduplicated by DOI).
+- One-click citation copy: in-text/bibliography for the filed page, per-source in-text citation
+  from the list, and a project-wide bibliography.
+- Shared design tokens and component styles extracted to `panel.css`; accessibility preserved
+  (roles, keyboard, reduced-motion) with stable `data-od-id` hooks.
+- `citations/document` message to cite any listed source. Pure side-panel view-model
+  (filter/group/progress) unit-tested (56 tests total).
+
+### Notes
+
+- Bundling OFL web fonts (serif display + mono) for cross-platform visual fidelity is a tracked
+  follow-up; the current stack degrades gracefully.
+
 ## [0.0.5] — 2026-07-23
 
 ### Added
@@ -75,7 +96,8 @@ _Phase 1 MVP in progress — see `doc/build-plan.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.5...v0.1.0
 [0.0.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.2...v0.0.3

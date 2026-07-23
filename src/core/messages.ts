@@ -20,6 +20,10 @@ export interface MessageMap {
     req: { referenceId: Id; template: string };
     res: { inText: string; bibliography: string };
   };
+  'citations/document': {
+    req: { documentId: Id; template: string };
+    res: { inText: string; bibliography: string };
+  };
 }
 
 export type MessageType = keyof MessageMap;

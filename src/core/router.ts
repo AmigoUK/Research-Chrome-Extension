@@ -8,7 +8,11 @@ import type { RepositorySet } from './ports/repositories';
 import type { CitationFormatter } from './ports/citation';
 import type { AnyRequest, Result } from './messages';
 import { capturePage, type CaptureDeps } from './usecases/capture';
-import { formatProjectBibliography, formatReferenceCitation } from './usecases/citations';
+import {
+  formatProjectBibliography,
+  formatReferenceCitation,
+  formatDocumentCitation,
+} from './usecases/citations';
 
 function ok(data: unknown): { ok: true; data: unknown } {
   return { ok: true, data };
@@ -64,6 +68,13 @@ export async function handleRequest(
         return ok(
           await formatReferenceCitation(repos, requireFormatter(deps), {
             referenceId: request.referenceId,
+            template: request.template,
+          }),
+        ) as Result;
+      case 'citations/document':
+        return ok(
+          await formatDocumentCitation(repos, requireFormatter(deps), {
+            documentId: request.documentId,
             template: request.template,
           }),
         ) as Result;

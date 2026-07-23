@@ -6,10 +6,11 @@ import { createRepositories } from '../../src/adapters/idb/repositories';
 import {
   formatProjectBibliography,
   formatReferenceCitation,
+  formatDocumentCitation,
 } from '../../src/core/usecases/citations';
 import type { RepositorySet } from '../../src/core/ports/repositories';
 import type { CitationFormatter, CslItem } from '../../src/core/ports/citation';
-import type { Reference } from '../../src/core/model/types';
+import type { Document, Reference } from '../../src/core/model/types';
 
 const NOW = '2026-07-23T00:00:00.000Z';
 
@@ -80,5 +81,46 @@ describe('formatReferenceCitation', () => {
     await expect(
       formatReferenceCitation(repos, stubFormatter, { referenceId: 'nope', template: 'apa' }),
     ).rejects.toThrow('Reference not found');
+  });
+});
+
+describe('formatDocumentCitation', () => {
+  it('finds the reference linked to a document and formats it', async () => {
+    const doc: Document = {
+      id: 'd1',
+      projectId: 'p1',
+      url: 'https://example.org/d1',
+      type: 'article',
+      metadata: { title: 'Doc' },
+      status: 'toRead',
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const ref = makeRef('r1', 'p1');
+    ref.documentId = 'd1';
+    await repos.documents.put(doc);
+    await repos.references.put(ref);
+
+    const out = await formatDocumentCitation(repos, stubFormatter, {
+      documentId: 'd1',
+      template: 'apa',
+    });
+    expect(out.bibliography).toBe('[apa] r1');
+  });
+
+  it('throws when the document has no linked reference', async () => {
+    await repos.documents.put({
+      id: 'd2',
+      projectId: 'p1',
+      url: 'u',
+      type: 'article',
+      metadata: {},
+      status: 'toRead',
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await expect(
+      formatDocumentCitation(repos, stubFormatter, { documentId: 'd2', template: 'apa' }),
+    ).rejects.toThrow('No reference for document');
   });
 });

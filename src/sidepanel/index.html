@@ -6,9 +6,79 @@
     <title>Context Notes — Research Companion</title>
   </head>
   <body>
-    <main id="app" aria-label="Context Notes research companion">
-      <p>Context Notes — side panel scaffold.</p>
-    </main>
+    <aside class="panel" aria-label="Context Notes research companion">
+      <h1 class="sr-only">Context Notes — research companion</h1>
+
+      <header class="head">
+        <div class="head__top">
+          <div class="wordmark"><span class="glyph"></span>Context&nbsp;Notes</div>
+        </div>
+        <div class="switch">
+          <button class="switch__btn" id="switchBtn" aria-haspopup="menu" aria-expanded="false">
+            <span class="switch__spine"></span>
+            <span style="flex: 1; min-width: 0">
+              <span class="switch__name" id="activeName">—</span>
+              <span class="switch__sub" id="activeSub"></span>
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div class="body" id="scrollBody">
+        <section class="capture" id="captureCard" data-od-id="capture-card">
+          <div class="section-label">On this page <span class="rule"></span></div>
+          <div class="cap-src">
+            <div class="cap-src__type" id="capType">Scanning…</div>
+            <div class="cap-src__title" id="capTitle">—</div>
+            <div class="cap-src__meta" id="capMeta"></div>
+          </div>
+          <div class="cap-actions">
+            <button class="btn btn--primary" id="fileBtn" data-od-id="file-source-btn" disabled>
+              File into project
+            </button>
+          </div>
+          <div class="cite-row">
+            <button class="btn cite-btn" id="copyInText" data-od-id="copy-intext" disabled>
+              In-text
+            </button>
+            <button class="btn cite-btn" id="copyBiblio" data-od-id="copy-biblio" disabled>
+              Bibliography
+            </button>
+          </div>
+        </section>
+
+        <div class="controls" data-od-id="list-controls">
+          <div class="section-label">
+            Reading list <span class="rule"></span><span class="prog__val" id="totalCount"></span>
+          </div>
+          <div class="search">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Search titles, authors, DOI…"
+              autocomplete="off"
+              aria-label="Search sources"
+            />
+          </div>
+          <div class="segmented" id="segmented" role="group" aria-label="Filter by status"></div>
+        </div>
+
+        <div class="list" id="listRoot" data-od-id="reading-list"></div>
+      </div>
+
+      <footer class="foot" data-od-id="panel-footer">
+        <div class="prog__top">
+          <span class="prog__lbl">Review progress</span>
+          <span class="prog__val" id="progVal">—</span>
+        </div>
+        <div class="prog__bar" id="progBar" role="img" aria-label="Review progress"></div>
+        <div class="foot__actions">
+          <button class="btn" id="bibBtn" data-od-id="build-bib-btn">Copy bibliography</button>
+        </div>
+      </footer>
+    </aside>
+
+    <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

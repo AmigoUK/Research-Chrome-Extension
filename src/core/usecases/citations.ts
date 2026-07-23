@@ -34,3 +34,20 @@ export async function formatReferenceCitation(
     bibliography: formatter.bibliography(items, args.template),
   };
 }
+
+export async function formatDocumentCitation(
+  repos: RepositorySet,
+  formatter: CitationFormatter,
+  args: { documentId: Id; template: string },
+): Promise<{ inText: string; bibliography: string }> {
+  const document = await repos.documents.get(args.documentId);
+  if (!document) throw new Error(`Document not found: ${args.documentId}`);
+  const references = await repos.references.listByProject(document.projectId);
+  const reference = references.find((r) => r.documentId === args.documentId);
+  if (!reference) throw new Error(`No reference for document: ${args.documentId}`);
+  const items = [toItem(reference.cslData, reference.id)];
+  return {
+    inText: formatter.inText(items, args.template),
+    bibliography: formatter.bibliography(items, args.template),
+  };
+}

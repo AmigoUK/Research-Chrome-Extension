@@ -16,8 +16,8 @@ async function getActiveTabId(): Promise<number> {
   return tab.id;
 }
 
-/** Scan the active tab and file it into the given project. */
-export async function captureActiveTab(projectId: Id, section?: string): Promise<CaptureResult> {
+/** Inject the scanner into the active tab and return its primitives. */
+export async function scanActiveTab(): Promise<RawPageScan> {
   const tabId = await getActiveTabId();
   const [injection] = await chrome.scripting.executeScript({
     target: { tabId },
@@ -25,7 +25,12 @@ export async function captureActiveTab(projectId: Id, section?: string): Promise
   });
   const scan = injection?.result as RawPageScan | undefined;
   if (!scan) throw new Error('Page scan returned no result');
+  return scan;
+}
 
+/** Scan the active tab and file it into the given project. */
+export async function captureActiveTab(projectId: Id, section?: string): Promise<CaptureResult> {
+  const scan = await scanActiveTab();
   const input = buildCaptureInput(scan, projectId, section);
   return sendRequest({ type: 'capture/page', input });
 }
