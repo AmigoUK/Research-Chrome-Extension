@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Phase 1 MVP in progress — see `doc/build-plan.md`._
 
+## [0.0.2] — 2026-07-23
+
+### Added
+
+- Domain-core model types mirroring the data model (Project, Document, Annotation,
+  Reference, CitationStyle, User), including the multi-strategy `Anchor` (web + PDF).
+- Repository ports (storage contract) with no IndexedDB/`chrome.*` leakage.
+- IndexedDB adapter via `idb`: versioned schema, ordered migrations, object stores and
+  indexes (incl. `[projectId, metadata.doi]` for capture-time deduplication).
+- DOI-aware `findByDoi` for documents and references (case- and `doi.org`-prefix insensitive).
+- Unit tests (`fake-indexeddb`): CRUD, project isolation, DOI dedup, migration ordering (11 tests).
+
 ## [0.0.1] — 2026-07-23
 
 ### Added
@@ -19,5 +31,6 @@ _Phase 1 MVP in progress — see `doc/build-plan.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.1...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.2...HEAD
+[0.0.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.0.1...v0.0.2
 [0.0.1]: https://github.com/AmigoUK/Research-Chrome-Extension/releases/tag/v0.0.1
