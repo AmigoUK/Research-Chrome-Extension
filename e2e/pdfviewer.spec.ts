@@ -180,3 +180,32 @@ test('selecting text and clicking Highlight creates a persisted anchor', async (
 
   await page.close();
 });
+
+test('dragging a region in Region mode anchors a rectangle that persists', async () => {
+  await seedPdfDocument('e2e-region-doc');
+  const page = await context.newPage();
+  await page.goto(viewerUrl('e2e-region-doc'));
+  await expect(page.locator('.pdf-page canvas')).toBeVisible();
+
+  await page.locator('#modeSeg button[data-mode="region"]').click();
+  const box = await page.locator('.pdf-page').boundingBox();
+  expect(box).not.toBeNull();
+  if (box) {
+    await page.mouse.move(box.x + 40, box.y + 40);
+    await page.mouse.down();
+    await page.mouse.move(box.x + 180, box.y + 120, { steps: 8 });
+    await page.mouse.up();
+  }
+
+  await expect(page.locator('#seltool.on')).toBeVisible();
+  await page.locator('#seltool button', { hasText: 'Anchor region' }).click();
+
+  await expect(page.locator('.anno-layer .ov.region')).toBeVisible();
+  await expect(page.locator('#railList .ac .ac-kind', { hasText: 'Region' })).toBeVisible();
+
+  // Persists across reload.
+  await page.reload();
+  await expect(page.locator('.anno-layer .ov.region')).toBeVisible();
+
+  await page.close();
+});

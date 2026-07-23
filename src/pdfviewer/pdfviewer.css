@@ -59,7 +59,8 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 /* One page = white sheet holding the pdf.js canvas + text layer + overlays */
 .pdf-page { position: relative; background: var(--surface); box-shadow: 0 6px 30px -10px oklch(20% .02 70/.35); margin: 0 auto; }
 .pdf-page canvas { display: block; }
-.mode-region .pdf-page { cursor: crosshair; }
+.mode-region .pdf-page, .mode-region .textLayer, .mode-region .textLayer span { cursor: crosshair; }
+.mode-region .textLayer { user-select: none; }
 .mode-region ::selection { background: transparent; }
 
 /* pdf.js text layer (transparent, selectable) */

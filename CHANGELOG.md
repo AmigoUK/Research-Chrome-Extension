@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 3 (PDF anchoring) in progress. Next: region (rectangle) anchoring (M4)._
+_Phase 3 (PDF anchoring) in progress. Next: ingestion UX — Add PDF / Open in reader (M5)._
+
+## [0.11.0] — 2026-07-23
+
+### Added
+
+- **Region anchoring (Phase 3, M4)**: in **Region** mode, drag a rectangle over the page to anchor a
+  figure/table/region. A live rubber-band shows the selection; releasing pops the Anchor / Note
+  toolbar and stores the rectangle as a fraction-rect anchor (no quote), rendered as a bordered
+  `.ov.region` overlay with a corner label and listed in the rail as a Region card. Persists and
+  re-anchors across zoom, page changes, and reload like text highlights.
+
+### Notes
+
+- E2E: dragging a rectangle in Region mode anchors it and the overlay survives a reload (13 E2E specs).
 
 ## [0.10.0] — 2026-07-23
 
@@ -276,7 +290,8 @@ _Phase 3 (PDF anchoring) in progress. Next: region (rectangle) anchoring (M4)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...v0.8.0

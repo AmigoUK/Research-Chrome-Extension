@@ -299,6 +299,63 @@ function hideSeltool(): void {
   $('#seltool').classList.remove('on');
 }
 
+/* ---- Region selection (drag a rectangle) ---- */
+let regionStart: { x: number; y: number; box: DOMRect } | null = null;
+function onRegionMouseDown(e: MouseEvent): void {
+  if (state.mode !== 'region' || e.button !== 0) return;
+  const pageEl = currentPageEl();
+  if (!pageEl || !pageEl.contains(e.target as Node)) return;
+  e.preventDefault();
+  regionStart = { x: e.clientX, y: e.clientY, box: pageEl.getBoundingClientRect() };
+  const rubber = document.createElement('div');
+  rubber.className = 'rubber';
+  rubber.id = 'rubber';
+  pageEl.appendChild(rubber);
+  updateRubber(e.clientX, e.clientY);
+}
+function rubberRect(cx: number, cy: number): PxRect {
+  const b = regionStart!.box;
+  return {
+    left: Math.min(regionStart!.x, cx) - b.left,
+    top: Math.min(regionStart!.y, cy) - b.top,
+    width: Math.abs(cx - regionStart!.x),
+    height: Math.abs(cy - regionStart!.y),
+  };
+}
+function updateRubber(cx: number, cy: number): void {
+  const rubber = document.getElementById('rubber');
+  if (!rubber || !regionStart) return;
+  const r = rubberRect(cx, cy);
+  rubber.style.left = `${r.left}px`;
+  rubber.style.top = `${r.top}px`;
+  rubber.style.width = `${r.width}px`;
+  rubber.style.height = `${r.height}px`;
+}
+function onRegionMouseMove(e: MouseEvent): void {
+  if (regionStart) updateRubber(e.clientX, e.clientY);
+}
+function onRegionMouseUp(e: MouseEvent): void {
+  if (!regionStart) return;
+  const r = rubberRect(e.clientX, e.clientY);
+  const b = regionStart.box;
+  document.getElementById('rubber')?.remove();
+  regionStart = null;
+  if (r.width < 8 || r.height < 8) {
+    hideSeltool();
+    return;
+  }
+  state.pending = {
+    page: state.pageNum,
+    quote: '',
+    rects: [r],
+    box: { width: b.width, height: b.height },
+  };
+  showSeltool(b.left + r.left + r.width / 2, b.top + r.top, [
+    { icon: ICON.region, label: 'Anchor region', fn: () => void commitAnchor(false) },
+    { icon: ICON.note, label: 'Note', fn: () => void commitAnchor(true) },
+  ]);
+}
+
 async function commitAnchor(withNote: boolean): Promise<void> {
   const p = state.pending;
   if (!p || !state.document || !state.documentId) return;
@@ -508,6 +565,11 @@ function init(): void {
   // Text selection → anchor toolbar.
   document.addEventListener('mouseup', () => setTimeout(onTextSelect, 0));
   $('#pagewrap').addEventListener('scroll', hideSeltool);
+
+  // Region drag → anchor a rectangle.
+  $('#pagewrap').addEventListener('mousedown', onRegionMouseDown);
+  document.addEventListener('mousemove', onRegionMouseMove);
+  document.addEventListener('mouseup', onRegionMouseUp);
 
   document.addEventListener('keydown', (e) => {
     const el = e.target as HTMLElement;
