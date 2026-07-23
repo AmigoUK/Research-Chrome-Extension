@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 2 in progress. Next: Citation styles view (M6)._
+_Phase 2 (Dashboard & Workflow) core complete. Next: Phase 3 (PDF anchoring) — see `doc/roadmap.md`._
+
+## [0.7.0] — 2026-07-23
+
+### Added
+
+- **Citation styles view (Phase 2, M6)**: a two-column styles workspace — a list of style profiles
+  (APA, Chicago, Harvard seeded on first run) and a lightweight rule editor: citation system
+  (author–date / footnote), a maximum-authors stepper, and Include DOI / URL / issue toggles, with a
+  **live preview** that reformats one- and four-author samples as the rules change.
+- Create new style profiles and **Save** edits, persisted via the new `citationStyles/put` message.
+- A "Full editor" affordance flags the complete CSL rule editor coming in Phase 4.
+
+### Notes
+
+- This completes the Phase 2 core: Dashboard shell, Overview + Kanban, Documents, References + DOI
+  import, Annotations, and Citation styles. Team and the full CSL editor remain deferred by design.
+- 71 unit tests and 7 dashboard E2E specs (shell, routing, Documents filter, References + import
+  form, Annotations review status, Kanban keyboard move, and a persisted citation-style edit).
 
 ## [0.6.0] — 2026-07-23
 
@@ -200,7 +218,8 @@ _Phase 2 in progress. Next: Citation styles view (M6)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.3.0...v0.4.0

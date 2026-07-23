@@ -72,6 +72,9 @@ export async function handleRequest(
         ) as Result;
       case 'citationStyles/list':
         return ok(await repos.citationStyles.list()) as Result;
+      case 'citationStyles/put':
+        await repos.citationStyles.put(request.style);
+        return ok(null) as Result;
       case 'capture/page':
         return ok(await capturePage(repos, request.input, capture)) as Result;
       case 'citations/bibliography':

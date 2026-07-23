@@ -20,6 +20,7 @@ export interface MessageMap {
   'references/put': { req: { reference: Reference }; res: null };
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
+  'citationStyles/put': { req: { style: CitationStyle }; res: null };
   'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
   'citations/bibliography': { req: { projectId: Id; template: string }; res: string };
   'citations/reference': {

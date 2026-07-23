@@ -189,6 +189,29 @@ test('Annotations view changes a note review status and persists it', async () =
   await page.close();
 });
 
+test('Citation styles editor saves a rule change that persists', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await expect(page.locator('.style-list .style-card')).not.toHaveCount(0);
+
+  // Toggle "Include URL" on and save.
+  const urlSwitch = page.locator('#swUrl');
+  const before = await urlSwitch.getAttribute('aria-checked');
+  await urlSwitch.click();
+  await expect(urlSwitch).not.toHaveAttribute('aria-checked', before ?? '');
+  await page.locator('#sSave').click();
+
+  // Persisted after reload.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await expect(page.locator('#swUrl')).not.toHaveAttribute('aria-checked', before ?? '');
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

@@ -18,6 +18,8 @@ import type {
   Anchor,
   Reference,
   CitationStyle,
+  CitationUserRules,
+  CitationSystem,
   Id,
 } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
@@ -50,6 +52,7 @@ const ICON = {
   down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>',
   ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>',
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
+  plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>',
 };
 
 interface NavDef {
@@ -105,6 +108,7 @@ interface DashState {
   drag: Id | null;
   docFilter: ListFilter;
   annoFilter: { search: string; status: AnnotationStatus | 'all' };
+  selectedStyleId: Id | null;
 }
 const state: DashState = {
   projects: [],
@@ -118,6 +122,7 @@ const state: DashState = {
   drag: null,
   docFilter: { search: '', status: 'all' },
   annoFilter: { search: '', status: 'all' },
+  selectedStyleId: null,
 };
 
 const activeProject = (): Project | undefined =>
@@ -162,6 +167,37 @@ async function loadProjects(): Promise<void> {
     state.projects = [seed];
   }
   if (!activeProject()) state.activeProjectId = state.projects[0]?.id ?? null;
+}
+function defaultRules(system: CitationSystem, over: Partial<CitationUserRules> = {}): CitationUserRules {
+  return {
+    system,
+    maxAuthors: 3,
+    etAlUseFirst: 1,
+    nameAnd: 'symbol',
+    includeDoi: true,
+    doiAsUri: true,
+    includeUrl: false,
+    includeIssue: true,
+    pagePrefix: false,
+    foiTemplate: false,
+    legalTemplate: false,
+    ...over,
+  };
+}
+const SEED_STYLES: CitationStyle[] = [
+  { id: 'apa', name: 'APA 7th', baseStyleId: 'apa', userRules: defaultRules('authorDate') },
+  { id: 'chicago', name: 'Chicago 17th', baseStyleId: 'chicago', userRules: defaultRules('footnote') },
+  {
+    id: 'harvard',
+    name: 'Harvard',
+    baseStyleId: 'harvard',
+    userRules: defaultRules('authorDate', { includeDoi: false, includeUrl: true, maxAuthors: 6 }),
+  },
+];
+async function ensureSeedStyles(): Promise<void> {
+  if (state.styles.length > 0) return;
+  for (const style of SEED_STYLES) await sendRequest({ type: 'citationStyles/put', style });
+  state.styles = SEED_STYLES.map((s) => ({ ...s, userRules: { ...s.userRules } }));
 }
 async function loadProjectData(): Promise<void> {
   if (!state.activeProjectId) {
@@ -264,7 +300,7 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   documents: renderDocuments,
   annotations: renderAnnotations,
   references: renderReferences,
-  styles: (v) => placeholder(v, 'Citation styles', 'Style profiles and the rule editor arrive soon.'),
+  styles: renderStyles,
 };
 function render(): void {
   renderProjSwitch();
@@ -896,16 +932,206 @@ async function copyReferenceCitation(referenceId: Id): Promise<void> {
   }
 }
 
-function emptyState(title: string, desc: string): string {
-  return `<div class="empty">
-    <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
-    <div class="et">${esc(title)}</div>
-    <div class="ed">${esc(desc)}</div>
-  </div>`;
+/* ---- Citation styles (lightweight editor) ---- */
+interface PreviewSample {
+  label: string;
+  authors: Array<{ family: string; given: string }>;
+  year: number;
+  title: string;
+  journal: string;
+  volume: string;
+  issue: string;
+  page: string;
+  doi: string;
+}
+const PREVIEW_SAMPLES: PreviewSample[] = [
+  {
+    label: '1 author',
+    authors: [{ family: 'Oke', given: 'T. R.' }],
+    year: 1982,
+    title: 'The energetic basis of the urban heat island',
+    journal: 'Quarterly Journal of the Royal Meteorological Society',
+    volume: '108',
+    issue: '455',
+    page: '1–24',
+    doi: '10.1002/qj.49710845502',
+  },
+  {
+    label: '4 authors — triggers “et al.”',
+    authors: [
+      { family: 'Gasparrini', given: 'A.' },
+      { family: 'Guo', given: 'Y.' },
+      { family: 'Hashizume', given: 'M.' },
+      { family: 'Lavigne', given: 'E.' },
+    ],
+    year: 2015,
+    title: 'Mortality risk attributable to high and low ambient temperature',
+    journal: 'The Lancet',
+    volume: '386',
+    issue: '9991',
+    page: '369–375',
+    doi: '10.1016/S0140-6736(14)62114-0',
+  },
+];
+function previewCite(s: PreviewSample, r: CitationUserRules): { inText: string; biblio: string } {
+  const a = s.authors;
+  const surnames = a.map((x) => x.family);
+  const trunc = a.length > r.maxAuthors;
+  let inText: string;
+  if (r.system === 'footnote') inText = '¹ (footnote)';
+  else if (r.system === 'numeric') inText = '[1]';
+  else if (a.length === 1) inText = `(${surnames[0]}, ${s.year})`;
+  else if (a.length === 2) inText = `(${surnames[0]} & ${surnames[1]}, ${s.year})`;
+  else
+    inText = `(${(trunc ? [surnames[0], 'et al.'] : surnames).join(trunc ? ' ' : ', ')}, ${s.year})`;
+  const doi = r.includeDoi ? ` https://doi.org/${s.doi}` : '';
+  const url = r.includeUrl && !r.includeDoi ? ' Retrieved from the journal site.' : '';
+  const iss = r.includeIssue && s.issue ? `(${s.issue})` : '';
+  let biblio: string;
+  if (r.system === 'footnote') {
+    const names =
+      (trunc ? a.slice(0, r.maxAuthors) : a).map((p) => `${p.given} ${p.family}`).join(', ') +
+      (trunc ? ', et al.' : '');
+    biblio = `¹ ${names}, “${s.title},” ${s.journal} ${s.volume}, no. ${s.issue} (${s.year}): ${s.page}.${doi}`;
+  } else {
+    const names =
+      (trunc ? a.slice(0, r.maxAuthors) : a).map((p) => `${p.family}, ${p.given}`).join(', ') +
+      (trunc ? ', et al.' : '');
+    biblio = `${names} (${s.year}). ${s.title}. ${s.journal}, ${s.volume}${iss}, ${s.page}.${doi}${url}`;
+  }
+  return { inText, biblio };
 }
 
-function placeholder(view: HTMLElement, title: string, desc: string): void {
-  view.innerHTML = `<div class="empty">
+function selectedStyle(): CitationStyle | undefined {
+  return state.styles.find((s) => s.id === state.selectedStyleId) ?? state.styles[0];
+}
+
+function renderStyles(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = `<button class="btn btn--ghost btn--sm" id="sFull">Full editor</button><button class="btn btn--primary btn--sm" id="sSave">${ICON.check} Save profile</button>`;
+  $('#sFull', actions).onclick = () => toast('The full CSL rule editor arrives in Phase 4');
+  $('#sSave', actions).onclick = () => void saveStyle();
+
+  if (state.styles.length === 0) {
+    view.innerHTML = emptyState('No citation styles', 'Add a style profile to format your citations.');
+    return;
+  }
+  if (!state.selectedStyleId) state.selectedStyleId = state.styles[0]?.id ?? null;
+
+  view.innerHTML = `<div class="styles-grid">
+    <div>
+      <div class="sec-h" style="margin-top:0"><h2 style="font-size:14px">Profiles</h2></div>
+      <div class="style-list" id="slist"></div>
+      <button class="btn btn--sm" style="margin-top:11px;width:100%" id="sNew">${ICON.plus} New style</button>
+    </div>
+    <div><div class="editor" id="editor"></div></div>
+  </div>`;
+  $('#sNew', view).onclick = () => void createStyle();
+  drawStyleList();
+  drawStyleEditor();
+}
+
+function drawStyleList(): void {
+  const host = $('#slist');
+  host.innerHTML = state.styles
+    .map(
+      (s) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${s.id}">
+      <div class="snm">${esc(s.name)}</div>
+      <div class="sb">${s.userRules.system === 'footnote' ? 'Footnote' : s.userRules.system === 'numeric' ? 'Numeric' : 'Author–date'} · base ${esc(s.baseStyleId)}</div>
+    </button>`,
+    )
+    .join('');
+  $$('[data-s]', host).forEach((b) => {
+    b.onclick = () => {
+      state.selectedStyleId = b.dataset.s ?? null;
+      drawStyleList();
+      drawStyleEditor();
+    };
+  });
+}
+
+function drawStyleEditor(): void {
+  const style = selectedStyle();
+  if (!style) return;
+  const r = style.userRules;
+  const editor = $('#editor');
+  editor.innerHTML = `
+    <div class="ed-row"><div class="ed-lbl"><b>Citation system</b><span>Author–date in text, or numbered footnotes</span></div>
+      <div class="seg" id="sysSeg"><button data-v="authorDate" aria-pressed="${r.system === 'authorDate'}">Author–date</button><button data-v="footnote" aria-pressed="${r.system === 'footnote'}">Footnote</button></div></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Maximum authors</b><span>Before the list is truncated with “et al.”</span></div>
+      <div class="stepper"><button data-step="-1" aria-label="Fewer">−</button><span class="val" id="maVal">${r.maxAuthors}</span><button data-step="1" aria-label="More">+</button></div></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Include DOI</b><span>Append the DOI to bibliography entries</span></div>
+      <button class="sw" role="switch" id="swDoi" aria-checked="${r.includeDoi}" aria-label="Include DOI"></button></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Include URL</b><span>When no DOI is present</span></div>
+      <button class="sw" role="switch" id="swUrl" aria-checked="${r.includeUrl}" aria-label="Include URL"></button></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Include issue number</b><span>Show the issue alongside the volume</span></div>
+      <button class="sw" role="switch" id="swIssue" aria-checked="${r.includeIssue}" aria-label="Include issue number"></button></div>
+    <div class="preview" id="cpreview"></div>`;
+  $$('#sysSeg button', editor).forEach((b) => {
+    b.onclick = () => {
+      r.system = b.dataset.v as CitationSystem;
+      drawStyleList();
+      drawStyleEditor();
+    };
+  });
+  $$('.stepper [data-step]', editor).forEach((b) => {
+    b.onclick = () => {
+      r.maxAuthors = Math.max(1, Math.min(20, r.maxAuthors + Number(b.dataset.step)));
+      drawStyleEditor();
+    };
+  });
+  $('#swDoi', editor).onclick = () => {
+    r.includeDoi = !r.includeDoi;
+    drawStyleEditor();
+  };
+  $('#swUrl', editor).onclick = () => {
+    r.includeUrl = !r.includeUrl;
+    drawStyleEditor();
+  };
+  $('#swIssue', editor).onclick = () => {
+    r.includeIssue = !r.includeIssue;
+    drawStyleEditor();
+  };
+
+  $('#cpreview', editor).innerHTML =
+    `<div class="pl">Live preview · ${esc(style.name)} · ${r.system === 'footnote' ? 'footnote' : r.system === 'numeric' ? 'numeric' : 'author–date'}</div>` +
+    PREVIEW_SAMPLES.map((sample) => {
+      const f = previewCite(sample, r);
+      return `<div class="pex"><div class="pex-l">${esc(sample.label)}</div><div class="intxt">${esc(f.inText)}</div><div class="pv">${esc(f.biblio)}</div></div>`;
+    }).join('');
+}
+
+async function saveStyle(): Promise<void> {
+  const style = selectedStyle();
+  if (!style) return;
+  try {
+    await sendRequest({ type: 'citationStyles/put', style: { ...style, userRules: { ...style.userRules } } });
+    toast(`Saved · ${style.name}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t save style', ICON.warn, true);
+  }
+}
+
+async function createStyle(): Promise<void> {
+  const base = selectedStyle();
+  const style: CitationStyle = {
+    id: crypto.randomUUID(),
+    name: `New style ${state.styles.length + 1}`,
+    baseStyleId: base?.baseStyleId ?? 'apa',
+    userRules: defaultRules(base?.userRules.system ?? 'authorDate'),
+  };
+  try {
+    await sendRequest({ type: 'citationStyles/put', style });
+    state.styles = [...state.styles, style];
+    state.selectedStyleId = style.id;
+    render();
+    toast('New style created', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t create style', ICON.warn, true);
+  }
+}
+
+function emptyState(title: string, desc: string): string {
+  return `<div class="empty">
     <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
     <div class="et">${esc(title)}</div>
     <div class="ed">${esc(desc)}</div>
@@ -976,6 +1202,7 @@ async function init(): Promise<void> {
   try {
     await loadProjects();
     await loadProjectData();
+    await ensureSeedStyles();
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Failed to load projects', ICON.warn, true);
   }
