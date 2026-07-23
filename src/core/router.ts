@@ -6,12 +6,22 @@
  */
 import type { RepositorySet } from './ports/repositories';
 import type { AnyRequest, Result } from './messages';
+import { capturePage, type CaptureDeps } from './usecases/capture';
 
 function ok(data: unknown): { ok: true; data: unknown } {
   return { ok: true, data };
 }
 
-export async function handleRequest(repos: RepositorySet, request: AnyRequest): Promise<Result> {
+const defaultDeps: CaptureDeps = {
+  newId: () => crypto.randomUUID(),
+  now: () => new Date().toISOString(),
+};
+
+export async function handleRequest(
+  repos: RepositorySet,
+  request: AnyRequest,
+  deps: CaptureDeps = defaultDeps,
+): Promise<Result> {
   try {
     switch (request.type) {
       case 'ping':
@@ -28,6 +38,8 @@ export async function handleRequest(repos: RepositorySet, request: AnyRequest): 
         return ok(null) as Result;
       case 'documents/listByProject':
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
+      case 'capture/page':
+        return ok(await capturePage(repos, request.input, deps)) as Result;
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

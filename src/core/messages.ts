@@ -5,6 +5,7 @@
  * lives in the domain core so both sides share one source of truth.
  */
 import type { Project, Document, Id } from './model/types';
+import type { CaptureInput, CaptureResult } from './usecases/capture';
 
 export interface MessageMap {
   ping: { req: Record<never, never>; res: 'pong' };
@@ -13,6 +14,7 @@ export interface MessageMap {
   'documents/get': { req: { id: Id }; res: Document | undefined };
   'documents/put': { req: { document: Document }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
+  'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
 }
 
 export type MessageType = keyof MessageMap;
