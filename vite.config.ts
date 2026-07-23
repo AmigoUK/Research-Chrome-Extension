@@ -14,6 +14,13 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    rollupOptions: {
+      // The PDF reader is web-accessible (not a manifest surface), so declare it
+      // as an explicit Rollup HTML input for @crxjs to bundle (script + pdf.js).
+      input: {
+        pdfviewer: fileURLToPath(new URL('./src/pdfviewer/index.html', import.meta.url)),
+      },
+    },
   },
   server: {
     port: 5173,

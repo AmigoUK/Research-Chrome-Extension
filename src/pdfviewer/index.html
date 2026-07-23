@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Context Notes — PDF Reader</title>
+  </head>
+  <body>
+    <div class="app" id="app" data-od-id="pdf-reader">
+      <!-- Toolbar -->
+      <header class="bar" data-od-id="toolbar">
+        <button class="back" id="back" aria-label="Back to dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6" /></svg>
+          Dashboard
+        </button>
+        <div class="doc-id">
+          <div class="dt" id="docTitle">Loading…</div>
+          <div class="ds" id="docSub">PDF</div>
+        </div>
+        <div class="bar-grow"></div>
+
+        <div class="modeseg" id="modeSeg" role="group" aria-label="Annotation mode">
+          <button data-mode="text" aria-pressed="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7V4h16v3M9 20h6M12 4v16" /></svg>Text
+          </button>
+          <button data-mode="region" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 3"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>Region
+          </button>
+        </div>
+
+        <div class="cluster">
+          <button class="cbtn" id="pgPrev" aria-label="Previous page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 18-6-6 6-6" /></svg>
+          </button>
+          <span class="rd">p. <b id="pgCur">1</b> / <span id="pgTot">1</span></span>
+          <button class="cbtn" id="pgNext" aria-label="Next page">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m9 18 6-6-6-6" /></svg>
+          </button>
+        </div>
+
+        <div class="cluster">
+          <button class="cbtn" id="zOut" aria-label="Zoom out">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M8 11h6" /></svg>
+          </button>
+          <span class="rd"><b id="zVal">125</b>%</span>
+          <button class="cbtn" id="zIn" aria-label="Zoom in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3M11 8v6M8 11h6" /></svg>
+          </button>
+        </div>
+
+        <button class="cbtn rail-toggle" id="railToggle" aria-label="Toggle annotations">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+        </button>
+      </header>
+
+      <!-- Body -->
+      <div class="split">
+        <div class="pagewrap" id="pagewrap">
+          <div class="pagescale" id="pagescale"></div>
+        </div>
+        <aside class="rail" id="rail" data-od-id="annotation-rail" aria-label="Annotations">
+          <div class="rail-h">
+            <div class="t"><h2>Annotations</h2><span class="n" id="railN">—</span></div>
+            <div class="rail-seg" id="railSeg" role="group" aria-label="Scope">
+              <button data-scope="page" aria-pressed="true">This page</button>
+              <button data-scope="all" aria-pressed="false">All pages</button>
+            </div>
+          </div>
+          <div class="rail-list" id="railList"></div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="seltool" id="seltool"></div>
+    <div class="pop" id="pop"></div>
+    <div class="toast-wrap" id="toastWrap" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

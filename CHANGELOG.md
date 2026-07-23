@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 3 (PDF anchoring) in progress. Next: pdf.js viewer surface (M2)._
+_Phase 3 (PDF anchoring) in progress. Next: text anchoring + annotations rail (M3)._
+
+## [0.9.0] — 2026-07-23
+
+### Added
+
+- **PDF reader surface (Phase 3, M2)**: a standalone, web-accessible extension page
+  (`src/pdfviewer/`, opened as `…/src/pdfviewer/index.html?documentId=…`) that renders a stored PDF
+  with **pdf.js** — canvas rendering, page navigation, and zoom (75–175%), with a toolbar (back to
+  dashboard, document identity, Text/Region mode toggle, page + zoom clusters) and the annotations
+  rail scaffold. Ported the reader's design tokens/components into `pdfviewer.css`.
+- `pdfjs-dist` bundled locally with its **ESM worker** (no eval → the default MV3 CSP is untouched);
+  the viewer HTML is declared as a Rollup input and the worker/assets are web-accessible.
+
+### Notes
+
+- The viewer is a full-screen workspace, so it carries **no credit footer** (per the skip rule).
+- E2E: a minimal PDF fixture is seeded via `files/put` and the reader renders it to a canvas with no
+  worker/CSP console errors (10 E2E specs total).
 
 ## [0.8.0] — 2026-07-23
 
@@ -237,7 +255,8 @@ _Phase 3 (PDF anchoring) in progress. Next: pdf.js viewer surface (M2)._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.5.0...v0.6.0

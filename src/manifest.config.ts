@@ -30,4 +30,13 @@ export default defineManifest({
     default_path: 'src/sidepanel/index.html',
   },
   options_page: 'src/options/index.html',
+  // The PDF reader is a standalone extension page opened in a tab; it and the
+  // bundled pdf.js worker/assets must be web-accessible. @crxjs treats the
+  // listed HTML as a build entry point.
+  web_accessible_resources: [
+    {
+      resources: ['src/pdfviewer/index.html', 'assets/*'],
+      matches: ['<all_urls>'],
+    },
+  ],
 });
