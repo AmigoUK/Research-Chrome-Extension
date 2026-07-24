@@ -187,6 +187,35 @@ export interface User {
   rolesPerProject: Record<Id, ProjectRole>;
 }
 
+/** One message in a thread. Threads are stored whole, so this is not an entity. */
+export interface Comment {
+  id: Id;
+  authorId: Id;
+  body: string;
+  createdAt: IsoDateTime;
+}
+
+/**
+ * A discussion anchored to something in the project — a document, or one of its
+ * annotations. Comments are embedded rather than stored separately: the UI only
+ * ever reads a thread whole, and a reply is then one atomic write.
+ */
+export interface CommentThread {
+  id: Id;
+  projectId: Id;
+  documentId?: Id;
+  /** Set when the thread hangs off an annotation rather than the document. */
+  annotationId?: Id;
+  /** Where the thread points, in words — e.g. `p. 2` or a quoted phrase. */
+  anchorLabel: string;
+  /** The passage under discussion, shown under the anchor. */
+  quote?: string;
+  resolved: boolean;
+  comments: Comment[];
+  createdAt: IsoDateTime;
+  updatedAt: IsoDateTime;
+}
+
 /**
  * What kind of change an activity event records. `comment` and `sync` belong to
  * later milestones (M3 threads, M4 snapshots) — nothing emits them yet, and the

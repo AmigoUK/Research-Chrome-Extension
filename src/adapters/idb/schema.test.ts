@@ -20,14 +20,15 @@ describe('migrationVersionsToRun', () => {
 });
 
 describe('schema at DB_VERSION', () => {
-  it('creates all stores including the v2 files and v3 activity stores', async () => {
+  it('creates every store, up to v3 activity and v4 comment threads', async () => {
     globalThis.indexedDB = new IDBFactory();
-    const db = await openContextNotesDB('schema-v3');
+    const db = await openContextNotesDB('schema-v4');
     expect(db.version).toBe(DB_VERSION);
     expect([...db.objectStoreNames].sort()).toEqual(
       [
         'activity',
         'annotations',
+        'commentThreads',
         'citationStyles',
         'documents',
         'files',
@@ -44,6 +45,14 @@ describe('schema at DB_VERSION', () => {
     const db = await openContextNotesDB('schema-v3-index');
     const index = db.transaction('activity').store.index('byProjectTime');
     expect(index.keyPath).toEqual(['projectId', 'createdAt']);
+    db.close();
+  });
+
+  it('indexes comment threads by project and by document', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    const db = await openContextNotesDB('schema-v4-index');
+    const store = db.transaction('commentThreads').store;
+    expect([...store.indexNames].sort()).toEqual(['byDocument', 'byProject']);
     db.close();
   });
 });

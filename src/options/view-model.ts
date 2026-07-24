@@ -48,7 +48,7 @@ export const ROUTE_TITLES: Record<Route, readonly [string, string]> = {
   references: ['References', 'Bibliographic records'],
   styles: ['Citation styles', 'Style profiles & rules'],
   styleEditor: ['Style editor', 'Rules compile to CSL overrides'],
-  team: ['Team', 'Activity, members & roles'],
+  team: ['Team', 'Activity, comments & members'],
 };
 
 /** CSS custom-property carrying each status colour in `dashboard.css`. */

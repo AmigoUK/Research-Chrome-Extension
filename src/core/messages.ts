@@ -11,12 +11,14 @@ import type {
   Reference,
   CitationStyle,
   ActivityEvent,
+  CommentThread,
   Id,
   ProjectRole,
   User,
 } from './model/types';
 import type { CaptureInput, CaptureResult } from './usecases/capture';
 import type { MemberView } from './usecases/members';
+import type { ReplyInput, StartThreadInput } from './usecases/comments';
 
 /** File bytes cross the messaging boundary as base64 (JSON-safe). */
 export interface FilePayload {
@@ -74,6 +76,12 @@ export interface MessageMap {
   'members/remove': { req: { projectId: Id; userId: Id }; res: null };
   /** Newest first; `limit` pages the feed (default `DEFAULT_ACTIVITY_LIMIT`). */
   'activity/listByProject': { req: { projectId: Id; limit?: number }; res: ActivityEvent[] };
+  /** Open threads first, newest first within each group. */
+  'comments/listByProject': { req: { projectId: Id }; res: CommentThread[] };
+  'comments/start': { req: { input: StartThreadInput }; res: CommentThread };
+  'comments/reply': { req: ReplyInput; res: CommentThread };
+  'comments/setResolved': { req: { threadId: Id; resolved: boolean }; res: CommentThread };
+  'comments/delete': { req: { threadId: Id }; res: null };
 }
 
 export type MessageType = keyof MessageMap;

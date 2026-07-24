@@ -1,18 +1,19 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — Phase 4 complete and merged; Phase 5 in progress (M2 of 4 done)._
+_Last updated: 2026-07-24 — Phase 4 complete and merged; Phase 5 in progress (M3 of 4 done)._
 
 ## Where we are
 
 **Phase 4 (Citation style editor) is complete and merged to `main`.** **Phase 5 (Collaboration &
-Sync) is in progress** — M1 (members & roles) and M2 (activity feed) shipped; M3–M4 remain.
+Sync) is in progress** — M1 (members & roles), M2 (activity feed) and M3 (comment threads) shipped;
+only M4 (snapshot export/import) remains.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.16.0 is on `main`** (Phases 1–5 M2). No unmerged work.
-- **Releases:** v0.15.0 → v0.16.0 (Phase 5 M1–M2); v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
+- **Branch state:** everything through **v0.17.0 is on `main`** (Phases 1–5 M3). No unmerged work.
+- **Releases:** v0.15.0 → v0.17.0 (Phase 5 M1–M3); v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 168 unit + 17 E2E (5 PDF viewer + 10 dashboard + 2 side panel), all green.
+- **Tests:** 181 unit + 18 E2E (5 PDF viewer + 11 dashboard + 2 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -32,11 +33,17 @@ Consequences carried through the code and the UI:
 |---|---|---|
 | M1 — Members & roles: capability matrix (`src/core/model/roles.ts`), membership use-cases, Team view (6th nav item), `members/*` + `users/*` messages | v0.15.0 | ✅ |
 | M2 — Activity feed: `ActivityEvent` entity, IDB **schema v3**, recording in the router cases, day-grouped feed with kind filters and before→after diffs | v0.16.0 | ✅ |
-| M3 — Comment threads: anchored threads on documents & annotations, reply / resolve, Comments tab | — | ⬜ |
+| M3 — Comment threads: `CommentThread` with embedded comments, IDB **schema v4**, start / reply / resolve / delete, Comments tab + "Discuss" on an annotation | v0.17.0 | ✅ |
 | M4 — Snapshot export/import: portable JSON, optional AES-GCM password, merge on import with **hard DOI dedup**, sync-mode selector (local / file; backend shown as unavailable) | — | ⬜ |
 
-The Team view now has the tab bar the design mock has, minus the tab whose milestone has not landed:
-M2 shipped **Activity | Members**, M3 adds **Comments**. No dead tabs at any point.
+The Team view now has the design mock's full tab bar — **Activity | Comments | Members**. The
+Comments counter shows **open** threads only: a resolved thread is not a to-do.
+
+M3 decisions worth remembering: comments are **embedded in the thread record** rather than a second
+store — the UI only ever reads a thread whole, so a reply is one atomic write. Threads are started
+from a note (**Annotations → Discuss**), which anchors them to the annotation and inherits its
+document and quote. Resolved threads take no further replies. Every thread change records a
+`comment` event, the kind M2 defined and left unused, so the feed's chip appeared by itself.
 
 M2 decisions worth remembering: events carry a seventh kind, **`source`**, beyond the mock's six —
 filing a page is not the same act as importing a bibliographic record, and the feed says so. Events
@@ -80,7 +87,6 @@ styles (v0.2.0–v0.7.0). Dashboard-local CSS; side panel untouched.
 
 ### Deferred by design (not blocking)
 
-- **Team view** remains deferred (the full CSL rule editor shipped in Phase 4).
 - `CitationStyle.cslOverride` is still not persisted — the override object is generated on demand for
   the editor's code view; storing it would only duplicate `userRules`.
 - Per-annotation "section" + link-to-section (mock nicety) omitted — the domain `Annotation` has no
@@ -103,9 +109,9 @@ styles (v0.2.0–v0.7.0). Dashboard-local CSS; side panel untouched.
 
 ### Architecture
 
-Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters in
-`src/adapters`. Surfaces in `src/background` (service worker), `src/sidepanel`, `src/options`
-(stub).
+Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters in `src/adapters`.
+Surfaces: `src/background` (service worker), `src/sidepanel`, `src/options` (dashboard) and
+`src/pdfviewer` (bundled pdf.js reader).
 
 ## Known follow-ups (not blocking)
 
@@ -119,18 +125,22 @@ Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters 
 
 ## Resume plan — next steps
 
-**Continue Phase 5 at M3 (comment threads).** Nothing is half-finished: `main` is green at v0.16.0
-and the working tree is clean. M3 starts with the domain entity and the IDB migration:
+**Finish Phase 5 at M4 (snapshot export/import).** Nothing is half-finished: `main` is green at
+v0.17.0 and the working tree is clean. M4 is the last milestone of the phase:
 
-1. A `CommentThread` / `Comment` pair in `src/core/model/types.ts`, anchored the way annotations are
-   (`Anchor`) so a thread can hang off a document region as well as off an annotation.
-2. IDB **schema v4** — follow `src/adapters/idb/schema.ts`: append `migrations[4]`, never touch
-   `migrations[1]`–`[3]`; index by project and by the entity the thread is anchored to.
-3. Reply / resolve use-cases in `src/core/usecases/`, and recording through the **existing**
-   `recordActivity` with the already-defined `comment` kind — the filter chip appears by itself once
-   events exist.
-4. Team view gains the third tab (**Comments**) beside Activity and Members; the thread card, reply
-   box and resolve pill are in `collaboration-sync.html`.
+1. A portable JSON snapshot of the project — projects, documents, annotations, references, styles,
+   users, activity and comment threads — with a format version, so an older build can refuse a newer
+   file rather than mangle it. PDF bytes are the open question: including them makes the file huge,
+   so decide (and state) whether `files` travel with the snapshot.
+2. **Optional** password encryption: WebCrypto **AES-GCM + PBKDF2**. An empty password gives plain
+   JSON for backup and inspection; a password gives an encrypted envelope. Import detects which it
+   is from the file itself.
+3. Merge on import with **hard DOI dedup** — the rule the roadmap states. Everything else merges by
+   id, newest `updatedAt` winning; the merge writes `sync` activity events (the kind is already
+   defined and still unused).
+4. A sync-mode selector in the Team view: **Local only** and **File-based** selectable, self-hosted
+   backend shown as unavailable — the local-first scope decision, stated in the UI rather than
+   implied.
 
 **Smaller follow-ons in the citation area:** bundle size (the Chicago notes CSL is 243 kB raw —
 lazy-loading base styles from `web_accessible_resources` would trim the SW), and importing a

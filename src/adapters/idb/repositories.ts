@@ -14,6 +14,7 @@ import type {
   UserRepository,
   FileRepository,
   ActivityRepository,
+  CommentThreadRepository,
   RepositorySet,
 } from '../../core/ports/repositories';
 import type {
@@ -25,6 +26,7 @@ import type {
   User,
   StoredFile,
   ActivityEvent,
+  CommentThread,
   Id,
 } from '../../core/model/types';
 import type { ContextNotesDatabase } from './db';
@@ -176,6 +178,22 @@ class IdbActivityRepository implements ActivityRepository {
   }
 }
 
+class IdbCommentThreadRepository implements CommentThreadRepository {
+  constructor(private readonly db: ContextNotesDatabase) {}
+  get(id: Id): Promise<CommentThread | undefined> {
+    return this.db.get('commentThreads', id);
+  }
+  listByProject(projectId: Id): Promise<CommentThread[]> {
+    return this.db.getAllFromIndex('commentThreads', 'byProject', projectId);
+  }
+  async put(thread: CommentThread): Promise<void> {
+    await this.db.put('commentThreads', thread);
+  }
+  async delete(id: Id): Promise<void> {
+    await this.db.delete('commentThreads', id);
+  }
+}
+
 function normaliseDoi(doi: unknown): string | undefined {
   if (typeof doi !== 'string') return undefined;
   return doi
@@ -194,5 +212,6 @@ export function createRepositories(db: ContextNotesDatabase): RepositorySet {
     users: new IdbUserRepository(db),
     files: new IdbFileRepository(db),
     activity: new IdbActivityRepository(db),
+    commentThreads: new IdbCommentThreadRepository(db),
   };
 }

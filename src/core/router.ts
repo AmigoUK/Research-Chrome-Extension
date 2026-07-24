@@ -26,6 +26,13 @@ import {
   recordMemberRoleChanged,
   recordReferenceAdded,
 } from './usecases/activity';
+import {
+  deleteThread,
+  listThreads,
+  replyToThread,
+  setThreadResolved,
+  startThread,
+} from './usecases/comments';
 import { roleOf } from './model/roles';
 import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
@@ -236,6 +243,28 @@ export async function handleRequest(
       }
       case 'activity/listByProject':
         return ok(await listActivity(repos, request.projectId, request.limit)) as Result;
+      case 'comments/listByProject':
+        return ok(await listThreads(repos, request.projectId)) as Result;
+      case 'comments/start':
+        return ok(await startThread(repos, capture, request.input)) as Result;
+      case 'comments/reply':
+        return ok(
+          await replyToThread(repos, capture, {
+            threadId: request.threadId,
+            body: request.body,
+            ...(request.authorId ? { authorId: request.authorId } : {}),
+          }),
+        ) as Result;
+      case 'comments/setResolved':
+        return ok(
+          await setThreadResolved(repos, capture, {
+            threadId: request.threadId,
+            resolved: request.resolved,
+          }),
+        ) as Result;
+      case 'comments/delete':
+        await deleteThread(repos, capture, request.threadId);
+        return ok(null) as Result;
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

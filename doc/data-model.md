@@ -84,9 +84,50 @@ Fields:
 - `email`: optional.
 - `rolesPerProject`: mapping project -> role.
 
+### StoredFile
+
+Binary payload (PDF bytes) referenced by `Document.fileId`. Fields: `id`, `name`, `mime`, `bytes`, `createdAt`. Bytes cross the messaging boundary as base64, because `chrome.runtime.sendMessage` is JSON-only.
+
+### ActivityEvent (Phase 5, M2)
+
+One recorded change in a project's history — the activity feed's unit. Events are written where the change happens (the message router), never in a UI, so a status moved in the side panel and one moved in the Kanban are recorded identically.
+
+Fields:
+- `id`, `projectId`, `actorUserId`, `createdAt`.
+- `kind`: `source` | `status` | `annotation` | `comment` | `reference` | `member` | `sync`. (`sync` is reserved for M4.)
+- `summary`: plain text, escaped at render; `entityLabel` marks the part to emphasise.
+- `entityId`: the document / annotation / thread / user the event is about.
+- `from`, `to`: **raw domain values** (status ids, role ids) for the before→after diff — the view labels them, the store never does.
+
+Retention is a read limit, not a purge: nothing is deleted, and the feed pages 200 at a time.
+
+### CommentThread (Phase 5, M3)
+
+A discussion anchored to a document, or to one of its annotations. Comments are **embedded** rather than stored separately: the UI only ever reads a thread whole, and a reply is then one atomic write.
+
+Fields:
+- `id`, `projectId`, `createdAt`, `updatedAt`.
+- `documentId`, `annotationId`: what the thread hangs off (an annotation implies its document).
+- `anchorLabel`: where the thread points, in words (e.g. `p. 2` or a quoted phrase).
+- `quote`: the passage under discussion.
+- `resolved`: whether the thread is closed; resolved threads take no further replies.
+- `comments`: `{ id, authorId, body, createdAt }[]`.
+
 ## Relationships
 
-- One `Project` has many `Documents`, `Annotations`, `References`, and users with roles.
+- One `Project` has many `Documents`, `Annotations`, `References`, `ActivityEvents`, `CommentThreads`, and users with roles.
 - One `Document` belongs to one `Project` and may have many `Annotations` and one or more `References`.
 - One `Reference` belongs to one `Project` and optionally to one `Document`.
 - One `CitationStyle` can be used as `defaultCitationStyleId` in multiple projects.
+- One `CommentThread` belongs to one `Project` and points at a `Document` or an `Annotation`.
+
+## Persisted schema versions
+
+| Version | Adds |
+|---|---|
+| 1 | `projects`, `documents`, `annotations`, `references`, `citationStyles`, `users` |
+| 2 | `files` (PDF bytes) |
+| 3 | `activity` (index `[projectId, createdAt]`) |
+| 4 | `commentThreads` (indexes `byProject`, `byDocument`) |
+
+Migrations are append-only: a shipped migration is never edited.

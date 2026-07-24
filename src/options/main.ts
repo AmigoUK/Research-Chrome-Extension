@@ -18,6 +18,7 @@ import type {
   ActivityEvent,
   ActivityKind,
   Anchor,
+  CommentThread,
   Reference,
   CitationStyle,
   CitationUserRules,
@@ -44,7 +45,7 @@ import {
   ROLE_SUMMARIES,
   can,
 } from '../core/model/roles';
-import type { MemberView } from '../core/usecases/members';
+import { initialsOf, type MemberView } from '../core/usecases/members';
 import { bytesToBase64 } from '../core/files/base64';
 import {
   computeProgress,
@@ -167,6 +168,7 @@ interface DashState {
   styles: CitationStyle[];
   members: MemberView[];
   activity: ActivityEvent[];
+  threads: CommentThread[];
   route: Route;
   flash: Id | null;
   drag: Id | null;
@@ -175,8 +177,8 @@ interface DashState {
   selectedStyleId: Id | null;
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
-  /** Tab within the Team view (Comments joins them in M3). */
-  teamTab: 'activity' | 'members';
+  /** Tab within the Team view. */
+  teamTab: 'activity' | 'comments' | 'members';
   activityFilter: ActivityKind | 'all';
   /** How many events the feed has asked for — grows with "Show older". */
   activityLimit: number;
@@ -190,6 +192,7 @@ const state: DashState = {
   styles: [],
   members: [],
   activity: [],
+  threads: [],
   route: 'overview',
   flash: null,
   drag: null,
@@ -293,16 +296,18 @@ async function loadProjectData(): Promise<void> {
     state.styles = [];
     state.members = [];
     state.activity = [];
+    state.threads = [];
     return;
   }
   const projectId = state.activeProjectId;
-  const [documents, annotations, references, styles, members, activity] = await Promise.all([
+  const [documents, annotations, references, styles, members, activity, threads] = await Promise.all([
     sendRequest({ type: 'documents/listByProject', projectId }),
     sendRequest({ type: 'annotations/listByProject', projectId }),
     sendRequest({ type: 'references/listByProject', projectId }),
     sendRequest({ type: 'citationStyles/list' }),
     sendRequest({ type: 'members/list', projectId }),
     sendRequest({ type: 'activity/listByProject', projectId, limit: state.activityLimit }),
+    sendRequest({ type: 'comments/listByProject', projectId }),
   ]);
   state.documents = documents;
   state.annotations = annotations;
@@ -310,6 +315,7 @@ async function loadProjectData(): Promise<void> {
   state.styles = styles;
   state.members = members;
   state.activity = activity;
+  state.threads = threads;
 }
 
 /**
@@ -330,6 +336,15 @@ async function ensureSelfUser(): Promise<void> {
 async function reloadMembers(): Promise<void> {
   if (!state.activeProjectId) return;
   state.members = await sendRequest({ type: 'members/list', projectId: state.activeProjectId });
+}
+
+/** Reload the comment threads — after starting, replying, resolving or deleting. */
+async function reloadThreads(): Promise<void> {
+  if (!state.activeProjectId) return;
+  state.threads = await sendRequest({
+    type: 'comments/listByProject',
+    projectId: state.activeProjectId,
+  });
 }
 
 /** Reload the feed. Changes are recorded in the service worker, so the only way
@@ -933,7 +948,8 @@ function drawAnnotations(): void {
         <div class="anno-foot">
           <button class="stat-tag ${st.cls}" data-status aria-label="Change review status">${st.label}</button>
           ${a.tags.map((t) => `<span class="chip">#${esc(t)}</span>`).join('')}
-          <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-cite="${a.documentId}">${ICON.copy} Cite</button>
+          <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-discuss="${a.id}">${ICON.note} Discuss</button>
+          <button class="btn btn--ghost btn--sm" data-cite="${a.documentId}">${ICON.copy} Cite</button>
         </div></article>`;
     })
     .join('');
@@ -949,6 +965,13 @@ function drawAnnotations(): void {
     b.onclick = () => {
       const docId = b.dataset.cite;
       if (docId) void citeDocument(docId);
+    };
+  });
+  $$('[data-discuss]', box).forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      const anno = state.annotations.find((a) => a.id === b.dataset.discuss);
+      if (anno) openDiscussPopover(b, anno);
     };
   });
 }
@@ -1775,13 +1798,16 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
     openInvitePopover($('#tInvite'));
   };
 
-  const tab = (id: 'activity' | 'members', label: string, count: number): string =>
+  const tab = (id: DashState['teamTab'], label: string, count: number): string =>
     `<button class="vtab" role="tab" data-tab="${id}" aria-selected="${state.teamTab === id}">
       ${label}<span class="n">${count}</span></button>`;
 
+  // The Comments count is the open ones — a resolved thread is not a to-do.
+  const openThreads = state.threads.filter((t) => !t.resolved).length;
   view.innerHTML = `
     <div class="vtabs" role="tablist">
       ${tab('activity', 'Activity', state.activity.length)}
+      ${tab('comments', 'Comments', openThreads)}
       ${tab('members', 'Members', state.members.length)}
     </div>
     <div id="teamBody"></div>`;
@@ -1789,7 +1815,7 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
   $$('.vtab', view).forEach((b) => {
     b.onclick = () => {
       const t = b.dataset.tab;
-      if (t === 'activity' || t === 'members') {
+      if (t === 'activity' || t === 'comments' || t === 'members') {
         state.teamTab = t;
         render();
       }
@@ -1798,6 +1824,7 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
 
   const body = $('#teamBody', view);
   if (state.teamTab === 'members') renderMembersTab(body);
+  else if (state.teamTab === 'comments') renderCommentsTab(body);
   else renderActivityTab(body);
 }
 
@@ -1912,6 +1939,164 @@ function renderActivityTab(body: HTMLElement): void {
   });
   const olderBtn = body.querySelector<HTMLButtonElement>('#actOlder');
   if (olderBtn) olderBtn.onclick = () => void showOlderActivity();
+}
+
+/* ---- Team: comment threads (Phase 5, M3) ---- */
+
+function commentHtml(comment: CommentThread['comments'][number]): string {
+  const who = actorName(comment.authorId);
+  return `<div class="cm">
+    <span class="cm-av">${esc(initialsOf(who))}</span>
+    <div class="cm-b">
+      <div class="cm-h"><b>${esc(who)}</b><span class="t">${esc(timeLabel(comment.createdAt))}</span></div>
+      <div class="cm-txt">${esc(comment.body)}</div>
+    </div>
+  </div>`;
+}
+
+function threadHtml(thread: CommentThread): string {
+  const source = thread.documentId ? docById(thread.documentId) : undefined;
+  const title = source?.metadata.title;
+  const quote = thread.quote ?? title;
+  return `<div class="thread${thread.resolved ? ' resolved' : ''}" data-t="${esc(thread.id)}">
+    <div class="th-h">
+      <span class="anchor">${esc(thread.anchorLabel)}</span>
+      <span class="th-q">${quote ? `“${esc(quote)}”` : ''}</span>
+      <button class="resolve${thread.resolved ? ' done' : ''}" data-res="${esc(thread.id)}">
+        ${thread.resolved ? `${ICON.check}Resolved` : 'Resolve'}</button>
+      <button class="btn btn--ghost btn--sm" data-delthread="${esc(thread.id)}"
+        aria-label="Delete this thread">${ICON.x}</button>
+    </div>
+    <div class="comments">${thread.comments.map(commentHtml).join('')}</div>
+    ${
+      thread.resolved
+        ? ''
+        : `<div class="reply">
+            <input data-reply="${esc(thread.id)}" placeholder="Reply to the thread…" aria-label="Reply to the thread">
+            <button class="btn btn--primary btn--sm" data-post="${esc(thread.id)}">Post</button>
+          </div>`
+    }
+  </div>`;
+}
+
+function renderCommentsTab(body: HTMLElement): void {
+  if (state.threads.length === 0) {
+    body.innerHTML = emptyState(
+      'No discussions yet',
+      'Start one from a note — Annotations → Discuss — and the thread appears here.',
+    );
+    return;
+  }
+  body.innerHTML = state.threads.map(threadHtml).join('');
+
+  $$('[data-res]', body).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.res;
+      const thread = state.threads.find((t) => t.id === id);
+      if (thread) void setResolved(thread.id, !thread.resolved);
+    };
+  });
+  $$('[data-post]', body).forEach((b) => {
+    b.onclick = () => void postReply(b.dataset.post ?? '');
+  });
+  $$('[data-delthread]', body).forEach((b) => {
+    b.onclick = () => void removeThread(b.dataset.delthread ?? '');
+  });
+  $$<HTMLInputElement>('[data-reply]', body).forEach((input) => {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        void postReply(input.dataset.reply ?? '');
+      }
+    });
+  });
+}
+
+/** Refresh threads and feed together — every thread change writes an event. */
+async function reloadDiscussion(): Promise<void> {
+  await Promise.all([reloadThreads(), reloadActivity()]);
+}
+
+async function postReply(threadId: Id): Promise<void> {
+  const input = $<HTMLInputElement>(`[data-reply="${threadId}"]`);
+  const body = input?.value.trim() ?? '';
+  if (!body) return;
+  try {
+    await sendRequest({ type: 'comments/reply', threadId, body });
+    await reloadDiscussion();
+    render();
+    // The re-render replaced the input, so focus the new one.
+    $<HTMLInputElement>(`[data-reply="${threadId}"]`)?.focus();
+    toast('Comment posted', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t post the comment', ICON.warn, true);
+  }
+}
+
+async function setResolved(threadId: Id, resolved: boolean): Promise<void> {
+  try {
+    await sendRequest({ type: 'comments/setResolved', threadId, resolved });
+    await reloadDiscussion();
+    render();
+    toast(resolved ? 'Thread resolved' : 'Thread reopened', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t update the thread', ICON.warn, true);
+  }
+}
+
+async function removeThread(threadId: Id): Promise<void> {
+  try {
+    await sendRequest({ type: 'comments/delete', threadId });
+    await reloadDiscussion();
+    render();
+    toast('Thread deleted', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t delete the thread', ICON.warn, true);
+  }
+}
+
+/** Start a thread on an annotation, from the Annotations view. */
+function openDiscussPopover(anchor: HTMLElement, annotation: Annotation): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">Start a discussion</div>
+    <div class="pop-form">
+      <input id="thBody" class="sel" type="text" placeholder="What is worth asking here?"
+        aria-label="First comment" style="width:260px">
+      <button class="btn btn--primary btn--sm" id="thGo">${ICON.check} Post</button>
+    </div>
+    <div class="pop-note">The thread is anchored to this note and opens in Team → Comments.</div>`;
+  const input = $<HTMLInputElement>('#thBody', pop);
+  const submit = (): void => void startDiscussion(annotation, input.value);
+  $('#thGo', pop).onclick = submit;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  placePop(anchor);
+  input.focus();
+}
+
+async function startDiscussion(annotation: Annotation, body: string): Promise<void> {
+  if (!body.trim()) return;
+  try {
+    await sendRequest({
+      type: 'comments/start',
+      input: {
+        projectId: annotation.projectId,
+        annotationId: annotation.id,
+        anchorLabel: anchorLabel(annotation.anchor),
+        body: body.trim(),
+      },
+    });
+    closePop();
+    await reloadDiscussion();
+    render();
+    toast('Thread started · Team → Comments', ICON.note);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t start the thread', ICON.warn, true);
+  }
 }
 
 async function showOlderActivity(): Promise<void> {

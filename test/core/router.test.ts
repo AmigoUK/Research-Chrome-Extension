@@ -5,7 +5,7 @@ import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import { handleRequest } from '../../src/core/router';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type { ActivityEvent, Document } from '../../src/core/model/types';
+import type { ActivityEvent, CommentThread, Document } from '../../src/core/model/types';
 
 const NOW = '2026-07-23T00:00:00.000Z';
 
@@ -295,6 +295,51 @@ describe('activity recording (Phase 5, M2)', () => {
     const events = await feed();
     expect(events.map((e) => e.kind)).toEqual(['source']);
     expect(events[0]?.summary).toBe('added Urban heat');
+  });
+
+  it('routes a whole comment thread: start → reply → resolve → delete', async () => {
+    const started = await handleRequest(
+      repos,
+      { type: 'comments/start', input: { projectId: 'p1', body: 'Worth a caveat?' } },
+      deps,
+    );
+    expect(started.ok).toBe(true);
+    const threadId = started.ok ? (started.data as CommentThread).id : '';
+
+    const replied = await handleRequest(
+      repos,
+      { type: 'comments/reply', threadId, body: 'Agreed — added it.' },
+      deps,
+    );
+    expect(replied.ok && (replied.data as CommentThread).comments.map((c) => c.body)).toEqual([
+      'Worth a caveat?',
+      'Agreed — added it.',
+    ]);
+
+    const resolved = await handleRequest(
+      repos,
+      { type: 'comments/setResolved', threadId, resolved: true },
+      deps,
+    );
+    expect(resolved.ok && (resolved.data as CommentThread).resolved).toBe(true);
+
+    // Every step is in the feed, under the kind M2 defined and left unused.
+    const events = await feed();
+    expect(events.map((e) => e.kind)).toEqual(['comment', 'comment', 'comment']);
+
+    const removed = await handleRequest(repos, { type: 'comments/delete', threadId }, deps);
+    expect(removed).toEqual({ ok: true, data: null });
+    const listed = await handleRequest(repos, { type: 'comments/listByProject', projectId: 'p1' });
+    expect(listed.ok && (listed.data as CommentThread[])).toHaveLength(0);
+  });
+
+  it('returns an error result rather than throwing on an empty comment', async () => {
+    const res = await handleRequest(
+      repos,
+      { type: 'comments/start', input: { projectId: 'p1', body: '  ' } },
+      deps,
+    );
+    expect(res).toMatchObject({ ok: false });
   });
 
   it('lists a project newest first and honours the limit', async () => {

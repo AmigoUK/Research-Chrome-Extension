@@ -366,6 +366,82 @@ test('Activity tab shows a status move with a before→after diff and filters by
   await page.close();
 });
 
+test('Discuss on an annotation starts a thread, which replies and resolves in Team → Comments', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Seed a source and a note to hang the discussion off.
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-thread-doc',
+        projectId,
+        url: 'https://example.org/thread',
+        type: 'article',
+        metadata: { title: 'Thread source', authors: ['Talker, T.'], year: 2026 },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-thread-anno',
+        projectId,
+        documentId: 'e2e-thread-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'worth discussing' }] },
+        content: 'Needs a second opinion',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  // Start the thread from the annotation card.
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  await page.locator('.anno[data-id="e2e-thread-anno"] [data-discuss]').click();
+  await page.locator('#thBody').fill('Is the sample big enough here?');
+  await page.locator('#thGo').click();
+
+  // It is waiting in Team → Comments, anchored to the quoted passage.
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="comments"]').click();
+  const thread = page.locator('.thread').filter({ hasText: 'Is the sample big enough here?' });
+  await expect(thread).toHaveCount(1);
+  await expect(thread.locator('.anchor')).toContainText('worth discussing');
+
+  // Reply, then resolve: the reply is kept and the thread stops taking input.
+  await thread.locator('[data-reply]').fill('Three cities only — add a caveat.');
+  await thread.locator('[data-post]').click();
+  await expect(page.locator('.thread .cm-txt')).toHaveCount(2);
+
+  await page.locator('.thread [data-res]').first().click();
+  await expect(page.locator('.thread.resolved')).toHaveCount(1);
+  await expect(page.locator('.thread.resolved [data-reply]')).toHaveCount(0);
+
+  // Reload: the whole thread persisted, and the feed recorded every step.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="comments"]').click();
+  await expect(page.locator('.thread .cm-txt')).toHaveCount(2);
+
+  await page.locator('.vtab[data-tab="activity"]').click();
+  await expect(page.locator('.ev', { hasText: 'started a thread' })).toHaveCount(1);
+  await expect(page.locator('.ev', { hasText: 'resolved a thread' })).toHaveCount(1);
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

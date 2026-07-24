@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 5 M2 (activity feed) shipped. Next: M3 — anchored comment threads._
+_Phase 5 M3 (comment threads) shipped. Next: M4 — snapshot export/import, the last milestone of the
+phase._
+
+## [0.17.0] — 2026-07-24
+
+### Added
+
+- **Comment threads (Phase 5, M3)** — anchored discussion, the third of the mock's tabs:
+  - `CommentThread` in `src/core/model/types.ts` with **embedded comments**: the UI only ever reads a
+    thread whole, so a reply is one atomic write and there is no second store to keep in step.
+  - IndexedDB **schema v4**: a `commentThreads` store indexed `byProject` and `byDocument`.
+    `migrations[1]`–`[3]` untouched.
+  - `src/core/usecases/comments.ts` — `startThread` / `replyToThread` / `setThreadResolved` /
+    `deleteThread` / `listThreads`, plus `sortThreads` (open first, newest first within each group).
+    An empty comment is refused; a resolved thread takes no further replies.
+  - New messages `comments/listByProject|start|reply|setResolved|delete`.
+  - **Team → Comments**: thread cards with the anchor chip, the quoted passage, a resolve pill and a
+    reply box. The tab's counter shows **open** threads only — a resolved thread is not a to-do.
+  - **Annotations → Discuss** starts a thread on a note, inheriting its document, quote and anchor
+    label, and says where the thread went.
+- Every thread change records a `comment` activity event — the kind M2 defined and left unused, so
+  the feed's filter chip appeared on its own.
+
+### Changed
+
+- **README rewritten** — it still claimed "Phase 1 MVP in progress" four phases later. It now
+  describes what the extension actually does, the local-first posture, the test commands and where
+  the documentation lives.
+- `doc/data-model.md` gained `StoredFile`, `ActivityEvent` and `CommentThread`, plus a table of the
+  four persisted schema versions.
+
+### Notes
+
+- 181 unit tests (up from 168) + 18 E2E; the new E2E starts a thread from an annotation, replies,
+  resolves, reloads to prove persistence, and finds both steps in the activity feed.
 
 ## [0.16.0] — 2026-07-24
 
@@ -450,7 +484,8 @@ _Phase 5 M2 (activity feed) shipped. Next: M3 — anchored comment threads._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...v0.14.0

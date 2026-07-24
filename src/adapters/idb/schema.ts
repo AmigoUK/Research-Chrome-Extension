@@ -16,10 +16,11 @@ import type {
   User,
   StoredFile,
   ActivityEvent,
+  CommentThread,
 } from '../../core/model/types';
 
 export const DB_NAME = 'context-notes';
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 export interface ContextNotesDB extends DBSchema {
   projects: { key: string; value: Project };
@@ -47,6 +48,12 @@ export interface ContextNotesDB extends DBSchema {
     key: string;
     value: ActivityEvent;
     indexes: { byProjectTime: [string, string] };
+  };
+  /** Anchored discussions, comments embedded in the thread record. */
+  commentThreads: {
+    key: string;
+    value: CommentThread;
+    indexes: { byProject: string; byDocument: string };
   };
 }
 
@@ -89,6 +96,13 @@ export const migrations: Record<number, (db: IDBPDatabase<ContextNotesDB>, tx: U
       // lets the feed read a project's newest events without sorting in memory.
       const activity = db.createObjectStore('activity', { keyPath: 'id' });
       activity.createIndex('byProjectTime', ['projectId', 'createdAt']);
+    },
+    4(db) {
+      // Phase 5 M3: comment threads. Comments live inside the thread record, so
+      // a reply is one write and there is no second store to keep in step.
+      const threads = db.createObjectStore('commentThreads', { keyPath: 'id' });
+      threads.createIndex('byProject', 'projectId');
+      threads.createIndex('byDocument', 'documentId');
     },
   };
 

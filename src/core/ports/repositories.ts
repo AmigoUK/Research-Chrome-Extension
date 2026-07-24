@@ -13,6 +13,7 @@ import type {
   User,
   StoredFile,
   ActivityEvent,
+  CommentThread,
   Id,
 } from '../model/types';
 
@@ -75,6 +76,13 @@ export interface ActivityRepository {
   delete(id: Id): Promise<void>;
 }
 
+export interface CommentThreadRepository {
+  get(id: Id): Promise<CommentThread | undefined>;
+  listByProject(projectId: Id): Promise<CommentThread[]>;
+  put(thread: CommentThread): Promise<void>;
+  delete(id: Id): Promise<void>;
+}
+
 export interface RepositorySet {
   projects: ProjectRepository;
   documents: DocumentRepository;
@@ -84,4 +92,5 @@ export interface RepositorySet {
   users: UserRepository;
   files: FileRepository;
   activity: ActivityRepository;
+  commentThreads: CommentThreadRepository;
 }
