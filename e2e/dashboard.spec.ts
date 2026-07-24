@@ -50,6 +50,32 @@ test('dashboard shell renders: wordmark, project switcher, nav and credit footer
   await page.close();
 });
 
+test('the extension declares icons and every declared file actually loads', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+
+  // A manifest can name an icon that was never built; Chrome then falls back to
+  // the default puzzle piece and says nothing. So check the bytes, not the JSON.
+  const icons = await page.evaluate(async () => {
+    const manifest = chrome.runtime.getManifest();
+    const declared = { ...manifest.icons, ...(manifest.action?.default_icon as object) };
+    const checked: Record<string, { status: number; bytes: number }> = {};
+    for (const [size, path] of Object.entries(declared)) {
+      const res = await fetch(chrome.runtime.getURL(path as string));
+      checked[size] = { status: res.status, bytes: (await res.blob()).size };
+    }
+    return { declared, checked };
+  });
+
+  expect(Object.keys(icons.declared).sort()).toEqual(['128', '16', '32', '48']);
+  for (const [size, result] of Object.entries(icons.checked)) {
+    expect(result.status, `icon ${size} status`).toBe(200);
+    expect(result.bytes, `icon ${size} bytes`).toBeGreaterThan(100);
+  }
+
+  await page.close();
+});
+
 test('nav routes update the topbar title', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

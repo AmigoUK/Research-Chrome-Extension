@@ -1,0 +1,13 @@
+<!--
+  Extension icon: the wordmark glyph from the dashboard, filled rather than
+  outlined so it survives 16px in the toolbar. Terracotta is the app's single
+  accent (`--accent`, oklch(52% 0.1 28)); the two rules are the note lines.
+
+  This SVG is the source. The PNGs beside it are generated from it — see
+  doc/screenshots/README.md for how, and regenerate rather than hand-editing.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="#8b3a2b"/>
+  <rect x="30" y="42" width="68" height="13" rx="6.5" fill="#fdfcfa"/>
+  <rect x="30" y="73" width="46" height="13" rx="6.5" fill="#fdfcfa" opacity=".72"/>
+</svg>

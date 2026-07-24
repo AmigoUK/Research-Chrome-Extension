@@ -9,7 +9,7 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.22.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
+- **Branch state:** everything through **v0.23.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
@@ -128,9 +128,9 @@ Surfaces: `src/background` (service worker), `src/sidepanel`, `src/options` (das
 A full-codebase audit fixed the one serious finding — HTML injection through an imported snapshot,
 see the v0.22.0 CHANGELOG entry — and left these, in the order the audit ranked them:
 
-1. **No extension icons.** `src/manifest.config.ts` declares none, so Chrome shows the default puzzle
-   piece everywhere. A 128×128 icon is also mandatory for a Web Store listing, so this blocks
-   distribution rather than merely looking unfinished.
+1. ~~**No extension icons**~~ — **done in v0.23.0**: generated from `src/assets/icons/icon.svg`
+   (plus a small-size variant), declared at 16/32/48/128, and guarded by an E2E test that fetches
+   every declared file.
 2. **`web_accessible_resources` exposes `assets/*` to `<all_urls>`**, which lets any website detect
    the extension and fetch its assets — a poor fit for a privacy-first tool. It is probably
    unnecessary: the reader is opened from an extension page, and the CSL files are fetched

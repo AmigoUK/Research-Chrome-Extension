@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_The polish list is done. See `doc/STATUS.md`._
+_Working through the audit's remaining findings; see `doc/STATUS.md`._
+
+## [0.23.0] — 2026-07-24
+
+### Added
+
+- **The extension has icons.** It shipped without any, so Chrome drew the default puzzle piece in the
+  toolbar, the extensions page and the side-panel header — and a 128×128 icon is mandatory for a Web
+  Store listing, so this blocked distribution rather than merely looking unfinished.
+  - `src/assets/icons/icon.svg` is the source: the dashboard wordmark's glyph, filled rather than
+    outlined so it survives 16px, in the app's single accent.
+  - `icon-small.svg` draws the two toolbar sizes. The full icon's second rule is shorter and
+    lighter, and at 16px it disappears entirely — the small variant carries two equal rules on a
+    tighter margin. Same motif, drawn for the size it is actually seen at.
+  - The PNGs are generated from the SVGs by rendering them in Chromium, so the icon and the UI
+    cannot drift apart through a hand-typed hex.
+- An E2E test asserts the manifest declares all four sizes **and that each declared file really
+  loads** — a manifest can name an icon that was never built, and Chrome then falls back to the
+  puzzle piece without saying anything.
 
 ## [0.22.0] — 2026-07-24
 
@@ -705,7 +723,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...v0.21.0

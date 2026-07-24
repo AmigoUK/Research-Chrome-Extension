@@ -1,0 +1,11 @@
+<!--
+  The 16 and 32 px variant. The full icon's second rule is shorter and lighter,
+  which disappears entirely at toolbar size — so the small variant carries two
+  equal, opaque rules on a tighter margin. Same motif, drawn for the size it is
+  actually seen at.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="#8b3a2b"/>
+  <rect x="28" y="40" width="72" height="16" rx="8" fill="#fdfcfa"/>
+  <rect x="28" y="72" width="72" height="16" rx="8" fill="#fdfcfa"/>
+</svg>

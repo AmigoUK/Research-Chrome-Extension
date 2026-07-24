@@ -17,6 +17,14 @@ export default defineManifest({
   version: pkg.version,
   description: pkg.description,
   minimum_chrome_version: '116',
+  // Generated from `src/assets/icons/icon.svg` (and `icon-small.svg` for the two
+  // toolbar sizes, whose motif is drawn for the size it is actually seen at).
+  icons: {
+    16: 'src/assets/icons/icon-16.png',
+    32: 'src/assets/icons/icon-32.png',
+    48: 'src/assets/icons/icon-48.png',
+    128: 'src/assets/icons/icon-128.png',
+  },
   permissions: ['storage', 'scripting', 'activeTab', 'sidePanel'],
   optional_host_permissions: ['*://*/*'],
   background: {
@@ -25,6 +33,12 @@ export default defineManifest({
   },
   action: {
     default_title: 'Open Context Notes',
+    default_icon: {
+      16: 'src/assets/icons/icon-16.png',
+      32: 'src/assets/icons/icon-32.png',
+      48: 'src/assets/icons/icon-48.png',
+      128: 'src/assets/icons/icon-128.png',
+    },
   },
   side_panel: {
     default_path: 'src/sidepanel/index.html',
