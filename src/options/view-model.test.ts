@@ -1,9 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { DOCUMENT_STATUSES } from '../core/model/workflow';
 import {
+  NAV_ROUTES,
   ROUTES,
   ROUTE_TITLES,
   isRoute,
+  isNavRoute,
+  isFullScreenRoute,
   statusDot,
   STATUS_DOT,
   sourceCountLabel,
@@ -11,8 +14,8 @@ import {
 } from './view-model';
 
 describe('dashboard view-model', () => {
-  it('lists the Phase 2 routes in nav order', () => {
-    expect(ROUTES).toEqual(['overview', 'documents', 'annotations', 'references', 'styles']);
+  it('lists the nav routes in nav order', () => {
+    expect(NAV_ROUTES).toEqual(['overview', 'documents', 'annotations', 'references', 'styles']);
   });
 
   it('has a title + subtitle for every route', () => {
@@ -25,8 +28,15 @@ describe('dashboard view-model', () => {
 
   it('narrows valid routes and rejects unknown ones', () => {
     expect(isRoute('overview')).toBe(true);
-    expect(isRoute('members')).toBe(false); // Team is deferred, not a Phase 2 route
+    expect(isRoute('members')).toBe(false); // Team is deferred, not a route
     expect(isRoute('')).toBe(false);
+  });
+
+  it('keeps the style editor out of the nav but reachable as a route', () => {
+    expect(isRoute('styleEditor')).toBe(true);
+    expect(isNavRoute('styleEditor')).toBe(false);
+    expect(isFullScreenRoute('styleEditor')).toBe(true);
+    expect(isFullScreenRoute('styles')).toBe(false);
   });
 
   it('maps every document status to a css colour variable', () => {

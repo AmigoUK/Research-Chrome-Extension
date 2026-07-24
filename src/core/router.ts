@@ -112,6 +112,9 @@ export async function handleRequest(
       case 'citationStyles/put':
         await repos.citationStyles.put(request.style);
         return ok(null) as Result;
+      case 'citationStyles/delete':
+        await repos.citationStyles.delete(request.id);
+        return ok(null) as Result;
       case 'capture/page':
         return ok(await capturePage(repos, request.input, capture)) as Result;
       case 'citations/bibliography':
@@ -140,6 +143,8 @@ export async function handleRequest(
         ) as Result;
       case 'citations/preview':
         return ok(formatPreview(requireFormatter(deps), request.style, request.items)) as Result;
+      case 'citations/compiledCsl':
+        return ok(requireFormatter(deps).compileStyle(request.style)) as Result;
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

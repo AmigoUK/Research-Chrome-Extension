@@ -23,6 +23,7 @@ const stubFormatter: CitationFormatter = {
     `(${template}:${items.map((i) => i['id']).join(',')})`,
   formatWithStyle: (items: CslItem[], style, kind) =>
     `[${style.id}:${kind}] ${items.map((i) => i['id']).join('; ')}`,
+  compileStyle: (style) => `<style id="${style.id}"/>`,
 };
 
 function makeRef(id: string, projectId: string): Reference {

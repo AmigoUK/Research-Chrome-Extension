@@ -3,12 +3,20 @@
  * citeproc formats. Pure string transforms — no DOM, no `chrome.*` — so it runs
  * in the service worker and is unit-testable.
  *
- * Two levers:
+ * Three levers, in order of how much of the CSL machinery they touch:
  *  - `compileCsl` injects the citeproc-honored name attributes (`and`,
  *    `et-al-min`, `et-al-use-first`) onto every `<name …>` element of the base
  *    style, so author truncation and the final-name joiner reflect the rules.
- *  - `applyRulesToItem` drops `DOI` / `URL` / `issue` from a CSL-JSON item per
- *    the inclusion rules — a robust way to change output without touching CSL.
+ *  - `applyRulesToItem` reshapes the CSL-JSON item (dropping identifiers,
+ *    labelling page ranges, applying the FOI / legal templates) — controlled
+ *    post-processing, as `doc/citations.md` allows, and far more robust than
+ *    rewriting bibliography macros.
+ *  - `applyDoiFormat` rewrites the rendered text for the one rule that no CSL
+ *    attribute expresses: printing a DOI as `doi:…` rather than a full URI.
+ *
+ * The citation *system* (author–date / footnote / numeric) is deliberately not
+ * a lever here: it is declared by the base style itself (`citationFormatOf`),
+ * so the editor switches base style instead of trying to convert one.
  */
 import type { CitationUserRules } from '../model/types';
 
@@ -38,10 +46,33 @@ export function compileCsl(baseCslXml: string, rules: CitationUserRules): string
   // ellipsis for 21+ authors). Force plain "first N, et al." truncation so the
   // user's maxAuthors rule behaves predictably across base styles.
   xml = setNameAttr(xml, 'et-al-use-last', 'false');
+  if (rules.pagePrefix) xml = addPageLabels(xml);
   return xml;
 }
 
-/** Return a copy of a CSL-JSON item with identifiers removed per the rules. */
+/**
+ * Prepend a short page label (`p.` / `pp.`, pluralised by citeproc) to every
+ * rendered page range. Done in CSL rather than on the item, because citeproc
+ * parses and re-formats the `page` variable and would strip a literal prefix.
+ * The pair is wrapped in a `<group>` so the enclosing group's delimiter does
+ * not land between the label and the range.
+ */
+function addPageLabels(xml: string): string {
+  return xml.replace(
+    /<text variable="page"([^>]*)\/>/g,
+    '<group><label variable="page" form="short" suffix=" "/><text variable="page"$1/></group>',
+  );
+}
+
+/** `<category citation-format="…"/>` as declared by a CSL style, if any. */
+export function citationFormatOf(cslXml: string): string | undefined {
+  return /<category\s[^>]*citation-format="([^"]+)"/.exec(cslXml)?.[1];
+}
+
+/**
+ * Return a copy of a CSL-JSON item reshaped by the rules: identifiers removed,
+ * page ranges labelled, and the special-source templates applied.
+ */
 export function applyRulesToItem(
   item: Record<string, unknown>,
   rules: CitationUserRules,
@@ -50,7 +81,31 @@ export function applyRulesToItem(
   if (!rules.includeDoi) delete out.DOI;
   if (!rules.includeUrl) delete out.URL;
   if (!rules.includeIssue) delete out.issue;
+
+  // FOI requests are CSL `report`s with an issuing `authority`; the template
+  // adds the descriptor that styles render alongside the title.
+  if (out.type === 'report' && out.authority) {
+    if (rules.foiTemplate) out.genre ??= 'Freedom of Information request';
+    else delete out.genre;
+  }
+
+  // Without the legal template a case cites bare (name + year); with it, the
+  // neutral citation and the court are kept.
+  if (out.type === 'legal_case' && !rules.legalTemplate) {
+    delete out.authority;
+    delete out['container-title'];
+  }
+
   return out;
+}
+
+/**
+ * Rewrite rendered DOIs to the bare `doi:…` form. No CSL attribute expresses
+ * this choice, so it is applied to the formatted string.
+ */
+export function applyDoiFormat(text: string, rules: CitationUserRules): string {
+  if (!rules.includeDoi || rules.doiAsUri) return text;
+  return text.replace(/https?:\/\/(?:dx\.)?doi\.org\//g, 'doi:');
 }
 
 /**

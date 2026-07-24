@@ -9,13 +9,26 @@ import { STATUS_META, statusLabel } from '../sidepanel/view-model';
 
 export { STATUS_META, statusLabel };
 
-/** Top-level dashboard routes, in nav order. Team + full style editor are out of
- * scope for Phase 2 (deferred to later phases). */
-export const ROUTES = ['overview', 'documents', 'annotations', 'references', 'styles'] as const;
+/** Routes reachable from the sidebar nav, in nav order. Team is still deferred. */
+export const NAV_ROUTES = ['overview', 'documents', 'annotations', 'references', 'styles'] as const;
+export type NavRoute = (typeof NAV_ROUTES)[number];
+
+/** Every route, including full-screen workspaces reached from inside a view.
+ * `styleEditor` (Phase 4) is opened from the Citation styles view, not the nav. */
+export const ROUTES = [...NAV_ROUTES, 'styleEditor'] as const;
 export type Route = (typeof ROUTES)[number];
 
 export function isRoute(value: string): value is Route {
   return (ROUTES as readonly string[]).includes(value);
+}
+
+export function isNavRoute(value: string): value is NavRoute {
+  return (NAV_ROUTES as readonly string[]).includes(value);
+}
+
+/** Full-screen workspaces hide the app shell (sidebar + credit footer). */
+export function isFullScreenRoute(route: Route): boolean {
+  return route === 'styleEditor';
 }
 
 /** Topbar [title, subtitle] per route. */
@@ -25,6 +38,7 @@ export const ROUTE_TITLES: Record<Route, readonly [string, string]> = {
   annotations: ['Annotations', 'Notes across the project'],
   references: ['References', 'Bibliographic records'],
   styles: ['Citation styles', 'Style profiles & rules'],
+  styleEditor: ['Style editor', 'Rules compile to CSL overrides'],
 };
 
 /** CSS custom-property carrying each status colour in `dashboard.css`. */

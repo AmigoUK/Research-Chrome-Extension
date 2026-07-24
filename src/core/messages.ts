@@ -33,20 +33,25 @@ export interface MessageMap {
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
   'citationStyles/put': { req: { style: CitationStyle }; res: null };
+  'citationStyles/delete': { req: { id: Id }; res: null };
   'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
-  'citations/bibliography': { req: { projectId: Id; template: string; styleId?: Id }; res: string };
+  'citations/bibliography': {
+    req: { projectId: Id; template: string; styleId?: Id | undefined };
+    res: string;
+  };
   'citations/reference': {
-    req: { referenceId: Id; template: string; styleId?: Id };
+    req: { referenceId: Id; template: string; styleId?: Id | undefined };
     res: { inText: string; bibliography: string };
   };
   'citations/document': {
-    req: { documentId: Id; template: string; styleId?: Id };
+    req: { documentId: Id; template: string; styleId?: Id | undefined };
     res: { inText: string; bibliography: string };
   };
   'citations/preview': {
     req: { style: CitationStyle; items: Array<Record<string, unknown>> };
     res: Array<{ inText: string; bibliography: string }>;
   };
+  'citations/compiledCsl': { req: { style: CitationStyle }; res: string };
 }
 
 export type MessageType = keyof MessageMap;

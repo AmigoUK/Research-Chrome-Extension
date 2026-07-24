@@ -23,7 +23,14 @@ import type {
   Id,
 } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
-import { templateFor } from '../core/citation/styles';
+import {
+  BASE_STYLES,
+  baseStyleForSystem,
+  baseStyleInfo,
+  systemFor,
+  templateFor,
+} from '../core/citation/styles';
+import { overrideObject } from '../core/citation/compile';
 import { bytesToBase64 } from '../core/files/base64';
 import {
   computeProgress,
@@ -31,12 +38,23 @@ import {
   statusCounts,
   type ListFilter,
 } from '../sidepanel/view-model';
-import { ROUTE_TITLES, STATUS_META, isRoute, statusDot, statusLabel, type Route } from './view-model';
+import {
+  ROUTE_TITLES,
+  STATUS_META,
+  isFullScreenRoute,
+  isNavRoute,
+  statusDot,
+  statusLabel,
+  type Route,
+} from './view-model';
+import { highlightJson } from './csl-code';
+import { PREVIEW_SAMPLES, previewItems } from './preview-samples';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T =>
   root.querySelector(sel) as T;
-const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T[] =>
-  [...root.querySelectorAll<T>(sel)];
+const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T[] => [
+  ...root.querySelectorAll<T>(sel),
+];
 const esc = (s: unknown): string =>
   String(s).replace(
     /[&<>"]/g,
@@ -111,6 +129,8 @@ interface DashState {
   docFilter: ListFilter;
   annoFilter: { search: string; status: AnnotationStatus | 'all' };
   selectedStyleId: Id | null;
+  /** Right-hand panel tab in the full-screen style editor. */
+  editorTab: 'preview' | 'csl';
 }
 const state: DashState = {
   projects: [],
@@ -125,6 +145,7 @@ const state: DashState = {
   docFilter: { search: '', status: 'all' },
   annoFilter: { search: '', status: 'all' },
   selectedStyleId: null,
+  editorTab: 'preview',
 };
 
 const activeProject = (): Project | undefined =>
@@ -170,7 +191,10 @@ async function loadProjects(): Promise<void> {
   }
   if (!activeProject()) state.activeProjectId = state.projects[0]?.id ?? null;
 }
-function defaultRules(system: CitationSystem, over: Partial<CitationUserRules> = {}): CitationUserRules {
+function defaultRules(
+  system: CitationSystem,
+  over: Partial<CitationUserRules> = {},
+): CitationUserRules {
   return {
     system,
     maxAuthors: 3,
@@ -188,7 +212,14 @@ function defaultRules(system: CitationSystem, over: Partial<CitationUserRules> =
 }
 const SEED_STYLES: CitationStyle[] = [
   { id: 'apa', name: 'APA 7th', baseStyleId: 'apa', userRules: defaultRules('authorDate') },
-  { id: 'chicago', name: 'Chicago 17th', baseStyleId: 'chicago', userRules: defaultRules('footnote') },
+  {
+    // Footnote profile — the base style has to be a note style for the system
+    // to be real; `chicago` (author–date) would silently format in-text.
+    id: 'chicago',
+    name: 'Chicago (notes)',
+    baseStyleId: 'chicago-note',
+    userRules: defaultRules('footnote'),
+  },
   {
     id: 'harvard',
     name: 'Harvard',
@@ -236,7 +267,7 @@ function renderNav(): void {
   $$('.nav-item', nav).forEach((b) => {
     b.onclick = () => {
       const r = b.dataset.route;
-      if (r && isRoute(r)) go(r);
+      if (r && isNavRoute(r)) go(r);
       closeSidebar();
     };
   });
@@ -249,7 +280,9 @@ function renderProjSwitch(): void {
   menu.innerHTML =
     state.projects
       .map(
-        (pr) => `<button class="pmi${pr.id === state.activeProjectId ? ' active' : ''}" role="menuitem" data-p="${pr.id}">
+        (
+          pr,
+        ) => `<button class="pmi${pr.id === state.activeProjectId ? ' active' : ''}" role="menuitem" data-p="${pr.id}">
         <span class="dot"></span><span class="nm">${esc(pr.name)}</span></button>`,
       )
       .join('') +
@@ -303,8 +336,12 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   annotations: renderAnnotations,
   references: renderReferences,
   styles: renderStyles,
+  styleEditor: renderStyleEditor,
 };
 function render(): void {
+  // Full-screen workspaces drop the app shell (sidebar + credit footer) — the
+  // same rule the PDF reader follows.
+  $('.app').classList.toggle('editor-mode', isFullScreenRoute(state.route));
   renderProjSwitch();
   renderNav();
   const [title, sub] = ROUTE_TITLES[state.route];
@@ -410,7 +447,8 @@ function wireKanban(board: HTMLElement): void {
       col.classList.add('drop');
     });
     col.addEventListener('dragleave', (e) => {
-      if (!col.contains((e as DragEvent).relatedTarget as Node | null)) col.classList.remove('drop');
+      if (!col.contains((e as DragEvent).relatedTarget as Node | null))
+        col.classList.remove('drop');
     });
     col.addEventListener('drop', (e) => {
       e.preventDefault();
@@ -452,12 +490,13 @@ async function exportBibliography(): Promise<void> {
     toast('No sources to export yet', ICON.warn, true);
     return;
   }
-  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  const { template, styleId } = citeArgs();
   try {
     const bibliography = await sendRequest({
       type: 'citations/bibliography',
       projectId: state.activeProjectId,
       template,
+      styleId,
     });
     await navigator.clipboard.writeText(bibliography);
     toast(`Bibliography copied · ${state.documents.length} entries`, ICON.copy);
@@ -852,12 +891,13 @@ async function setAnnotationStatus(anno: Annotation, status: AnnotationStatus): 
 }
 
 async function citeDocument(documentId: Id): Promise<void> {
-  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  const { template, styleId } = citeArgs();
   try {
     const { bibliography } = await sendRequest({
       type: 'citations/document',
       documentId,
       template,
+      styleId,
     });
     await navigator.clipboard.writeText(bibliography);
     toast('Citation copied', ICON.copy);
@@ -1010,11 +1050,7 @@ async function importByDoi(raw: string): Promise<void> {
   }
   if (!state.activeProjectId) return;
   const granted = await chrome.permissions.request({
-    origins: [
-      'https://doi.org/*',
-      'https://data.crossref.org/*',
-      'https://data.datacite.org/*',
-    ],
+    origins: ['https://doi.org/*', 'https://data.crossref.org/*', 'https://data.datacite.org/*'],
   });
   if (!granted) {
     toast('Permission is needed to fetch DOI metadata', ICON.warn, true);
@@ -1033,13 +1069,22 @@ async function importByDoi(raw: string): Promise<void> {
     toast(err instanceof Error ? err.message : 'DOI import failed', ICON.warn, true);
   }
 }
+/** Formatting arguments for the citation messages: the project's active style
+ * profile, so its user rules shape the copied text, with the base template as
+ * the fallback the service worker uses when no style id resolves. */
+function citeArgs(): { template: string; styleId: Id | undefined } {
+  const style = activeStyle();
+  return { template: templateFor(style?.baseStyleId ?? 'apa'), styleId: style?.id };
+}
+
 async function copyReferenceCitation(referenceId: Id): Promise<void> {
-  const template = templateFor(activeStyle()?.baseStyleId ?? 'apa');
+  const { template, styleId } = citeArgs();
   try {
     const { bibliography } = await sendRequest({
       type: 'citations/reference',
       referenceId,
       template,
+      styleId,
     });
     await navigator.clipboard.writeText(bibliography);
     toast('Citation copied', ICON.copy);
@@ -1048,87 +1093,60 @@ async function copyReferenceCitation(referenceId: Id): Promise<void> {
   }
 }
 
-/* ---- Citation styles (lightweight editor) ---- */
-interface PreviewSample {
-  label: string;
-  authors: Array<{ family: string; given: string }>;
-  year: number;
-  title: string;
-  journal: string;
-  volume: string;
-  issue: string;
-  page: string;
-  doi: string;
-}
-const PREVIEW_SAMPLES: PreviewSample[] = [
-  {
-    label: '1 author',
-    authors: [{ family: 'Oke', given: 'T. R.' }],
-    year: 1982,
-    title: 'The energetic basis of the urban heat island',
-    journal: 'Quarterly Journal of the Royal Meteorological Society',
-    volume: '108',
-    issue: '455',
-    page: '1–24',
-    doi: '10.1002/qj.49710845502',
-  },
-  {
-    label: '4 authors — triggers “et al.”',
-    authors: [
-      { family: 'Gasparrini', given: 'A.' },
-      { family: 'Guo', given: 'Y.' },
-      { family: 'Hashizume', given: 'M.' },
-      { family: 'Lavigne', given: 'E.' },
-    ],
-    year: 2015,
-    title: 'Mortality risk attributable to high and low ambient temperature',
-    journal: 'The Lancet',
-    volume: '386',
-    issue: '9991',
-    page: '369–375',
-    doi: '10.1016/S0140-6736(14)62114-0',
-  },
-];
-function previewCite(s: PreviewSample, r: CitationUserRules): { inText: string; biblio: string } {
-  const a = s.authors;
-  const surnames = a.map((x) => x.family);
-  const trunc = a.length > r.maxAuthors;
-  let inText: string;
-  if (r.system === 'footnote') inText = '¹ (footnote)';
-  else if (r.system === 'numeric') inText = '[1]';
-  else if (a.length === 1) inText = `(${surnames[0]}, ${s.year})`;
-  else if (a.length === 2) inText = `(${surnames[0]} & ${surnames[1]}, ${s.year})`;
-  else
-    inText = `(${(trunc ? [surnames[0], 'et al.'] : surnames).join(trunc ? ' ' : ', ')}, ${s.year})`;
-  const doi = r.includeDoi ? ` https://doi.org/${s.doi}` : '';
-  const url = r.includeUrl && !r.includeDoi ? ' Retrieved from the journal site.' : '';
-  const iss = r.includeIssue && s.issue ? `(${s.issue})` : '';
-  let biblio: string;
-  if (r.system === 'footnote') {
-    const names =
-      (trunc ? a.slice(0, r.maxAuthors) : a).map((p) => `${p.given} ${p.family}`).join(', ') +
-      (trunc ? ', et al.' : '');
-    biblio = `¹ ${names}, “${s.title},” ${s.journal} ${s.volume}, no. ${s.issue} (${s.year}): ${s.page}.${doi}`;
-  } else {
-    const names =
-      (trunc ? a.slice(0, r.maxAuthors) : a).map((p) => `${p.family}, ${p.given}`).join(', ') +
-      (trunc ? ', et al.' : '');
-    biblio = `${names} (${s.year}). ${s.title}. ${s.journal}, ${s.volume}${iss}, ${s.page}.${doi}${url}`;
-  }
-  return { inText, biblio };
-}
-
+/* ---- Citation styles ---- */
 function selectedStyle(): CitationStyle | undefined {
   return state.styles.find((s) => s.id === state.selectedStyleId) ?? state.styles[0];
 }
 
+/** A detached copy, so edits in the editor never mutate the loaded state until saved. */
+function cloneStyle(style: CitationStyle): CitationStyle {
+  return { ...style, userRules: { ...style.userRules } };
+}
+
+type PreviewRow = { inText: string; bibliography: string };
+
+/**
+ * Paint a live preview of `style` into `host`. The formatting itself runs in
+ * the service worker (`citations/preview`) through real citeproc, so what the
+ * editor shows is exactly what a copied citation will say. Debounced, with a
+ * sequence guard so a slow response can't overwrite a newer one.
+ */
+let previewSeq = 0;
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
+function paintPreview(
+  host: HTMLElement,
+  style: CitationStyle,
+  layout: (rows: PreviewRow[]) => string,
+): void {
+  const seq = ++previewSeq;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    void sendRequest({ type: 'citations/preview', style: cloneStyle(style), items: previewItems() })
+      .then((rows) => {
+        if (seq === previewSeq) host.innerHTML = layout(rows);
+      })
+      .catch((err: unknown) => {
+        if (seq !== previewSeq) return;
+        const msg = err instanceof Error ? err.message : 'Preview unavailable';
+        host.innerHTML = `<div class="pv-err">${esc(msg)}</div>`;
+      });
+  }, 120);
+}
+
+function systemLabel(system: CitationSystem): string {
+  return system === 'footnote' ? 'Footnote' : system === 'numeric' ? 'Numeric' : 'Author–date';
+}
+
 function renderStyles(view: HTMLElement, actions: HTMLElement): void {
   actions.innerHTML = `<button class="btn btn--ghost btn--sm" id="sFull">Full editor</button><button class="btn btn--primary btn--sm" id="sSave">${ICON.check} Save profile</button>`;
-  $('#sFull', actions).onclick = () => toast('The full CSL rule editor arrives in Phase 4');
+  $('#sFull', actions).onclick = () => go('styleEditor');
   $('#sSave', actions).onclick = () => void saveStyle();
 
   if (state.styles.length === 0) {
-    view.innerHTML = emptyState('No citation styles', 'Add a style profile to format your citations.');
+    view.innerHTML = emptyState(
+      'No citation styles',
+      'Add a style profile to format your citations.',
+    );
     return;
   }
   if (!state.selectedStyleId) state.selectedStyleId = state.styles[0]?.id ?? null;
@@ -1150,9 +1168,11 @@ function drawStyleList(): void {
   const host = $('#slist');
   host.innerHTML = state.styles
     .map(
-      (s) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${s.id}">
+      (
+        s,
+      ) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${s.id}">
       <div class="snm">${esc(s.name)}</div>
-      <div class="sb">${s.userRules.system === 'footnote' ? 'Footnote' : s.userRules.system === 'numeric' ? 'Numeric' : 'Author–date'} · base ${esc(s.baseStyleId)}</div>
+      <div class="sb">${systemLabel(systemFor(s.baseStyleId))} · base ${esc(s.baseStyleId)}</div>
     </button>`,
     )
     .join('');
@@ -1171,8 +1191,8 @@ function drawStyleEditor(): void {
   const r = style.userRules;
   const editor = $('#editor');
   editor.innerHTML = `
-    <div class="ed-row"><div class="ed-lbl"><b>Citation system</b><span>Author–date in text, or numbered footnotes</span></div>
-      <div class="seg" id="sysSeg"><button data-v="authorDate" aria-pressed="${r.system === 'authorDate'}">Author–date</button><button data-v="footnote" aria-pressed="${r.system === 'footnote'}">Footnote</button></div></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Base CSL style</b><span>Sets the citation system — ${esc(systemLabel(systemFor(style.baseStyleId)).toLowerCase())}</span></div>
+      <select class="sel" id="baseSel" aria-label="Base CSL style">${baseOptions(style.baseStyleId)}</select></div>
     <div class="ed-row"><div class="ed-lbl"><b>Maximum authors</b><span>Before the list is truncated with “et al.”</span></div>
       <div class="stepper"><button data-step="-1" aria-label="Fewer">−</button><span class="val" id="maVal">${r.maxAuthors}</span><button data-step="1" aria-label="More">+</button></div></div>
     <div class="ed-row"><div class="ed-lbl"><b>Include DOI</b><span>Append the DOI to bibliography entries</span></div>
@@ -1182,13 +1202,11 @@ function drawStyleEditor(): void {
     <div class="ed-row"><div class="ed-lbl"><b>Include issue number</b><span>Show the issue alongside the volume</span></div>
       <button class="sw" role="switch" id="swIssue" aria-checked="${r.includeIssue}" aria-label="Include issue number"></button></div>
     <div class="preview" id="cpreview"></div>`;
-  $$('#sysSeg button', editor).forEach((b) => {
-    b.onclick = () => {
-      r.system = b.dataset.v as CitationSystem;
-      drawStyleList();
-      drawStyleEditor();
-    };
-  });
+  $('#baseSel', editor).onchange = (e) => {
+    setBaseStyle(style, (e.target as HTMLSelectElement).value);
+    drawStyleList();
+    drawStyleEditor();
+  };
   $$('.stepper [data-step]', editor).forEach((b) => {
     b.onclick = () => {
       r.maxAuthors = Math.max(1, Math.min(20, r.maxAuthors + Number(b.dataset.step)));
@@ -1208,19 +1226,45 @@ function drawStyleEditor(): void {
     drawStyleEditor();
   };
 
-  $('#cpreview', editor).innerHTML =
-    `<div class="pl">Live preview · ${esc(style.name)} · ${r.system === 'footnote' ? 'footnote' : r.system === 'numeric' ? 'numeric' : 'author–date'}</div>` +
-    PREVIEW_SAMPLES.map((sample) => {
-      const f = previewCite(sample, r);
-      return `<div class="pex"><div class="pex-l">${esc(sample.label)}</div><div class="intxt">${esc(f.inText)}</div><div class="pv">${esc(f.biblio)}</div></div>`;
-    }).join('');
+  const host = $('#cpreview', editor);
+  host.innerHTML = `<div class="pl">Live preview · formatting…</div>`;
+  paintPreview(
+    host,
+    style,
+    (rows) =>
+      `<div class="pl">Live preview · ${esc(style.name)} · ${esc(systemLabel(systemFor(style.baseStyleId)).toLowerCase())}</div>` +
+      rows
+        .map((row, i) => {
+          const sample = PREVIEW_SAMPLES[i];
+          if (!sample) return '';
+          return `<div class="pex"><div class="pex-l">${esc(sample.label)}</div><div class="intxt">${esc(row.inText)}</div><div class="pv">${esc(row.bibliography)}</div></div>`;
+        })
+        .join(''),
+  );
+}
+
+/** `<option>` list for the base-style picker, with `selected` on the current one. */
+function baseOptions(current: string): string {
+  return BASE_STYLES.map(
+    (b) => `<option value="${b.id}"${b.id === current ? ' selected' : ''}>${esc(b.label)}</option>`,
+  ).join('');
+}
+
+/** Switch the base style, keeping `userRules.system` truthful: the citation
+ * system is declared by the CSL file, not chosen independently of it. */
+function setBaseStyle(style: CitationStyle, baseStyleId: string): void {
+  style.baseStyleId = baseStyleId;
+  style.userRules.system = systemFor(baseStyleId);
 }
 
 async function saveStyle(): Promise<void> {
   const style = selectedStyle();
   if (!style) return;
   try {
-    await sendRequest({ type: 'citationStyles/put', style: { ...style, userRules: { ...style.userRules } } });
+    await sendRequest({
+      type: 'citationStyles/put',
+      style: { ...style, userRules: { ...style.userRules } },
+    });
     toast(`Saved · ${style.name}`, ICON.check);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t save style', ICON.warn, true);
@@ -1235,14 +1279,378 @@ async function createStyle(): Promise<void> {
     baseStyleId: base?.baseStyleId ?? 'apa',
     userRules: defaultRules(base?.userRules.system ?? 'authorDate'),
   };
+  await addStyle(style, 'New style created');
+}
+
+/** Copy the selected profile — the mock's "Duplicate" action. */
+async function duplicateStyle(): Promise<void> {
+  const base = selectedStyle();
+  if (!base) return;
+  await addStyle(
+    { ...cloneStyle(base), id: crypto.randomUUID(), name: `${base.name} (copy)` },
+    `Duplicated · ${base.name}`,
+  );
+}
+
+async function addStyle(style: CitationStyle, message: string): Promise<void> {
   try {
     await sendRequest({ type: 'citationStyles/put', style });
     state.styles = [...state.styles, style];
     state.selectedStyleId = style.id;
     render();
-    toast('New style created', ICON.check);
+    toast(message, ICON.check);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t create style', ICON.warn, true);
+  }
+}
+
+async function deleteStyle(id: Id): Promise<void> {
+  const style = state.styles.find((s) => s.id === id);
+  if (!style) return;
+  if (state.styles.length === 1) {
+    toast('Keep at least one style profile', ICON.warn, true);
+    return;
+  }
+  try {
+    await sendRequest({ type: 'citationStyles/delete', id });
+    state.styles = state.styles.filter((s) => s.id !== id);
+    if (state.selectedStyleId === id) state.selectedStyleId = state.styles[0]?.id ?? null;
+    render();
+    toast(`Deleted · ${style.name}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t delete style', ICON.warn, true);
+  }
+}
+
+/* ---- Citation styles: full-screen editor (Phase 4) ---- */
+
+const RULE_ICON = {
+  system: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  authors: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/>',
+  identifiers:
+    '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+  formatting: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/>',
+  special:
+    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>',
+};
+
+function ruleGroup(icon: string, title: string, rows: string): string {
+  return `<div class="grp">
+    <div class="grp-h"><svg class="gi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">${icon}</svg><h2>${esc(title)}</h2><span class="ln"></span></div>
+    ${rows}
+  </div>`;
+}
+function ruleRow(title: string, help: string, control: string): string {
+  return `<div class="row"><div class="rl"><b>${title}</b><span>${help}</span></div>${control}</div>`;
+}
+function toggle(id: string, on: boolean, label: string, disabled = false): string {
+  return `<button class="sw" role="switch" id="${id}" aria-checked="${on}" aria-label="${esc(label)}"${disabled ? ' disabled' : ''}></button>`;
+}
+function stepper(key: string, value: number): string {
+  return `<div class="stepper"><button data-step="${key}" data-d="-1" aria-label="Fewer">−</button><span class="val" id="v-${key}">${value}</span><button data-step="${key}" data-d="1" aria-label="More">+</button></div>`;
+}
+
+function renderStyleEditor(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML =
+    `<button class="btn btn--ghost btn--sm" id="seBack">← Citation styles</button>` +
+    `<button class="btn btn--sm" id="seDup">Duplicate</button>` +
+    `<button class="btn btn--sm" id="seExport">${ICON.down} Export .csl</button>` +
+    `<button class="btn btn--primary btn--sm" id="seSave">${ICON.check} Save</button>`;
+  $('#seBack', actions).onclick = () => go('styles');
+  $('#seDup', actions).onclick = () => void duplicateStyle();
+  $('#seExport', actions).onclick = () => void exportStyleCsl();
+  $('#seSave', actions).onclick = () => void saveStyle();
+
+  if (state.styles.length === 0) {
+    view.innerHTML = emptyState(
+      'No citation styles',
+      'Add a style profile to format your citations.',
+    );
+    return;
+  }
+  if (!state.selectedStyleId) state.selectedStyleId = state.styles[0]?.id ?? null;
+
+  view.innerHTML = `<div class="sed">
+    <aside class="sed-side" aria-label="Style profiles">
+      <div class="sed-side-h">Style profiles</div>
+      <div class="sed-plist" id="sedList"></div>
+      <div class="sed-side-f"><button class="btn btn--sm" id="sedNew" style="width:100%">${ICON.plus} New style</button></div>
+    </aside>
+    <div class="sed-main">
+      <header class="sed-head">
+        <div class="h-name">
+          <label for="sedName">Style name</label>
+          <input class="name-in" id="sedName" aria-label="Style name" />
+        </div>
+        <div class="h-field">
+          <label for="sedBase">Base CSL style</label>
+          <select class="sel" id="sedBase"></select>
+        </div>
+      </header>
+      <div class="sed-work">
+        <div class="sed-rules" id="sedRules"></div>
+        <aside class="sed-panel">
+          <div class="ptabs" role="tablist">
+            <button class="ptab" id="tabPrev" role="tab">Live preview</button>
+            <button class="ptab" id="tabCsl" role="tab">CSL override</button>
+          </div>
+          <div class="pbody" id="sedPanel"></div>
+        </aside>
+      </div>
+    </div>
+  </div>`;
+
+  $('#sedNew', view).onclick = () => void createStyle();
+  $('#tabPrev', view).onclick = () => {
+    state.editorTab = 'preview';
+    drawEditorPanel();
+  };
+  $('#tabCsl', view).onclick = () => {
+    state.editorTab = 'csl';
+    drawEditorPanel();
+  };
+
+  const name = $<HTMLInputElement>('#sedName', view);
+  name.value = selectedStyle()?.name ?? '';
+  name.oninput = () => {
+    const style = selectedStyle();
+    if (!style) return;
+    style.name = name.value;
+    drawEditorProfiles(); // keeps focus in the input — no full redraw
+    drawEditorPanel();
+  };
+
+  const base = $<HTMLSelectElement>('#sedBase', view);
+  base.innerHTML = baseOptions(selectedStyle()?.baseStyleId ?? 'apa');
+  base.onchange = () => {
+    const style = selectedStyle();
+    if (!style) return;
+    setBaseStyle(style, base.value);
+    drawEditorProfiles();
+    drawEditorRules();
+    drawEditorPanel();
+  };
+
+  drawEditorProfiles();
+  drawEditorRules();
+  drawEditorPanel();
+}
+
+function drawEditorProfiles(): void {
+  const host = $('#sedList');
+  host.innerHTML = state.styles
+    .map((s) => {
+      const info = baseStyleInfo(s.baseStyleId);
+      return `<div class="sed-pcard${s.id === state.selectedStyleId ? ' sel' : ''}">
+        <button class="sed-pc-main" data-s="${s.id}">
+          <div class="pn">${esc(s.name)}</div>
+          <div class="pb"><span class="dot"></span>${esc(systemLabel(systemFor(s.baseStyleId)))} · ${esc((info?.label ?? s.baseStyleId).split(' ')[0] ?? '')}</div>
+        </button>
+        <button class="sed-pc-del" data-del="${s.id}" aria-label="Delete ${esc(s.name)}" title="Delete profile">×</button>
+      </div>`;
+    })
+    .join('');
+  $$('[data-s]', host).forEach((b) => {
+    b.onclick = () => {
+      state.selectedStyleId = b.dataset.s ?? null;
+      renderStyleEditor($('#view'), $('#viewActions'));
+    };
+  });
+  $$('[data-del]', host).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset.del;
+      if (id) void deleteStyle(id);
+    };
+  });
+}
+
+function drawEditorRules(): void {
+  const style = selectedStyle();
+  if (!style) return;
+  const r = style.userRules;
+  const system = systemFor(style.baseStyleId);
+  const host = $('#sedRules');
+
+  host.innerHTML =
+    ruleGroup(
+      RULE_ICON.system,
+      'Citation system',
+      ruleRow(
+        'Format',
+        'Declared by the base CSL style — switching here picks a matching style',
+        `<div class="seg" id="segSys">
+          <button data-v="authorDate" aria-pressed="${system === 'authorDate'}">Author–date</button>
+          <button data-v="footnote" aria-pressed="${system === 'footnote'}">Footnote</button>
+          <button data-v="numeric" aria-pressed="${system === 'numeric'}">Numeric</button>
+        </div>`,
+      ),
+    ) +
+    ruleGroup(
+      RULE_ICON.authors,
+      'Authors',
+      ruleRow(
+        'Maximum authors',
+        `Show every name up to this count, then truncate → <code>et-al-min: ${r.maxAuthors + 1}</code>`,
+        stepper('maxAuthors', r.maxAuthors),
+      ) +
+        ruleRow(
+          'Names before “et al.”',
+          'How many names to keep when truncating',
+          stepper('etAlUseFirst', r.etAlUseFirst),
+        ) +
+        ruleRow(
+          'Final name joiner',
+          'Between the last two authors',
+          `<div class="seg" id="segAnd"><button data-v="symbol" aria-pressed="${r.nameAnd === 'symbol'}">Ampersand&nbsp;&amp;</button><button data-v="text" aria-pressed="${r.nameAnd === 'text'}">Word “and”</button></div>`,
+        ),
+    ) +
+    ruleGroup(
+      RULE_ICON.identifiers,
+      'Identifiers',
+      ruleRow(
+        'Include DOI',
+        'Append the DOI to bibliography entries',
+        toggle('swDoi', r.includeDoi, 'Include DOI'),
+      ) +
+        ruleRow(
+          'DOI as full URL',
+          '<code>https://doi.org/…</code> vs <code>doi:…</code>',
+          toggle('swUri', r.doiAsUri, 'DOI as full URL', !r.includeDoi),
+        ) +
+        ruleRow(
+          'Include URL when no DOI',
+          'Fallback link for datasets &amp; web sources',
+          toggle('swUrl', r.includeUrl, 'Include URL when no DOI'),
+        ),
+    ) +
+    ruleGroup(
+      RULE_ICON.formatting,
+      'Formatting',
+      ruleRow(
+        'Include issue number',
+        'Show <code>vol(issue)</code> vs volume only',
+        toggle('swIssue', r.includeIssue, 'Include issue number'),
+      ) +
+        ruleRow(
+          'Page range label',
+          'Prepend <code>pp.</code> to page ranges',
+          toggle('swPp', r.pagePrefix, 'Page range label'),
+        ),
+    ) +
+    ruleGroup(
+      RULE_ICON.special,
+      'Special sources',
+      ruleRow(
+        'FOI request template',
+        'Label FOI reports with the request descriptor and reference',
+        toggle('swFoi', r.foiTemplate, 'FOI request template'),
+      ) +
+        ruleRow(
+          'Legal case template',
+          'Keep the neutral citation and the court',
+          toggle('swLegal', r.legalTemplate, 'Legal case template'),
+        ),
+    );
+
+  $$('#segSys button', host).forEach((b) => {
+    b.onclick = () => {
+      const next = b.dataset.v as CitationSystem;
+      if (next === system) return;
+      setBaseStyle(style, baseStyleForSystem(next));
+      $<HTMLSelectElement>('#sedBase').value = style.baseStyleId;
+      afterRuleChange();
+    };
+  });
+  $$('#segAnd button', host).forEach((b) => {
+    b.onclick = () => {
+      r.nameAnd = b.dataset.v === 'text' ? 'text' : 'symbol';
+      afterRuleChange();
+    };
+  });
+  $$('[data-step]', host).forEach((b) => {
+    b.onclick = () => {
+      const key = b.dataset.step as 'maxAuthors' | 'etAlUseFirst';
+      r[key] = Math.max(1, Math.min(30, r[key] + Number(b.dataset.d)));
+      if (r.etAlUseFirst > r.maxAuthors) r.etAlUseFirst = r.maxAuthors;
+      afterRuleChange();
+    };
+  });
+  const flip = (id: string, key: keyof CitationUserRules & string): void => {
+    const el = $<HTMLButtonElement>(`#${id}`, host);
+    if (!el || el.disabled) return;
+    el.onclick = () => {
+      (r[key] as boolean) = !r[key];
+      afterRuleChange();
+    };
+  };
+  flip('swDoi', 'includeDoi');
+  flip('swUri', 'doiAsUri');
+  flip('swUrl', 'includeUrl');
+  flip('swIssue', 'includeIssue');
+  flip('swPp', 'pagePrefix');
+  flip('swFoi', 'foiTemplate');
+  flip('swLegal', 'legalTemplate');
+}
+
+/** Redraw the rule column and the panel after any rule edit. */
+function afterRuleChange(): void {
+  drawEditorProfiles();
+  drawEditorRules();
+  drawEditorPanel();
+}
+
+function drawEditorPanel(): void {
+  const style = selectedStyle();
+  if (!style) return;
+  const host = $('#sedPanel');
+  const onPreview = state.editorTab === 'preview';
+  $('#tabPrev').setAttribute('aria-selected', String(onPreview));
+  $('#tabCsl').setAttribute('aria-selected', String(!onPreview));
+
+  if (!onPreview) {
+    const json = highlightJson(overrideObject(style.name, style.baseStyleId, style.userRules));
+    host.innerHTML = `<div class="code"><div class="code-head"><span class="ct">${esc(style.baseStyleId)}.overrides.json</span></div><pre>${json}</pre></div>
+      <div class="csl-note"><b>How this works.</b> These rules compile onto the base CSL style — name truncation and the joiner become CSL attributes, identifiers and special-source templates reshape the CSL-JSON item. The service worker formats through citeproc with the result, so no CSL XML is edited by hand. <b>Export .csl</b> saves the compiled style.</div>`;
+    return;
+  }
+
+  host.innerHTML = `<div class="ex"><div class="ex-t">Formatting…</div></div>`;
+  paintPreview(host, style, (rows) =>
+    rows
+      .map((row, i) => {
+        const sample = PREVIEW_SAMPLES[i];
+        if (!sample) return '';
+        return `<div class="ex">
+          <div class="ex-h"><span class="ex-type">${esc(sample.type)}</span><span class="ex-t">${esc(sample.label)}</span></div>
+          <div class="ex-lbl">In-text</div><div class="ex-intext">${esc(row.inText)}</div>
+          <div class="ex-lbl">Bibliography</div><div class="ex-bib">${esc(row.bibliography)}</div>
+        </div>`;
+      })
+      .join(''),
+  );
+}
+
+/** Download the compiled CSL for the selected profile. */
+async function exportStyleCsl(): Promise<void> {
+  const style = selectedStyle();
+  if (!style) return;
+  try {
+    const csl = await sendRequest({ type: 'citations/compiledCsl', style: cloneStyle(style) });
+    if (!csl) {
+      toast('No CSL available for this base style', ICON.warn, true);
+      return;
+    }
+    const url = URL.createObjectURL(
+      new Blob([csl], { type: 'application/vnd.citationstyles.style+xml' }),
+    );
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${style.name.replace(/[^\w.-]+/g, '-').toLowerCase() || 'style'}.csl`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast(`Exported · ${a.download}`, ICON.down);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t export the style', ICON.warn, true);
   }
 }
 

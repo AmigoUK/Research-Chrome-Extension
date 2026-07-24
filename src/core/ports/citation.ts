@@ -20,4 +20,9 @@ export interface CitationFormatter {
    * back to the plain base template when the base CSL is unavailable.
    */
   formatWithStyle(items: CslItem[], style: CitationStyle, kind: CitationKind): string;
+  /**
+   * The CSL XML a style compiles to — what the editor exports as a `.csl` file.
+   * Empty when the base style has no vendored CSL.
+   */
+  compileStyle(style: CitationStyle): string;
 }

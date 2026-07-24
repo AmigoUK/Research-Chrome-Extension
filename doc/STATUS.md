@@ -1,19 +1,32 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-23 — Phase 3 complete._
+_Last updated: 2026-07-24 — Phase 4 complete._
 
 ## Where we are
 
-**Phase 3 (PDF Anchoring) is complete and shipped.** The autonomous loop worked through all five
-milestones (M1–M5), each with the full loop (plan → code → test → commit → release). Phase 2
-(Dashboard) shipped and merged to `main` at v0.7.0; Phase 1 MVP earlier at v0.1.1.
+**Phase 4 (Citation style editor) is complete.** User rules now genuinely drive citeproc output, and
+the full-screen editor from the design mock is live. Phases 1–3 are merged to `main` (v0.12.0).
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** work on **`feat/phase-3-pdf`** at **v0.12.0** (not yet merged to `main`, which is
-  at v0.7.0).
-- **Releases:** v0.8.0 → v0.12.0 (5 Phase-3 GitHub releases; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1).
+- **Branch state:** work on **`feat/phase-4-styles`** at **v0.14.0** (not yet merged to `main`, which
+  is at v0.12.0).
+- **Releases:** v0.13.0 → v0.14.0 (Phase 4); v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2;
+  v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 83 unit + 14 E2E (5 PDF viewer + 7 dashboard + 2 side panel), all green.
+- **Tests:** 118 unit + 15 E2E (5 PDF viewer + 8 dashboard + 2 side panel), all green.
+
+### Phase 4 delivered (verified in headed Chromium + screenshots)
+
+| Milestone | Version | State |
+|---|---|---|
+| M1 — Rule-driven CSL engine: `compileCsl` / `applyRulesToItem`, `formatWithStyle`, `citations/preview`, five vendored base CSL | v0.13.0 | ✅ |
+| M2–M4 — Full-screen editor (profile rail, 5 rule groups, live citeproc preview, CSL-override tab, export/duplicate/delete) + `styleId` wired into every copy path | v0.14.0 | ✅ |
+
+Two design decisions worth remembering: the **citation system is declared by the base CSL style**
+(`<category citation-format="…"/>`), so the Author–date / Footnote / Numeric control switches the
+base style rather than pretending to convert one — which is why **Chicago (notes & bibliography)** is
+now vendored. And rules land through three levers: CSL attribute injection (names, page label),
+CSL-JSON reshaping (identifiers, FOI / legal templates) and one rendered-text rewrite (`doi:` form).
 
 ### Phase 3 delivered (verified end-to-end in headed Chromium + screenshots)
 
@@ -36,7 +49,9 @@ styles (v0.2.0–v0.7.0). Dashboard-local CSS; side panel untouched.
 
 ### Deferred by design (not blocking)
 
-- **Team view** and the **full CSL rule editor** (Phase 4) remain deferred.
+- **Team view** remains deferred (the full CSL rule editor shipped in Phase 4).
+- `CitationStyle.cslOverride` is still not persisted — the override object is generated on demand for
+  the editor's code view; storing it would only duplicate `userRules`.
 - Per-annotation "section" + link-to-section (mock nicety) omitted — the domain `Annotation` has no
   section field.
 - **DOI import** and **open-PDF-by-URL** real-network round trips need a runtime host-permission grant
@@ -73,22 +88,24 @@ Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters 
 
 ## Resume plan — next steps
 
-**Immediate housekeeping:** decide whether to merge `feat/phase-3-pdf` → `main` (Phases 1–2 kept
-`main` current). Not done automatically — `main` is still at v0.7.0.
+**Immediate housekeeping:** decide whether to merge `feat/phase-4-styles` → `main` (still at
+v0.12.0). Not done automatically.
 
-**Phase 4 — CSL style editor** (design ready: `doc/design_mock/.../citation-style-editor.html`, the
-"Full editor" the dashboard's Citation-styles view already links to). Extends the lightweight rule
-editor into the full CSL override editor: grouped rule sections (system, authors, identifiers,
-formatting, special sources), an editable style name, and a dark syntax-highlighted CSL/JSON preview.
-`CitationStyle.cslOverride` + `CitationUserRules` already exist in the model.
+**Next phase — pick one:**
 
-**Also outstanding:** the deferred **Team** view (Phase 2, `collaboration-sync.html`) and Phase 5
-collaboration/sync — pick either as a follow-on.
+- **Team view** (deferred from Phase 2, design: `collaboration-sync.html`) — roles, capability
+  matrix, activity feed.
+- **Phase 5 — collaboration & sync**: local-only / file-based encrypted snapshot / self-hosted
+  backend, with the stated invariant that roles are only enforced in backend mode.
+
+**Smaller follow-ons in the citation area:** bundle size (the Chicago notes CSL is 243 kB raw —
+lazy-loading base styles from `web_accessible_resources` would trim the SW), and importing a
+third-party `.csl` file as a base style.
 
 ### How to resume
 
 ```
-/loop work through Phase 4 (CSL style editor) milestones, one milestone per iteration, full loop each time
+/loop work through Phase 5 (collaboration & sync) milestones, one milestone per iteration, full loop each time
 ```
 
 Environment is ready: Node 22, deps installed, `gh` authenticated with `workflow` scope, Playwright

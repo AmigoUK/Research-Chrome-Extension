@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 4 M1 (rule-driven citation engine) shipped. Next: M2 — the full-screen CSL style editor UI._
+_Phase 4 complete. Next: the deferred Team view, or Phase 5 (collaboration & sync)._
+
+## [0.14.0] — 2026-07-24
+
+### Added
+
+- **Full-screen CSL style editor (Phase 4, M2–M4)** — the dashboard's "Full editor" button now opens
+  the workspace from `citation-style-editor.html` instead of a "coming in Phase 4" toast:
+  - A `styleEditor` route that drops the app shell (sidebar + credit footer) the way the PDF reader
+    does, with a profile rail, an editable style name, a base-style picker, and a preview panel.
+  - Five grouped rule sections — **Citation system**, **Authors** (max authors, names before
+    "et al.", final joiner), **Identifiers** (DOI, DOI-as-URI, URL fallback), **Formatting** (issue
+    number, page-range label) and **Special sources** (FOI, legal-case templates).
+  - **Live preview** formatted by real citeproc in the service worker (`citations/preview`) over
+    five sample sources — journal articles with one and four authors, a dataset, an FOI request and
+    a legal case. Debounced, with a sequence guard so a slow response can't overwrite a newer one.
+  - **CSL override** tab: the generated override object, syntax-highlighted by a hand-rolled
+    highlighter (`src/options/csl-code.ts` — MV3's CSP rules out a CDN library).
+  - **Export .csl** downloads the compiled style (`citations/compiledCsl`), plus **Duplicate**,
+    **New style** and per-profile delete (`citationStyles/delete`).
+- **Chicago (notes & bibliography)** vendored as a base style, so the "footnote" citation system is
+  real rather than a label on an author–date style.
+- Rule compilation gained the remaining levers: a **page-range label** (`p.` / `pp.`, injected into
+  the CSL as a `<label>` because citeproc re-formats the `page` variable), **DOI as `doi:…`** vs a
+  full URI, and the **FOI / legal-case** templates (report genre, court and neutral citation).
+
+### Changed
+
+- **BREAKING (internal port)** — `CitationFormatter` gained `compileStyle(style)`.
+- The citation **system is no longer an independent toggle**: it is declared by the base CSL style
+  (`<category citation-format="…"/>`), so choosing Author–date / Footnote / Numeric now switches the
+  base style, and `BASE_STYLES` is asserted against the vendored CSL files so the two can't drift.
+  The seeded "Chicago" profile therefore moves to the notes base style, where it always claimed to be.
+- Copying a citation from Documents, References or the project bibliography now passes the active
+  profile's `styleId`, so user rules shape the copied text — previously only the base template did.
+- The compact Citation-styles view swapped its hand-rolled preview for the same citeproc-backed one,
+  and its system toggle for a base-style picker.
+
+### Notes
+
+- 118 unit tests (up from 95) + 15 E2E; the new E2E drives the editor end to end (rule change →
+  preview moves → CSL tab agrees → save → survives reload).
+- The service-worker bundle grows to ~1.15 MB (213 kB gzipped) from vendoring the Chicago notes CSL.
 
 ## [0.13.0] — 2026-07-24
 
@@ -341,7 +383,8 @@ _Phase 4 M1 (rule-driven citation engine) shipped. Next: M2 — the full-screen 
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...v0.11.0

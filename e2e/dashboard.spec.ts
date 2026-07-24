@@ -85,8 +85,14 @@ test('Documents view filters rows by search text', async () => {
       createdAt: now,
       updatedAt: now,
     });
-    await chrome.runtime.sendMessage({ type: 'documents/put', document: mk('e2e-docs-heat', 'Urban heat island effects') });
-    await chrome.runtime.sendMessage({ type: 'documents/put', document: mk('e2e-docs-air', 'Air quality monitoring dataset') });
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: mk('e2e-docs-heat', 'Urban heat island effects'),
+    });
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: mk('e2e-docs-air', 'Air quality monitoring dataset'),
+    });
   });
   await page.reload();
 
@@ -208,6 +214,56 @@ test('Citation styles editor saves a rule change that persists', async () => {
   await page.reload();
   await page.locator('#nav .nav-item[data-route="styles"]').click();
   await expect(page.locator('#swUrl')).not.toHaveAttribute('aria-checked', before ?? '');
+
+  await page.close();
+});
+
+test('Full style editor: a rule change moves the real citeproc preview and persists', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await page.locator('#sFull').click();
+
+  // Full-screen workspace: app shell steps aside, profile rail + rule groups show.
+  await expect(page.locator('#viewTitle')).toHaveText('Style editor');
+  await expect(page.locator('.sidebar')).toBeHidden();
+  await expect(page.locator('.credit')).toBeHidden();
+  await expect(page.locator('.sed-rules .grp')).toHaveCount(5);
+
+  // The preview is formatted by citeproc in the service worker, not hand-rolled.
+  // The seeded profile truncates at 3 authors, so the 4-author sample says "et al.".
+  const fourAuthors = page.locator('.pbody .ex').first();
+  await expect(fourAuthors).toContainText('Gasparrini');
+  await expect(fourAuthors).toContainText('et al.');
+  await expect(page.locator('#v-maxAuthors')).toHaveText('3');
+
+  // Raise the limit past the sample's author count: the full list comes back.
+  const more = page.locator('[data-step="maxAuthors"][data-d="1"]');
+  await more.click();
+  await more.click();
+  await expect(page.locator('#v-maxAuthors')).toHaveText('5');
+  await expect(fourAuthors).toContainText('Hashizume');
+  await expect(fourAuthors).not.toContainText('et al.');
+
+  // The CSL override tab mirrors the same rule (et-al-min = maxAuthors + 1).
+  await page.locator('#tabCsl').click();
+  await expect(page.locator('.code pre')).toContainText('"et-al-min"');
+  await expect(page.locator('.code pre')).toContainText('6');
+
+  await page.locator('#seSave').click();
+
+  // Persisted: reopen the editor after a reload.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await page.locator('#sFull').click();
+  await expect(page.locator('#v-maxAuthors')).toHaveText('5');
+
+  // Back to the list view restores the app shell.
+  await page.locator('#seBack').click();
+  await expect(page.locator('#viewTitle')).toHaveText('Citation styles');
+  await expect(page.locator('.sidebar')).toBeVisible();
 
   await page.close();
 });

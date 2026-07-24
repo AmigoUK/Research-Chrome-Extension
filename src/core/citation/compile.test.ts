@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { compileCsl, applyRulesToItem, overrideObject } from './compile';
+import {
+  compileCsl,
+  applyRulesToItem,
+  overrideObject,
+  citationFormatOf,
+  applyDoiFormat,
+} from './compile';
 import type { CitationUserRules } from '../model/types';
 
 const RULES: CitationUserRules = {
@@ -47,6 +53,15 @@ describe('compileCsl', () => {
   it('uses the ampersand joiner when nameAnd is symbol', () => {
     expect(compileCsl(CSL, { ...RULES, nameAnd: 'symbol' })).toContain('and="symbol"');
   });
+
+  it('adds a short page label before every page range when pagePrefix is on', () => {
+    const csl = `<style><bibliography><layout><text variable="page"/></layout></bibliography></style>`;
+    expect(compileCsl(csl, RULES)).not.toContain('<label variable="page"');
+    const labelled = compileCsl(csl, { ...RULES, pagePrefix: true });
+    expect(labelled).toContain(
+      '<group><label variable="page" form="short" suffix=" "/><text variable="page"/></group>',
+    );
+  });
 });
 
 describe('applyRulesToItem', () => {
@@ -76,6 +91,52 @@ describe('applyRulesToItem', () => {
   it('does not mutate the input', () => {
     applyRulesToItem(item, { ...RULES, includeIssue: false });
     expect(item.issue).toBe('3');
+  });
+
+  it('labels an FOI report with a genre only when the FOI template is on', () => {
+    const foi = { type: 'report', authority: 'Environment Agency', number: 'EA/2023/0456' };
+    expect(applyRulesToItem(foi, RULES).genre).toBeUndefined();
+    expect(applyRulesToItem(foi, { ...RULES, foiTemplate: true }).genre).toBe(
+      'Freedom of Information request',
+    );
+  });
+
+  it('keeps the court on a legal case only when the legal template is on', () => {
+    const legal = { type: 'legal_case', authority: 'High Court', number: '[2021] EWHC 1234' };
+    expect(applyRulesToItem(legal, RULES).authority).toBeUndefined();
+    const on = applyRulesToItem(legal, { ...RULES, legalTemplate: true });
+    expect(on.authority).toBe('High Court');
+    expect(on.number).toBe('[2021] EWHC 1234');
+  });
+});
+
+describe('applyDoiFormat', () => {
+  const text = 'Oke, T. R. (1982). Title. Journal, 108(455), 1–24. https://doi.org/10.1002/qj.497';
+
+  it('leaves DOI URIs alone when doiAsUri is on', () => {
+    expect(applyDoiFormat(text, RULES)).toContain('https://doi.org/10.1002/qj.497');
+  });
+
+  it('rewrites DOI URIs to the bare doi: form when doiAsUri is off', () => {
+    const out = applyDoiFormat(text, { ...RULES, doiAsUri: false });
+    expect(out).toContain('doi:10.1002/qj.497');
+    expect(out).not.toContain('https://doi.org/');
+  });
+
+  it('is a no-op when DOIs are excluded entirely', () => {
+    const plain = 'Oke, T. R. (1982). Title.';
+    expect(applyDoiFormat(plain, { ...RULES, includeDoi: false, doiAsUri: false })).toBe(plain);
+  });
+});
+
+describe('citationFormatOf', () => {
+  it('reads the citation-format category declared by a CSL style', () => {
+    const csl = `<style><info><category citation-format="note"/></info></style>`;
+    expect(citationFormatOf(csl)).toBe('note');
+  });
+
+  it('returns undefined when the style declares no citation format', () => {
+    expect(citationFormatOf('<style><info></info></style>')).toBeUndefined();
   });
 });
 
