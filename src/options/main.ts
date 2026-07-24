@@ -2542,6 +2542,11 @@ function emptyState(title: string, desc: string): string {
 
 /* ---- Toast ---- */
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+/**
+ * `msg` is plain text and is escaped here — callers must **not** pre-escape it,
+ * or a project called "Ecology & Society" reads as "Ecology &amp; Society".
+ * `icon` is markup and comes only from the `ICON` table, never from data.
+ */
 function toast(msg: string, icon = ICON.check, error = false): void {
   const wrap = $('#toastWrap');
   wrap.innerHTML = '';
