@@ -19,7 +19,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run build && xvfb-run -a playwright test",
-    "test:e2e:ci": "npm run build && playwright test"
+    "test:e2e:ci": "npm run build && playwright test",
+    "screenshots": "node scripts/screenshots.mjs"
   },
   "devDependencies": {
     "@crxjs/vite-plugin": "^2.7.1",

@@ -5,10 +5,10 @@ This extension bundles the following third-party assets. Their licences are repr
 
 ## Fonts (bundled as woff2, loaded from the extension itself — never from a CDN)
 
-| Font | Used for | Licence | Copyright |
-|---|---|---|---|
-| **Charis SIL** | Display serif, when neither Iowan Old Style nor Charter is installed | SIL Open Font License 1.1 — [`doc/licenses/OFL-Charis-SIL.txt`](doc/licenses/OFL-Charis-SIL.txt) | © 1997–2022 SIL International |
-| **IBM Plex Mono** | Monospace, when iA Writer Mono is not installed | SIL Open Font License 1.1 — [`doc/licenses/OFL-IBM-Plex-Mono.txt`](doc/licenses/OFL-IBM-Plex-Mono.txt) | © 2017 IBM Corp. |
+| Font              | Used for                                                             | Licence                                                                                                | Copyright                     |
+| ----------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| **Charis SIL**    | Display serif, when neither Iowan Old Style nor Charter is installed | SIL Open Font License 1.1 — [`doc/licenses/OFL-Charis-SIL.txt`](doc/licenses/OFL-Charis-SIL.txt)       | © 1997–2022 SIL International |
+| **IBM Plex Mono** | Monospace, when iA Writer Mono is not installed                      | SIL Open Font License 1.1 — [`doc/licenses/OFL-IBM-Plex-Mono.txt`](doc/licenses/OFL-IBM-Plex-Mono.txt) | © 2017 IBM Corp.              |
 
 Both are unmodified — only subset into `latin` and `latin-ext` woff2 by
 [Fontsource](https://fontsource.org), which is how they arrive as npm packages. Neither is renamed,

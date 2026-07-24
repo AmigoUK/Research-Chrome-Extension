@@ -3,6 +3,9 @@
 Every surface of the extension, captured from a real build against a seeded project. They are
 referenced from the root [`README.md`](../../README.md).
 
+Current set: **v0.25.0**, with the bundled OFL faces (Charis SIL for display, IBM Plex Mono for
+labels) — so they show what a machine without Iowan Old Style or iA Writer Mono actually renders.
+
 | File | Screen |
 |---|---|
 | `01-overview.png` | Dashboard → Overview (stat tiles + Kanban) |
@@ -22,12 +25,17 @@ referenced from the root [`README.md`](../../README.md).
 
 ## Retaking them
 
-They are produced by a Playwright script that loads `dist/` into a headed Chromium, seeds a project
-through the extension's own messaging layer, and walks every view. The script is not kept in the
-repo — it is a few dozen lines of seed data with no test value, and stale seed data ages worse than
-no script. To retake a set, build first (`npm run build`), then drive the same paths the E2E suite
-uses (`e2e/dashboard.spec.ts` shows the selectors) and write the PNGs here at 1360×940 for the
-dashboard and reader, 400×820 for the side panel.
+```bash
+npm run build && npm run screenshots
+```
+
+`scripts/screenshots.mjs` loads `dist/` into a headed Chromium, seeds a project through the
+extension's own messaging layer — so the data arrives the way a user's would — and walks every
+surface. Run it after any change that alters how the app looks.
+
+It was originally left out of the repo on the grounds that it was seed data with no test value.
+That was wrong: the set has needed retaking twice already (an icon-sizing fix, then bundled fonts),
+and rewriting the script each time costs more than keeping it.
 
 Screenshots are documentation, not fixtures: nothing in the build or the test suite reads them, and
 `dist/` contains no images from this folder.
