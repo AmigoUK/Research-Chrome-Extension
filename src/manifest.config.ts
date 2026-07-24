@@ -44,13 +44,10 @@ export default defineManifest({
     default_path: 'src/sidepanel/index.html',
   },
   options_page: 'src/options/index.html',
-  // The PDF reader is a standalone extension page opened in a tab; it and the
-  // bundled pdf.js worker/assets must be web-accessible. @crxjs treats the
-  // listed HTML as a build entry point.
-  web_accessible_resources: [
-    {
-      resources: ['src/pdfviewer/index.html', 'assets/*'],
-      matches: ['<all_urls>'],
-    },
-  ],
+  // No `web_accessible_resources`. The PDF reader is opened from an extension
+  // page (`window.open` on a `chrome-extension://` URL) and the CSL assets are
+  // fetched same-origin by the service worker, so nothing here needs to be
+  // reachable from a web page. Declaring `assets/*` for `<all_urls>` would let
+  // any site probe for this extension and read its assets — a poor trade for a
+  // tool whose point is that data stays on the machine.
 });

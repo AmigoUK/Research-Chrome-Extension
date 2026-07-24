@@ -151,7 +151,11 @@ export interface Annotation {
   updatedAt: IsoDateTime;
 }
 
-export type ReferenceSource = 'extractedFromPage' | 'importedFromZotero' | 'manual';
+export type ReferenceSource =
+  | 'extractedFromPage'
+  | 'importedByDoi'
+  | 'importedFromZotero'
+  | 'manual';
 
 export interface Reference {
   id: Id;

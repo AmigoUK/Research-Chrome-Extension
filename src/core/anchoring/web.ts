@@ -66,12 +66,18 @@ export function createWebAnchor(root: Element, range: Range): WebAnchor {
 export function resolveWebAnchor(root: Element, anchor: WebAnchor): Range | null {
   const quote = anchor.selectors.find((s): s is TextQuoteSelector => s.type === 'textQuote');
   if (quote) {
-    const range = textQuote.toRange(root, {
-      exact: quote.exact,
-      ...(quote.prefix ? { prefix: quote.prefix } : {}),
-      ...(quote.suffix ? { suffix: quote.suffix } : {}),
-    });
-    if (range) return range;
+    try {
+      const range = textQuote.toRange(root, {
+        exact: quote.exact,
+        ...(quote.prefix ? { prefix: quote.prefix } : {}),
+        ...(quote.suffix ? { suffix: quote.suffix } : {}),
+      });
+      if (range) return range;
+    } catch {
+      // The point of a strategy list is that a failing strategy hands over to
+      // the next one. An exception here used to abandon the whole chain, so a
+      // note that text-position could still have found was reported as lost.
+    }
   }
 
   const position = anchor.selectors.find(

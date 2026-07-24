@@ -56,3 +56,26 @@ describe('web anchoring', () => {
     expect(cssPath(root, p)).toBe('p:nth-child(2)');
   });
 });
+
+describe('the fallback chain survives a failing strategy', () => {
+  it('falls through to text-position when the quote strategy throws', () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<p>The energetic basis of the urban heat island.</p>';
+    document.body.append(root);
+
+    // A quote selector whose `exact` is not in the document, alongside a
+    // position selector that is. Whether the library returns null or throws,
+    // the next strategy must still get its turn.
+    const anchor = {
+      kind: 'web' as const,
+      selectors: [
+        { type: 'textQuote' as const, exact: 'nowhere to be found' },
+        { type: 'textPosition' as const, start: 4, end: 13 },
+      ],
+    };
+
+    const range = resolveWebAnchor(root, anchor);
+    expect(range?.toString()).toBe('energetic');
+    root.remove();
+  });
+});

@@ -61,7 +61,7 @@ Fields:
 - `projectId`: FK to `Project`.
 - `documentId`: optional link to `Document`.
 - `cslData`: CSL JSON representing full bibliographic metadata.
-- `source`: origin of metadata (`extractedFromPage`, `importedFromZotero`, `manual`).
+- `source`: origin of metadata (`extractedFromPage`, `importedByDoi`, `importedFromZotero`, `manual`). A record fetched from doi.org says so rather than claiming to be hand-entered.
 - `usedInOutputs`: list of identifiers of outputs (reports, papers) where this reference is used.
 
 ### CitationStyle

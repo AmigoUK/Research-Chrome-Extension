@@ -336,6 +336,30 @@ function openStatusMenu(anchor: HTMLElement, doc: Document): void {
   statusMenuAnchor = anchor;
   positionStatusMenu();
   $('scrollBody').addEventListener('scroll', positionStatusMenu, { passive: true });
+
+  // A menu you can open with the keyboard but not walk with it is not a menu.
+  const items = [...menu.querySelectorAll<HTMLButtonElement>('.smenu__item')];
+  items.forEach((item, index) => {
+    item.tabIndex = index === 0 ? 0 : -1;
+    item.addEventListener('keydown', (e) => {
+      const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+      if (step !== 0) {
+        e.preventDefault();
+        items[(index + step + items.length) % items.length]?.focus();
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        items[0]?.focus();
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        items[items.length - 1]?.focus();
+      } else if (e.key === 'Tab') {
+        // Leaving the menu closes it, rather than stranding it over the list.
+        closeStatusMenu();
+      }
+    });
+  });
+  // Open on the current status, so ↓ from there is the next stage.
+  (items.find((i) => i.classList.contains('is-current')) ?? items[0])?.focus();
 }
 
 function closeStatusMenu(): void {

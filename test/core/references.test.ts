@@ -45,7 +45,9 @@ describe('importReferenceByDoi', () => {
   it('stores fetched CSL-JSON as a project reference', async () => {
     const ref = await importReferenceByDoi(repos, { projectId: 'p1', doi: 'https://doi.org/10.1002/qj.49710845502' }, deps(SAMPLE));
     expect(ref.projectId).toBe('p1');
-    expect(ref.source).toBe('manual');
+    // A record fetched from doi.org is not hand-entered, and the References
+    // view's ORIGIN column shows the difference.
+    expect(ref.source).toBe('importedByDoi');
     expect((ref.cslData as { title?: string }).title).toBe(SAMPLE.title);
 
     const stored = await repos.references.listByProject('p1');

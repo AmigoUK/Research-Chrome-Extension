@@ -282,13 +282,17 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
   // --- History: events are immutable, so a known id is simply already here. ---
   const localActivity = await repos.activity.listByProject(projectId);
   const knownEvents = new Set(localActivity.map((e) => e.id));
+  // `entityId` means a different thing per kind — a document for `source` and
+  // `status`, but a user for `member` and a thread for `comment`. Remapping all
+  // of them through the *document* map would rewrite an unrelated id that
+  // happened to collide.
+  const documentKinds = new Set(['source', 'status']);
   for (const event of data.activity ?? []) {
     if (knownEvents.has(event.id)) continue;
+    const entityId =
+      event.entityId && documentKinds.has(event.kind) ? mapDocumentId(event.entityId) : event.entityId;
     writes.push(() =>
-      repos.activity.put({
-        ...event,
-        ...(event.entityId ? { entityId: mapDocumentId(event.entityId) } : {}),
-      }),
+      repos.activity.put({ ...event, ...(entityId ? { entityId } : {}) }),
     );
     report.activity++;
   }

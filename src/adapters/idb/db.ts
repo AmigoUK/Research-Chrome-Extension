@@ -14,5 +14,20 @@ export function openContextNotesDB(
     upgrade(db, oldVersion, newVersion, tx) {
       runMigrations(db, oldVersion, newVersion ?? DB_VERSION, tx);
     },
+    /** An upgrade is waiting on a connection that some other context still holds. */
+    blocked(currentVersion, blockedVersion) {
+      console.warn(
+        `[context-notes] database upgrade ${currentVersion} → ${blockedVersion ?? DB_VERSION} is ` +
+          'blocked by another open connection; close other extension pages',
+      );
+    },
+    /** Somewhere else wants to upgrade; let go so it can, rather than deadlock. */
+    blocking(currentVersion, blockedVersion, event) {
+      console.warn(
+        `[context-notes] closing this connection (v${currentVersion}) so an upgrade to ` +
+          `v${blockedVersion ?? DB_VERSION} can proceed`,
+      );
+      (event.target as IDBDatabase | null)?.close();
+    },
   });
 }

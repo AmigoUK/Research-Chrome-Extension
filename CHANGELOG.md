@@ -7,7 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Working through the audit's remaining findings; see `doc/STATUS.md`._
+_The audit's findings are all closed. See `doc/STATUS.md`._
+
+## [0.24.0] — 2026-07-24
+
+Everything the code audit found, other than the injection already fixed in v0.22.0 and the icons in
+v0.23.0. Each item was reproduced or verified before it was changed.
+
+### Security & privacy
+
+- **`web_accessible_resources` is gone.** It exposed `assets/*` to `<all_urls>`, which let any
+  website detect this extension and read its files — a poor trade for a tool whose point is that
+  data stays on the machine. It turned out to be unnecessary: the reader is opened from an extension
+  page and the CSL assets are fetched same-origin by the service worker. All 23 E2E tests, including
+  the five that drive the PDF reader, pass without it, and a new test keeps the list empty.
+
+### Fixed
+
+- **A hung DOI lookup no longer hangs the UI.** `fetchCsl` had no timeout, so an unresponsive
+  doi.org left the import button spinning forever and kept the service worker awake. It now aborts
+  after 15s and says so.
+- **A failing anchor strategy no longer abandons the chain.** `resolveWebAnchor` guarded
+  `textPosition` with try/catch but not `textQuote`, so an exception in the *first* strategy skipped
+  the two fallbacks that exist precisely for that case — a note that text-position could still have
+  found was reported as lost.
+- **The merge no longer rewrites unrelated ids.** Every imported event's `entityId` was remapped
+  through the *document* dedup map, but `entityId` means a user for a `member` event and a thread for
+  a `comment` one. Only the kinds that point at a document are remapped now.
+- **A DOI import says where it came from.** It recorded `source: 'manual'`, so the References view's
+  ORIGIN column called a fetched record hand-entered. `ReferenceSource` gained `importedByDoi`.
+- **A stalled database upgrade is visible.** `openDB` had no `blocked` / `blocking` handlers, so an
+  upgrade waiting on another connection simply hung. It now warns, and yields its own connection
+  when another context needs to upgrade.
+
+### Added
+
+- **The side-panel status menu is usable from the keyboard.** It opens focused on the current status;
+  ↑/↓ walk the pipeline, Home/End jump to its ends, Tab closes it. It had `role="menu"` and none of
+  the behaviour that makes the role true.
+
+### Notes
+
+- 241 unit tests + 24 E2E, all green. The new tests are the interesting part: the fallback chain is
+  now pinned by a test that feeds it a quote selector which cannot match, and the manifest's
+  emptiness is asserted rather than assumed.
 
 ## [0.23.0] — 2026-07-24
 
@@ -723,7 +766,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...v0.21.1

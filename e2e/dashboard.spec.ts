@@ -76,6 +76,19 @@ test('the extension declares icons and every declared file actually loads', asyn
   await page.close();
 });
 
+test('the extension exposes nothing to the open web', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+
+  // Every `web_accessible_resource` is a way for any site to detect this
+  // extension and read the listed files. The reader is opened from an extension
+  // page and the CSL assets are fetched same-origin, so the list should be empty.
+  const war = await page.evaluate(() => chrome.runtime.getManifest().web_accessible_resources);
+  expect(war ?? []).toEqual([]);
+
+  await page.close();
+});
+
 test('nav routes update the topbar title', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

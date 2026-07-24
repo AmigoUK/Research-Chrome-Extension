@@ -1056,6 +1056,7 @@ interface Csl {
 }
 const SOURCE_LABEL: Record<Reference['source'], string> = {
   extractedFromPage: 'Extracted',
+  importedByDoi: 'DOI',
   importedFromZotero: 'Zotero',
   manual: 'Manual',
 };
