@@ -4,8 +4,18 @@
  * Each message type maps to a request shape and a response data type. This
  * lives in the domain core so both sides share one source of truth.
  */
-import type { Project, Document, Annotation, Reference, CitationStyle, Id } from './model/types';
+import type {
+  Project,
+  Document,
+  Annotation,
+  Reference,
+  CitationStyle,
+  Id,
+  ProjectRole,
+  User,
+} from './model/types';
 import type { CaptureInput, CaptureResult } from './usecases/capture';
+import type { MemberView } from './usecases/members';
 
 /** File bytes cross the messaging boundary as base64 (JSON-safe). */
 export interface FilePayload {
@@ -52,6 +62,15 @@ export interface MessageMap {
     res: Array<{ inText: string; bibliography: string }>;
   };
   'citations/compiledCsl': { req: { style: CitationStyle }; res: string };
+  'users/list': { req: Record<never, never>; res: User[] };
+  'users/put': { req: { user: User }; res: null };
+  'members/list': { req: { projectId: Id }; res: MemberView[] };
+  'members/invite': {
+    req: { projectId: Id; email: string; role: ProjectRole };
+    res: MemberView;
+  };
+  'members/setRole': { req: { projectId: Id; userId: Id; role: ProjectRole }; res: null };
+  'members/remove': { req: { projectId: Id; userId: Id }; res: null };
 }
 
 export type MessageType = keyof MessageMap;

@@ -10,7 +10,14 @@ import { STATUS_META, statusLabel } from '../sidepanel/view-model';
 export { STATUS_META, statusLabel };
 
 /** Routes reachable from the sidebar nav, in nav order. Team is still deferred. */
-export const NAV_ROUTES = ['overview', 'documents', 'annotations', 'references', 'styles'] as const;
+export const NAV_ROUTES = [
+  'overview',
+  'documents',
+  'annotations',
+  'references',
+  'styles',
+  'team',
+] as const;
 export type NavRoute = (typeof NAV_ROUTES)[number];
 
 /** Every route, including full-screen workspaces reached from inside a view.
@@ -39,6 +46,7 @@ export const ROUTE_TITLES: Record<Route, readonly [string, string]> = {
   references: ['References', 'Bibliographic records'],
   styles: ['Citation styles', 'Style profiles & rules'],
   styleEditor: ['Style editor', 'Rules compile to CSL overrides'],
+  team: ['Team', 'Members & roles'],
 };
 
 /** CSS custom-property carrying each status colour in `dashboard.css`. */

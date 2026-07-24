@@ -7,7 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 4 complete. Next: the deferred Team view, or Phase 5 (collaboration & sync)._
+_Phase 5 M1 (members & roles) shipped. Next: M2 — the activity feed._
+
+## [0.15.0] — 2026-07-24
+
+### Added
+
+- **Team view — members & roles (Phase 5, M1)**, the sixth dashboard nav item and the end of the
+  Phase-2 "Team is deferred" note:
+  - `src/core/model/roles.ts` — the capability matrix from the design mock as data (`can(role,
+    capability)`), plus `keepsAnOwner()`, the guard that stops a project losing its last owner.
+  - `src/core/usecases/members.ts` — `listMembers` / `inviteMember` / `setMemberRole` /
+    `removeMember`. `Project.members` is authoritative for roles and `User.rolesPerProject` is
+    written in the same use-case, so the two cannot drift.
+  - Team view: member list with avatars, role selects and removal, an invite popover (email + role),
+    and the full capability matrix rendered from the same table the logic uses.
+  - New messages: `members/list|invite|setRole|remove`, `users/list|put`.
+- `ProjectMember.pending` — an invited member who has not accepted yet, shown as an **Invited** badge.
+
+### Changed
+
+- The Team view opens with a plain statement that **roles are advisory**: every collaborator holds a
+  full copy of the project in their own browser, so nothing enforces a role, and this build has no
+  backend that could. The scope decision for Phase 5 is local-first — no server is being built.
+
+### Notes
+
+- 139 unit tests (up from 118) + 16 E2E; the new E2E invites a member, changes their role, reloads to
+  prove persistence, and removes them again.
+- The last owner's role control is a static badge rather than a select — the guard is enforced in the
+  use-case too, so the UI is not the only thing holding the invariant.
 
 ## [0.14.0] — 2026-07-24
 
@@ -383,7 +412,8 @@ _Phase 4 complete. Next: the deferred Team view, or Phase 5 (collaboration & syn
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...v0.12.0

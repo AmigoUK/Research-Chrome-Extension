@@ -15,7 +15,14 @@ import {
 
 describe('dashboard view-model', () => {
   it('lists the nav routes in nav order', () => {
-    expect(NAV_ROUTES).toEqual(['overview', 'documents', 'annotations', 'references', 'styles']);
+    expect(NAV_ROUTES).toEqual([
+      'overview',
+      'documents',
+      'annotations',
+      'references',
+      'styles',
+      'team',
+    ]);
   });
 
   it('has a title + subtitle for every route', () => {

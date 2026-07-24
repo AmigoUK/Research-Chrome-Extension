@@ -15,6 +15,7 @@ import {
   formatPreview,
 } from './usecases/citations';
 import { importReferenceByDoi } from './usecases/references';
+import { listMembers, inviteMember, setMemberRole, removeMember } from './usecases/members';
 import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
 
@@ -145,6 +146,38 @@ export async function handleRequest(
         return ok(formatPreview(requireFormatter(deps), request.style, request.items)) as Result;
       case 'citations/compiledCsl':
         return ok(requireFormatter(deps).compileStyle(request.style)) as Result;
+      case 'users/list':
+        return ok(await repos.users.list()) as Result;
+      case 'users/put':
+        await repos.users.put(request.user);
+        return ok(null) as Result;
+      case 'members/list':
+        return ok(await listMembers(repos, request.projectId)) as Result;
+      case 'members/invite':
+        return ok(
+          await inviteMember(repos, {
+            projectId: request.projectId,
+            email: request.email,
+            role: request.role,
+            now: capture.now(),
+            userId: capture.newId(),
+          }),
+        ) as Result;
+      case 'members/setRole':
+        await setMemberRole(repos, {
+          projectId: request.projectId,
+          userId: request.userId,
+          role: request.role,
+          now: capture.now(),
+        });
+        return ok(null) as Result;
+      case 'members/remove':
+        await removeMember(repos, {
+          projectId: request.projectId,
+          userId: request.userId,
+          now: capture.now(),
+        });
+        return ok(null) as Result;
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

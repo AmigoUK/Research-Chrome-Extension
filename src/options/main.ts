@@ -20,6 +20,7 @@ import type {
   CitationStyle,
   CitationUserRules,
   CitationSystem,
+  ProjectRole,
   Id,
 } from '../core/model/types';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
@@ -31,6 +32,15 @@ import {
   templateFor,
 } from '../core/citation/styles';
 import { overrideObject } from '../core/citation/compile';
+import {
+  CAPABILITIES,
+  CAPABILITY_LABELS,
+  ROLES,
+  ROLE_LABELS,
+  ROLE_SUMMARIES,
+  can,
+} from '../core/model/roles';
+import type { MemberView } from '../core/usecases/members';
 import { bytesToBase64 } from '../core/files/base64';
 import {
   computeProgress,
@@ -73,6 +83,9 @@ const ICON = {
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M12 5v14M5 12h14"/></svg>',
   open: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 5h7a3 3 0 0 1 3 3v11a2.5 2.5 0 0 0-2.5-2.5H2zM22 5h-7a3 3 0 0 0-3 3v11a2.5 2.5 0 0 1 2.5-2.5H22z"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  invite:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>',
 };
 
 interface NavDef {
@@ -113,6 +126,12 @@ const NAV: NavDef[] = [
     count: () => (state.styles.length > 0 ? state.styles.length : undefined),
     icon: '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
   },
+  {
+    id: 'team',
+    label: 'Team',
+    count: () => (state.members.length > 0 ? state.members.length : undefined),
+    icon: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M17 11h6M20 8v6"/>',
+  },
 ];
 
 /* ---- State ---- */
@@ -123,6 +142,7 @@ interface DashState {
   annotations: Annotation[];
   references: Reference[];
   styles: CitationStyle[];
+  members: MemberView[];
   route: Route;
   flash: Id | null;
   drag: Id | null;
@@ -139,6 +159,7 @@ const state: DashState = {
   annotations: [],
   references: [],
   styles: [],
+  members: [],
   route: 'overview',
   flash: null,
   drag: null,
@@ -168,6 +189,10 @@ function authorLabel(authors?: string[]): string {
 }
 
 /* ---- Data ---- */
+/** The local user. Without a backend there are no accounts — this is the id the
+ * side panel and the dashboard have always written as the project owner. */
+const SELF_USER_ID = 'me';
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -177,7 +202,7 @@ function makeProject(name: string): Project {
     id: crypto.randomUUID(),
     name,
     sections: ['Literature', 'Methods', 'Data', 'Report'],
-    members: [{ userId: 'me', role: 'owner' }],
+    members: [{ userId: SELF_USER_ID, role: 'owner' }],
     createdAt: now,
     updatedAt: now,
   };
@@ -237,19 +262,42 @@ async function loadProjectData(): Promise<void> {
     state.documents = [];
     state.annotations = [];
     state.styles = [];
+    state.members = [];
     return;
   }
   const projectId = state.activeProjectId;
-  const [documents, annotations, references, styles] = await Promise.all([
+  const [documents, annotations, references, styles, members] = await Promise.all([
     sendRequest({ type: 'documents/listByProject', projectId }),
     sendRequest({ type: 'annotations/listByProject', projectId }),
     sendRequest({ type: 'references/listByProject', projectId }),
     sendRequest({ type: 'citationStyles/list' }),
+    sendRequest({ type: 'members/list', projectId }),
   ]);
   state.documents = documents;
   state.annotations = annotations;
   state.references = references;
   state.styles = styles;
+  state.members = members;
+}
+
+/**
+ * Make sure the local user has an identity row, so the Team view shows a name
+ * instead of the bare `me` id. Runs once at start-up; never overwrites a name
+ * the user already has.
+ */
+async function ensureSelfUser(): Promise<void> {
+  const users = await sendRequest({ type: 'users/list' });
+  if (users.some((u) => u.id === SELF_USER_ID)) return;
+  await sendRequest({
+    type: 'users/put',
+    user: { id: SELF_USER_ID, name: 'You', rolesPerProject: {} },
+  });
+}
+
+/** Reload just the member list — after an invite, role change or removal. */
+async function reloadMembers(): Promise<void> {
+  if (!state.activeProjectId) return;
+  state.members = await sendRequest({ type: 'members/list', projectId: state.activeProjectId });
 }
 
 /* ---- Sidebar ---- */
@@ -337,6 +385,7 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   references: renderReferences,
   styles: renderStyles,
   styleEditor: renderStyleEditor,
+  team: renderTeam,
 };
 function render(): void {
   // Full-screen workspaces drop the app shell (sidebar + credit footer) — the
@@ -1654,6 +1703,149 @@ async function exportStyleCsl(): Promise<void> {
   }
 }
 
+/* ---- Team: members & roles (Phase 5) ---- */
+
+function renderTeam(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = `<button class="btn btn--primary btn--sm" id="tInvite">${ICON.invite} Invite</button>`;
+  $('#tInvite', actions).onclick = (e) => {
+    e.stopPropagation();
+    openInvitePopover($('#tInvite', actions));
+  };
+
+  const yes = `<span class="cap-y">${ICON.check}</span>`;
+  const no = `<span class="cap-n">${ICON.x}</span>`;
+
+  view.innerHTML = `
+    <div class="advisory">${ICON.warn}<div><b>Roles are advisory.</b> Every collaborator holds a full
+      copy of the project in their own browser, so a role documents intent — it is not enforced.
+      Only a self-hosted backend could enforce it, and this build has no backend.</div></div>
+
+    <div class="sec-h" style="margin-top:0"><h2>Members</h2><span class="ln"></span><span class="cnt">${state.members.length}</span></div>
+    <div id="memList"></div>
+
+    <div class="sec-h"><h2>What each role may do</h2><span class="ln"></span></div>
+    <div class="matrix">
+      <table class="tbl">
+        <thead><tr><th>Capability</th>${ROLES.map((r) => `<th>${esc(ROLE_LABELS[r])}</th>`).join('')}</tr></thead>
+        <tbody>${CAPABILITIES.map(
+          (c) =>
+            `<tr><td>${esc(CAPABILITY_LABELS[c])}</td>${ROLES.map(
+              (r) => `<td class="cap">${can(r, c) ? yes : no}</td>`,
+            ).join('')}</tr>`,
+        ).join('')}</tbody>
+      </table>
+    </div>`;
+
+  drawMembers();
+}
+
+function drawMembers(): void {
+  const host = $('#memList');
+  if (state.members.length === 0) {
+    host.innerHTML = emptyState('No members yet', 'Invite a collaborator to share this project.');
+    return;
+  }
+  host.innerHTML = state.members
+    .map((m) => {
+      const owners = state.members.filter((x) => x.role === 'owner' && !x.pending).length;
+      const lastOwner = m.role === 'owner' && !m.pending && owners === 1;
+      const roleControl = lastOwner
+        ? `<span class="stat-tag rep" title="A project must keep at least one owner">Owner</span>`
+        : `<select class="sel" data-role="${esc(m.userId)}" aria-label="Role for ${esc(m.name)}">${ROLES.map(
+            (r) =>
+              `<option value="${r}"${r === m.role ? ' selected' : ''}>${esc(ROLE_LABELS[r])}</option>`,
+          ).join('')}</select>`;
+      return `<div class="mem" data-m="${esc(m.userId)}">
+        <span class="mem-av">${esc(m.initials)}</span>
+        <div class="mem-who">
+          <b>${esc(m.name)}${m.pending ? '<span class="badge-pend">Invited</span>' : ''}</b>
+          <span>${esc(m.email ?? ROLE_SUMMARIES[m.role])}</span>
+        </div>
+        ${roleControl}
+        ${lastOwner ? '' : `<button class="btn btn--ghost btn--sm" data-rm="${esc(m.userId)}" aria-label="Remove ${esc(m.name)}">${ICON.x}</button>`}
+      </div>`;
+    })
+    .join('');
+
+  $$('[data-role]', host).forEach((el) => {
+    const select = el as HTMLSelectElement;
+    select.onchange = () => void changeRole(select.dataset.role ?? '', select.value as ProjectRole);
+  });
+  $$('[data-rm]', host).forEach((b) => {
+    b.onclick = () => void removeMemberById(b.dataset.rm ?? '');
+  });
+}
+
+function openInvitePopover(anchor: HTMLElement): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">Invite a collaborator</div>
+    <div class="pop-form">
+      <input id="invEmail" class="sel" type="email" placeholder="name@institution.edu" aria-label="Email address" style="width:220px">
+      <select id="invRole" class="sel" aria-label="Role">${ROLES.filter((r) => r !== 'owner')
+        .map((r) => `<option value="${r}">${esc(ROLE_LABELS[r])}</option>`)
+        .join('')}</select>
+      <button class="btn btn--primary btn--sm" id="invGo">${ICON.check} Invite</button>
+    </div>
+    <div class="pop-note">Nothing is sent — the invitation travels in the next snapshot you share.</div>`;
+  const input = $<HTMLInputElement>('#invEmail', pop);
+  const submit = (): void =>
+    void invite(input.value, $<HTMLSelectElement>('#invRole', pop).value as ProjectRole);
+  $('#invGo', pop).onclick = submit;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  placePop(anchor);
+  input.focus();
+}
+
+async function invite(email: string, role: ProjectRole): Promise<void> {
+  if (!state.activeProjectId) return;
+  try {
+    const member = await sendRequest({
+      type: 'members/invite',
+      projectId: state.activeProjectId,
+      email: email.trim(),
+      role,
+    });
+    closePop();
+    await reloadMembers();
+    render();
+    toast(`Invited · ${member.name} as ${ROLE_LABELS[member.role]}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t invite', ICON.warn, true);
+  }
+}
+
+async function changeRole(userId: Id, role: ProjectRole): Promise<void> {
+  if (!state.activeProjectId) return;
+  try {
+    await sendRequest({ type: 'members/setRole', projectId: state.activeProjectId, userId, role });
+    await reloadMembers();
+    render();
+    toast(`Role updated to ${ROLE_LABELS[role]}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t change the role', ICON.warn, true);
+    await reloadMembers();
+    render();
+  }
+}
+
+async function removeMemberById(userId: Id): Promise<void> {
+  if (!state.activeProjectId) return;
+  const member = state.members.find((m) => m.userId === userId);
+  try {
+    await sendRequest({ type: 'members/remove', projectId: state.activeProjectId, userId });
+    await reloadMembers();
+    render();
+    toast(`Removed · ${member?.name ?? userId}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t remove the member', ICON.warn, true);
+  }
+}
+
 function emptyState(title: string, desc: string): string {
   return `<div class="empty">
     <div class="em"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="20" height="20"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>
@@ -1725,6 +1917,7 @@ async function init(): Promise<void> {
 
   try {
     await loadProjects();
+    await ensureSelfUser();
     await loadProjectData();
     await ensureSeedStyles();
   } catch (err) {

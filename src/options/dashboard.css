@@ -276,6 +276,23 @@ button.stat-tag:hover { border-color: var(--fg); }
 .csl-note { font-size: 11.5px; color: var(--muted); line-height: 1.6; margin-top: 14px; padding: 12px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .csl-note b { color: var(--fg); }
 
+/* ---- Team: members & roles (Phase 5) ---- */
+.advisory { display: flex; gap: 11px; align-items: flex-start; font-size: 12px; line-height: 1.55; background: oklch(96% .04 70); border: 1px solid oklch(85% .08 70); border-radius: 10px; padding: 12px 13px; margin-bottom: 22px; }
+.advisory svg { width: 16px; height: 16px; color: oklch(58% .12 70); flex: 0 0 auto; margin-top: 1px; }
+.advisory b { font-weight: 600; }
+.mem { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); margin-bottom: 9px; }
+.mem-av { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: oklch(99% .01 95); display: grid; place-items: center; font-family: var(--font-mono); font-size: 11px; font-weight: 600; flex: 0 0 auto; }
+.mem-who { flex: 1; min-width: 0; }
+.mem-who b { font-size: 13.5px; font-weight: 560; display: flex; align-items: center; gap: 8px; }
+.mem-who span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge-pend { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-weight: 500; }
+.matrix { overflow-x: auto; }
+.matrix .tbl td.cap { text-align: center; }
+.cap-y, .cap-n { display: inline-grid; place-items: center; }
+.cap-y svg { width: 14px; height: 14px; color: var(--success); }
+.cap-n svg { width: 13px; height: 13px; color: var(--border); }
+.pop-note { font-size: 10.5px; color: var(--muted); line-height: 1.5; padding: 0 8px 8px; max-width: 300px; }
+
 /* ---- Empty ---- */
 .empty { text-align: center; padding: 60px 24px; color: var(--muted); }
 .empty .em { width: 46px; height: 46px; margin: 0 auto 16px; border: 1.6px dashed var(--border); border-radius: 11px; display: grid; place-items: center; }

@@ -40,8 +40,8 @@ test('dashboard shell renders: wordmark, project switcher, nav and credit footer
   await expect(page.locator('#pName')).not.toHaveText('—');
   await expect(page.locator('#pName')).not.toHaveText('Loading…');
 
-  // The five Phase 2 nav items.
-  await expect(page.locator('#nav .nav-item')).toHaveCount(5);
+  // Six nav items: the five Phase 2 views plus Team (Phase 5).
+  await expect(page.locator('#nav .nav-item')).toHaveCount(6);
 
   // Credit footer (dashboard only) with attribution and version.
   await expect(page.locator('.credit')).toContainText('dev@attv.uk');
@@ -264,6 +264,47 @@ test('Full style editor: a rule change moves the real citeproc preview and persi
   await page.locator('#seBack').click();
   await expect(page.locator('#viewTitle')).toHaveText('Citation styles');
   await expect(page.locator('.sidebar')).toBeVisible();
+
+  await page.close();
+});
+
+test('Team view invites a member, changes their role, and states that roles are advisory', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await expect(page.locator('#viewTitle')).toHaveText('Team');
+
+  // The advisory-roles caveat is stated, not implied.
+  await expect(page.locator('.advisory')).toContainText('Roles are advisory');
+
+  // The owner is listed and cannot be demoted (last owner keeps the project administrable).
+  await expect(page.locator('.mem')).toHaveCount(1);
+  await expect(page.locator('.mem .stat-tag')).toHaveText('Owner');
+
+  // Capability matrix: six capabilities × three roles.
+  await expect(page.locator('.matrix tbody tr')).toHaveCount(6);
+
+  // Invite an editor.
+  await page.locator('#tInvite').click();
+  await page.locator('#invEmail').fill('j.park@lab.edu');
+  await page.locator('#invRole').selectOption('editor');
+  await page.locator('#invGo').click();
+
+  const invited = page.locator('.mem').nth(1);
+  await expect(invited).toContainText('j.park');
+  await expect(invited.locator('.badge-pend')).toHaveText('Invited');
+
+  // Change their role and reload: the change persisted.
+  await invited.locator('select[data-role]').selectOption('viewer');
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await expect(page.locator('.mem').nth(1).locator('select[data-role]')).toHaveValue('viewer');
+
+  // Remove them again, leaving the owner alone.
+  await page.locator('.mem').nth(1).locator('[data-rm]').click();
+  await expect(page.locator('.mem')).toHaveCount(1);
 
   await page.close();
 });

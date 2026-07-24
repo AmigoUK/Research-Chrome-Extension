@@ -78,6 +78,8 @@ export type ProjectRole = 'owner' | 'editor' | 'viewer';
 export interface ProjectMember {
   userId: Id;
   role: ProjectRole;
+  /** Invited but not yet accepted — no device of theirs holds the data yet. */
+  pending?: boolean;
 }
 
 export interface Project {
