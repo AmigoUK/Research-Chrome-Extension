@@ -27,6 +27,85 @@ and the Team view says so in plain words. Collaboration travels by shared snapsh
 with a password) and merges one back in. PDF bytes are opt-in, because a snapshot you cannot send is
 not a way of sharing work.
 
+## Screens
+
+The project workspace — sources counted by review status, and the workflow board they move across:
+
+![Dashboard overview: stat tiles for sources, analysed count, annotations and the active citation
+style, above a four-column Kanban board](doc/screenshots/01-overview.png)
+
+The bundled PDF reader. Highlights and dragged regions are stored as fractions of the page box, so
+they land in the right place after a zoom, a reload, or a different screen:
+
+![PDF reader: a rendered page with a highlight, beside a rail holding the annotation, its page
+anchor, quote, review status and tags](doc/screenshots/14-pdf-reader.png)
+
+The side panel is where capture happens, and the reading list groups sources by status:
+
+<img src="doc/screenshots/12-side-panel.png" alt="Side panel: capture card, reading list grouped by
+status, and a review-progress bar" width="400">
+
+<details>
+<summary><b>Eleven more screens</b> — Documents, Annotations, References, the style editor, and every
+Team tab</summary>
+
+### Dashboard
+
+**Documents** — one row per source, filtered by status, with the section and note count:
+
+![Documents table](doc/screenshots/02-documents.png)
+
+**Annotations** — every note in the project, each anchored to the passage it came from:
+
+![Annotations list](doc/screenshots/03-annotations.png)
+
+**References** — the bibliographic records behind the citations:
+
+![References table](doc/screenshots/04-references.png)
+
+**Citation styles** — the compact view: profiles on the left, rules and a live citeproc preview on
+the right:
+
+![Citation styles view](doc/screenshots/05-citation-styles.png)
+
+### Style editor
+
+Plain rules on the left, real citeproc output on the right — no CSL XML is edited by hand:
+
+![Style editor with live preview](doc/screenshots/06-style-editor.png)
+
+The **CSL override** tab shows what those rules compile to, and `Export .csl` saves the compiled
+style:
+
+![Style editor showing the generated CSL override](doc/screenshots/07-style-editor-csl.png)
+
+### Team
+
+**Activity** — every change, recorded where it happens, with before→after diffs:
+
+![Activity feed grouped by day with status and role diffs](doc/screenshots/08-team-activity.png)
+
+**Comments** — threads anchored to a note or a source, with reply and resolve:
+
+![Comment threads, one open and one resolved](doc/screenshots/09-team-comments.png)
+
+**Members** — roles, the capability matrix, and the plain statement that roles are advisory:
+
+![Members list, role selects and capability matrix](doc/screenshots/10-team-members.png)
+
+**Sync** — the mode selector, snapshot export with an optional password, and import:
+
+![Sync tab with mode cards, export and import panels](doc/screenshots/11-team-sync.png)
+
+### Side panel
+
+Picking a status directly — including moving a source *back*, which click-cycling could never do:
+
+<img src="doc/screenshots/13-side-panel-status-menu.png" alt="Side panel with the status menu open
+over a source card" width="400">
+
+</details>
+
 ## Development
 
 ```bash
