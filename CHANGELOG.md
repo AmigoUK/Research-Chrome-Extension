@@ -7,7 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 3 (PDF anchoring) complete. Next: Phase 4 (CSL style editor) — see `doc/roadmap.md`._
+_Phase 4 M1 (rule-driven citation engine) shipped. Next: M2 — the full-screen CSL style editor UI._
+
+## [0.13.0] — 2026-07-24
+
+### Added
+
+- **Rule-driven CSL citation engine (Phase 4, M1)** — `CitationStyle.userRules` now actually change
+  citeproc output, instead of only being stored:
+  - `src/core/citation/compile.ts` — pure compilation of a base CSL style plus user rules:
+    `compileCsl()` injects the citeproc-honored `and`, `et-al-min`, `et-al-use-first` and
+    `et-al-use-last` attributes onto every `<name …>` element; `applyRulesToItem()` strips
+    `DOI` / `URL` / `issue` from a CSL-JSON item per the inclusion rules; `overrideObject()` builds
+    the human-readable JSON override shown in the editor's code view.
+  - `CitationFormatter.formatWithStyle(items, style, kind)` — formats through a full style. The
+    compiled style is registered with citation-js under a stable `custom:<hash(rules)>` name and
+    cached per formatter instance.
+  - All five base CSL styles are now vendored under `src/assets/csl/` (APA, Harvard, Vancouver were
+    previously taken from the citation-js bundle; Chicago and MLA were already vendored), which is
+    what makes runtime compilation of custom styles possible.
+  - New `citations/preview` message — formats ad-hoc CSL-JSON samples through a style without
+    persisting anything; powers the editor's live preview.
+  - `citations/bibliography`, `citations/reference` and `citations/document` accept an optional
+    `styleId`; the router resolves it to a `CitationStyle` and formats with its rules.
+
+### Changed
+
+- **BREAKING (internal port)** — `CitationFormatter` gained a required `formatWithStyle` method, so
+  any adapter implementing the port must provide it. No user-facing behaviour changes when no
+  `styleId` is passed: the plain base-template path is unchanged.
+
+### Notes
+
+- 95 unit tests (up from 83): 8 for the pure compiler and 4 golden tests asserting that rules drive
+  real citeproc output (author truncation, DOI removal, issue removal, in-text shape).
+- No UI yet — the dashboard's "Full editor" button and its hand-rolled preview are M2/M3.
 
 ## [0.12.0] — 2026-07-23
 
@@ -307,7 +341,8 @@ _Phase 3 (PDF anchoring) complete. Next: Phase 4 (CSL style editor) — see `doc
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.9.0...v0.10.0

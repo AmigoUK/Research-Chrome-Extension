@@ -12,8 +12,10 @@ import {
   formatProjectBibliography,
   formatReferenceCitation,
   formatDocumentCitation,
+  formatPreview,
 } from './usecases/citations';
 import { importReferenceByDoi } from './usecases/references';
+import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
 
 function ok(data: unknown): { ok: true; data: unknown } {
@@ -33,6 +35,14 @@ export interface RouterDeps {
 function requireFormatter(deps: RouterDeps): CitationFormatter {
   if (!deps.formatter) throw new Error('No citation formatter configured');
   return deps.formatter;
+}
+
+/** Load a citation style by id (for rule-driven formatting), or undefined. */
+async function resolveStyle(
+  repos: RepositorySet,
+  styleId: Id | undefined,
+): Promise<CitationStyle | undefined> {
+  return styleId ? repos.citationStyles.get(styleId) : undefined;
 }
 
 export async function handleRequest(
@@ -109,6 +119,7 @@ export async function handleRequest(
           await formatProjectBibliography(repos, requireFormatter(deps), {
             projectId: request.projectId,
             template: request.template,
+            style: await resolveStyle(repos, request.styleId),
           }),
         ) as Result;
       case 'citations/reference':
@@ -116,6 +127,7 @@ export async function handleRequest(
           await formatReferenceCitation(repos, requireFormatter(deps), {
             referenceId: request.referenceId,
             template: request.template,
+            style: await resolveStyle(repos, request.styleId),
           }),
         ) as Result;
       case 'citations/document':
@@ -123,8 +135,11 @@ export async function handleRequest(
           await formatDocumentCitation(repos, requireFormatter(deps), {
             documentId: request.documentId,
             template: request.template,
+            style: await resolveStyle(repos, request.styleId),
           }),
         ) as Result;
+      case 'citations/preview':
+        return ok(formatPreview(requireFormatter(deps), request.style, request.items)) as Result;
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

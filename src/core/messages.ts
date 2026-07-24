@@ -34,14 +34,18 @@ export interface MessageMap {
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
   'citationStyles/put': { req: { style: CitationStyle }; res: null };
   'capture/page': { req: { input: CaptureInput }; res: CaptureResult };
-  'citations/bibliography': { req: { projectId: Id; template: string }; res: string };
+  'citations/bibliography': { req: { projectId: Id; template: string; styleId?: Id }; res: string };
   'citations/reference': {
-    req: { referenceId: Id; template: string };
+    req: { referenceId: Id; template: string; styleId?: Id };
     res: { inText: string; bibliography: string };
   };
   'citations/document': {
-    req: { documentId: Id; template: string };
+    req: { documentId: Id; template: string; styleId?: Id };
     res: { inText: string; bibliography: string };
+  };
+  'citations/preview': {
+    req: { style: CitationStyle; items: Array<Record<string, unknown>> };
+    res: Array<{ inText: string; bibliography: string }>;
   };
 }
 

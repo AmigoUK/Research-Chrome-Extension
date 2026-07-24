@@ -4,41 +4,66 @@
  */
 import type { RepositorySet } from '../ports/repositories';
 import type { CitationFormatter, CslItem } from '../ports/citation';
-import type { Id } from '../model/types';
+import type { CitationStyle, Id } from '../model/types';
 
 function toItem(cslData: Record<string, unknown>, id: Id): CslItem {
   return { ...cslData, id };
 }
 
+/** Format with a full style when given, else the plain base template. */
+function bibliographyWith(
+  formatter: CitationFormatter,
+  items: CslItem[],
+  template: string,
+  style?: CitationStyle,
+): string {
+  return style
+    ? formatter.formatWithStyle(items, style, 'bibliography')
+    : formatter.bibliography(items, template);
+}
+function pairWith(
+  formatter: CitationFormatter,
+  items: CslItem[],
+  template: string,
+  style?: CitationStyle,
+): { inText: string; bibliography: string } {
+  return style
+    ? {
+        inText: formatter.formatWithStyle(items, style, 'inText'),
+        bibliography: formatter.formatWithStyle(items, style, 'bibliography'),
+      }
+    : {
+        inText: formatter.inText(items, template),
+        bibliography: formatter.bibliography(items, template),
+      };
+}
+
 export async function formatProjectBibliography(
   repos: RepositorySet,
   formatter: CitationFormatter,
-  args: { projectId: Id; template: string },
+  args: { projectId: Id; template: string; style?: CitationStyle | undefined },
 ): Promise<string> {
   const references = await repos.references.listByProject(args.projectId);
   const items = references.map((r) => toItem(r.cslData, r.id));
   if (items.length === 0) return '';
-  return formatter.bibliography(items, args.template);
+  return bibliographyWith(formatter, items, args.template, args.style);
 }
 
 export async function formatReferenceCitation(
   repos: RepositorySet,
   formatter: CitationFormatter,
-  args: { referenceId: Id; template: string },
+  args: { referenceId: Id; template: string; style?: CitationStyle | undefined },
 ): Promise<{ inText: string; bibliography: string }> {
   const reference = await repos.references.get(args.referenceId);
   if (!reference) throw new Error(`Reference not found: ${args.referenceId}`);
   const items = [toItem(reference.cslData, reference.id)];
-  return {
-    inText: formatter.inText(items, args.template),
-    bibliography: formatter.bibliography(items, args.template),
-  };
+  return pairWith(formatter, items, args.template, args.style);
 }
 
 export async function formatDocumentCitation(
   repos: RepositorySet,
   formatter: CitationFormatter,
-  args: { documentId: Id; template: string },
+  args: { documentId: Id; template: string; style?: CitationStyle | undefined },
 ): Promise<{ inText: string; bibliography: string }> {
   const document = await repos.documents.get(args.documentId);
   if (!document) throw new Error(`Document not found: ${args.documentId}`);
@@ -46,8 +71,20 @@ export async function formatDocumentCitation(
   const reference = references.find((r) => r.documentId === args.documentId);
   if (!reference) throw new Error(`No reference for document: ${args.documentId}`);
   const items = [toItem(reference.cslData, reference.id)];
-  return {
-    inText: formatter.inText(items, args.template),
-    bibliography: formatter.bibliography(items, args.template),
-  };
+  return pairWith(formatter, items, args.template, args.style);
+}
+
+/** Format ad-hoc sample items through a style — powers the editor's live preview. */
+export function formatPreview(
+  formatter: CitationFormatter,
+  style: CitationStyle,
+  items: CslItem[],
+): Array<{ inText: string; bibliography: string }> {
+  return items.map((item, i) => {
+    const withId = [{ ...item, id: `preview-${i}` }];
+    return {
+      inText: formatter.formatWithStyle(withId, style, 'inText'),
+      bibliography: formatter.formatWithStyle(withId, style, 'bibliography'),
+    };
+  });
 }
