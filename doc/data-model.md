@@ -19,6 +19,7 @@ Fields:
 - `defaultCitationStyleId`: link to a `CitationStyle`.
 - `sections`: list of section definitions (e.g. `Literature`, `Methods`, `Data`, `FOI`, `Report`).
 - `members`: list of user-role pairs for collaboration.
+- `syncMode`: `local` | `file` — how the project travels between machines. Absent means `local`; there is deliberately no `backend` value, because this build has no server.
 - `createdAt`, `updatedAt`.
 
 ### Document
@@ -94,7 +95,7 @@ One recorded change in a project's history — the activity feed's unit. Events 
 
 Fields:
 - `id`, `projectId`, `actorUserId`, `createdAt`.
-- `kind`: `source` | `status` | `annotation` | `comment` | `reference` | `member` | `sync`. (`sync` is reserved for M4.)
+- `kind`: `source` | `status` | `annotation` | `comment` | `reference` | `member` | `sync`.
 - `summary`: plain text, escaped at render; `entityLabel` marks the part to emphasise.
 - `entityId`: the document / annotation / thread / user the event is about.
 - `from`, `to`: **raw domain values** (status ids, role ids) for the before→after diff — the view labels them, the store never does.
@@ -131,3 +132,24 @@ Fields:
 | 4 | `commentThreads` (indexes `byProject`, `byDocument`) |
 
 Migrations are append-only: a shipped migration is never edited.
+
+## Snapshots (Phase 5, M4)
+
+A snapshot is the whole project as one JSON file — the file-based half of the collaboration story. It carries `project`, `documents`, `annotations`, `references`, `citationStyles`, `users`, `activity` and `commentThreads`; **PDF bytes (`files`) are opt-in**, because they dwarf everything else and a snapshot that cannot be sent is not a way of sharing work.
+
+The file is an envelope with a `format` number, so an older build refuses a newer file instead of mangling it:
+
+- **plain** — `{ format, encrypted: false, projectName, exportedAt, payload }`, readable and diffable.
+- **encrypted** — the payload sealed with **AES-GCM** under a **PBKDF2-SHA-256** key (600k iterations, fresh salt and IV per export). `projectName` and `exportedAt` stay in the clear so a file is identifiable without the password.
+
+Merge rules on import:
+
+| Records | Rule |
+|---|---|
+| Documents, references | **Hard DOI dedup.** An incoming record whose DOI is already here is folded into the local one, and everything that pointed at it (annotations, references, threads, events) is remapped. |
+| Annotations, threads, documents, references | Otherwise by id; the **newer `updatedAt` wins**, so a local edit is never clobbered by an older copy. |
+| Project | Members are **unioned**; the newer record supplies the rest. |
+| Activity | Events are immutable, so a known id is simply already here. |
+| Citation styles, files | Added when absent, never overwritten. |
+
+Nothing is ever deleted by an import, and the merge records a `sync` activity event.

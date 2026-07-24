@@ -18,6 +18,7 @@ import { importReferenceByDoi } from './usecases/references';
 import { listMembers, inviteMember, setMemberRole, removeMember } from './usecases/members';
 import {
   listActivity,
+  recordActivity,
   recordAnnotationDelete,
   recordAnnotationPut,
   recordDocumentPut,
@@ -33,12 +34,26 @@ import {
   setThreadResolved,
   startThread,
 } from './usecases/comments';
+import {
+  assertSnapshotData,
+  buildSnapshot,
+  mergeSnapshot,
+  type SnapshotData,
+} from './usecases/snapshot';
+import { openSnapshot, sealSnapshot } from './snapshot/envelope';
 import { roleOf } from './model/roles';
 import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
 
 function ok(data: unknown): { ok: true; data: unknown } {
   return { ok: true, data };
+}
+
+/** `urban-heat-2026-07-24.json`, with `.enc` marking an encrypted file. */
+function snapshotFilename(projectName: string, exportedAt: string, password: string): string {
+  const slug = projectName.replace(/[^\w.-]+/g, '-').toLowerCase().replace(/^-|-$/g, '') || 'project';
+  const day = exportedAt.slice(0, 10);
+  return `${slug}-${day}${password ? '.enc' : ''}.json`;
 }
 
 const defaultCaptureDeps: CaptureDeps = {
@@ -265,6 +280,33 @@ export async function handleRequest(
       case 'comments/delete':
         await deleteThread(repos, capture, request.threadId);
         return ok(null) as Result;
+      case 'snapshot/export': {
+        const data = await buildSnapshot(repos, request.projectId, {
+          includeFiles: request.includeFiles === true,
+        });
+        const exportedAt = capture.now();
+        const content = await sealSnapshot(
+          data,
+          { projectName: data.project.name, exportedAt },
+          request.password ?? '',
+        );
+        await recordActivity(repos, capture, {
+          projectId: request.projectId,
+          kind: 'sync',
+          summary: `exported a snapshot of ${data.project.name}`,
+          entityLabel: data.project.name,
+        });
+        return ok({
+          filename: snapshotFilename(data.project.name, exportedAt, request.password ?? ''),
+          content,
+          bytes: content.length,
+        }) as Result;
+      }
+      case 'snapshot/import': {
+        const payload = await openSnapshot(request.content, request.password ?? '');
+        assertSnapshotData(payload);
+        return ok(await mergeSnapshot(repos, capture, payload as SnapshotData)) as Result;
+      }
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
         const unknown: never = request;

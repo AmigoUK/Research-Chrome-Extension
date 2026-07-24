@@ -7,8 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 5 M3 (comment threads) shipped. Next: M4 — snapshot export/import, the last milestone of the
-phase._
+_Phase 5 is complete — the whole roadmap is delivered. What follows is polish; see `doc/STATUS.md`._
+
+## [0.18.0] — 2026-07-24
+
+### Added
+
+- **Snapshot export & import (Phase 5, M4)** — the file-based half of collaboration, and the last
+  milestone of the roadmap:
+  - `src/core/usecases/snapshot.ts` — `buildSnapshot` collects the whole project (sources, notes,
+    references, styles, people, history and discussion); `mergeSnapshot` folds one back in.
+    **PDF bytes are opt-in**: they dwarf everything else, and a snapshot you cannot send is not a
+    way of sharing work.
+  - `src/core/snapshot/envelope.ts` — the file format. An **empty password gives plain JSON**
+    (readable, diffable, the point of a local-first backup); a password seals the payload with
+    **AES-GCM** under a **PBKDF2-SHA-256** key (600k iterations, fresh salt and IV per export).
+    Import detects which kind it is holding, so the user never declares it. `projectName` and
+    `exportedAt` stay in the clear, so an encrypted file is still identifiable.
+  - A `format` number in every envelope: a build refuses a **newer** snapshot rather than mangling
+    it, and says so.
+  - **Merge rules.** Documents and references dedup **by DOI** — the roadmap's hard rule — and the
+    folded id is **remapped**, so annotations, references and threads that pointed at the incoming
+    copy end up on the record that was already here. Everything else merges by id with the newer
+    `updatedAt` winning; project members are unioned. Nothing is ever deleted by an import.
+  - New messages `snapshot/export` and `snapshot/import`; both halves record a `sync` activity
+    event — the last of the seven kinds to come into use.
+- **Team → Sync** tab: the sync-mode selector (**Local only** / **File-based**, with **Self-hosted
+  backend** shown as *Unavailable* rather than pretended), export with an optional password and an
+  "Include PDF files" checkbox, and import with a file picker. `Project.syncMode` persists the choice.
+
+### Changed
+
+- README and `doc/roadmap.md` now say the roadmap is delivered; `doc/data-model.md` documents the
+  snapshot format and every merge rule.
+
+### Notes
+
+- 201 unit tests (up from 181) + 19 E2E; the new E2E exports a real file through the browser's
+  download path, switches sync mode and proves it survives a reload, then imports a snapshot whose
+  source carries a DOI the project already has — and shows one row, not two.
+- Presence, the one Phase 5 goal not delivered, needs a live channel between clients. A file-based
+  mode cannot provide one, and a backend is out of scope for this repo.
 
 ## [0.17.0] — 2026-07-24
 
@@ -484,7 +523,8 @@ phase._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...v0.15.0

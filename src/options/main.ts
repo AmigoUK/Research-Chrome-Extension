@@ -19,6 +19,7 @@ import type {
   ActivityKind,
   Anchor,
   CommentThread,
+  SyncMode,
   Reference,
   CitationStyle,
   CitationUserRules,
@@ -178,7 +179,7 @@ interface DashState {
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
   /** Tab within the Team view. */
-  teamTab: 'activity' | 'comments' | 'members';
+  teamTab: 'activity' | 'comments' | 'members' | 'sync';
   activityFilter: ActivityKind | 'all';
   /** How many events the feed has asked for — grows with "Show older". */
   activityLimit: number;
@@ -1809,13 +1810,14 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
       ${tab('activity', 'Activity', state.activity.length)}
       ${tab('comments', 'Comments', openThreads)}
       ${tab('members', 'Members', state.members.length)}
+      <button class="vtab" role="tab" data-tab="sync" aria-selected="${state.teamTab === 'sync'}">Sync</button>
     </div>
     <div id="teamBody"></div>`;
 
   $$('.vtab', view).forEach((b) => {
     b.onclick = () => {
       const t = b.dataset.tab;
-      if (t === 'activity' || t === 'comments' || t === 'members') {
+      if (t === 'activity' || t === 'comments' || t === 'members' || t === 'sync') {
         state.teamTab = t;
         render();
       }
@@ -1825,6 +1827,7 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
   const body = $('#teamBody', view);
   if (state.teamTab === 'members') renderMembersTab(body);
   else if (state.teamTab === 'comments') renderCommentsTab(body);
+  else if (state.teamTab === 'sync') renderSyncTab(body);
   else renderActivityTab(body);
 }
 
@@ -1939,6 +1942,161 @@ function renderActivityTab(body: HTMLElement): void {
   });
   const olderBtn = body.querySelector<HTMLButtonElement>('#actOlder');
   if (olderBtn) olderBtn.onclick = () => void showOlderActivity();
+}
+
+/* ---- Team: sync & snapshots (Phase 5, M4) ---- */
+
+const SYNC_MODES: Array<{ id: SyncMode | 'backend'; label: string; sub: string }> = [
+  {
+    id: 'local',
+    label: 'Local only',
+    sub: 'Data stays in this browser’s IndexedDB. Nothing leaves the machine.',
+  },
+  {
+    id: 'file',
+    label: 'File-based (shared drive)',
+    sub: 'A portable snapshot, optionally encrypted, shared through a drive or a network share. Merge on import.',
+  },
+  {
+    id: 'backend',
+    label: 'Self-hosted backend',
+    sub: 'Real-time sync with enforced roles — needs a server. Not part of this build.',
+  },
+];
+
+function humanSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} kB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderSyncTab(body: HTMLElement): void {
+  const project = activeProject();
+  const mode: SyncMode = project?.syncMode ?? 'local';
+  const pdfCount = state.documents.filter((d) => d.fileId).length;
+
+  body.innerHTML = `
+    <div class="sec-h" style="margin-top:0"><h2>Sync mode</h2><span class="ln"></span></div>
+    <div class="modes">
+      ${SYNC_MODES.map((m) => {
+        const unavailable = m.id === 'backend';
+        return `<button class="mode${!unavailable && m.id === mode ? ' on' : ''}${unavailable ? ' off' : ''}"
+          data-mode="${m.id}"${unavailable ? ' disabled aria-disabled="true"' : ''}
+          aria-pressed="${!unavailable && m.id === mode}">
+          <span class="mode-b">${esc(m.label)}${unavailable ? '<span class="badge-pend">Unavailable</span>' : ''}</span>
+          <span class="mode-s">${esc(m.sub)}</span>
+        </button>`;
+      }).join('')}
+    </div>
+
+    <div class="sec-h"><h2>Export a snapshot</h2><span class="ln"></span></div>
+    <div class="panel">
+      <p class="panel-note">Everything in this project — sources, notes, references, styles, people,
+        history and discussion — as one JSON file. Leave the password empty for plain JSON you can
+        read and diff; set one and the file is encrypted with AES-GCM.</p>
+      <div class="row">
+        <input id="expPass" class="sel" type="password" placeholder="Password (optional)"
+          aria-label="Snapshot password" style="width:220px">
+        <label class="check"><input type="checkbox" id="expFiles"${pdfCount === 0 ? ' disabled' : ''}>
+          Include PDF files${pdfCount > 0 ? ` (${pdfCount})` : ''}</label>
+        <button class="btn btn--primary btn--sm" id="expGo">${ICON.down} Export</button>
+      </div>
+      <p class="panel-note">PDF bytes are left out by default — they dwarf everything else, and a
+        snapshot you cannot send is not a way of sharing work.</p>
+    </div>
+
+    <div class="sec-h"><h2>Import a snapshot</h2><span class="ln"></span></div>
+    <div class="panel">
+      <p class="panel-note">Merges into this browser. <b>References and sources deduplicate by
+        DOI</b>; everything else merges by id, and the newer record wins. Nothing is deleted.</p>
+      <div class="row">
+        <input id="impPass" class="sel" type="password" placeholder="Password (if encrypted)"
+          aria-label="Password for the snapshot being imported" style="width:220px">
+        <button class="btn btn--sm" id="impGo">${ICON.up} Choose a file…</button>
+      </div>
+    </div>`;
+
+  $$('[data-mode]', body).forEach((b) => {
+    b.onclick = () => {
+      const value = b.dataset.mode;
+      if (value === 'local' || value === 'file') void setSyncMode(value);
+    };
+  });
+  $('#expGo', body).onclick = () => void exportSnapshot();
+  $('#impGo', body).onclick = () => pickSnapshotFile();
+}
+
+async function setSyncMode(mode: SyncMode): Promise<void> {
+  const project = activeProject();
+  if (!project || (project.syncMode ?? 'local') === mode) return;
+  const updated: Project = { ...project, syncMode: mode, updatedAt: nowIso() };
+  try {
+    await sendRequest({ type: 'projects/put', project: updated });
+    state.projects = state.projects.map((p) => (p.id === updated.id ? updated : p));
+    render();
+    toast(`Sync mode · ${mode === 'file' ? 'File-based' : 'Local only'}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t change the sync mode', ICON.warn, true);
+  }
+}
+
+async function exportSnapshot(): Promise<void> {
+  if (!state.activeProjectId) return;
+  const password = $<HTMLInputElement>('#expPass')?.value ?? '';
+  const includeFiles = $<HTMLInputElement>('#expFiles')?.checked === true;
+  try {
+    const snapshot = await sendRequest({
+      type: 'snapshot/export',
+      projectId: state.activeProjectId,
+      includeFiles,
+      password,
+    });
+    const url = URL.createObjectURL(new Blob([snapshot.content], { type: 'application/json' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = snapshot.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    await reloadActivity();
+    render();
+    toast(
+      `Exported · ${snapshot.filename} (${humanSize(snapshot.bytes)}${password ? ', encrypted' : ''})`,
+      ICON.down,
+    );
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t export the snapshot', ICON.warn, true);
+  }
+}
+
+function pickSnapshotFile(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'application/json,.json';
+  input.onchange = () => void importSnapshot(input.files?.[0]);
+  input.click();
+}
+
+async function importSnapshot(file: File | undefined): Promise<void> {
+  if (!file) return;
+  const password = $<HTMLInputElement>('#impPass')?.value ?? '';
+  try {
+    const report = await sendRequest({
+      type: 'snapshot/import',
+      content: await file.text(),
+      password,
+    });
+    const merged =
+      report.documents + report.annotations + report.references + report.commentThreads;
+    await loadProjectData();
+    render();
+    toast(
+      `Imported ${esc(report.projectName)} · ${merged} records` +
+        (report.dedupedByDoi > 0 ? ` · ${report.dedupedByDoi} deduped by DOI` : ''),
+      ICON.check,
+    );
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t import the snapshot', ICON.warn, true);
+  }
 }
 
 /* ---- Team: comment threads (Phase 5, M3) ---- */

@@ -82,6 +82,13 @@ export interface ProjectMember {
   pending?: boolean;
 }
 
+/**
+ * How a project travels between machines. `backend` is deliberately absent:
+ * this build has no server, and the Team view says so rather than offering a
+ * mode that cannot work.
+ */
+export type SyncMode = 'local' | 'file';
+
 export interface Project {
   id: Id;
   name: string;
@@ -89,6 +96,8 @@ export interface Project {
   defaultCitationStyleId?: Id;
   sections: string[];
   members: ProjectMember[];
+  /** Defaults to `local` when absent — projects created before Phase 5 M4. */
+  syncMode?: SyncMode;
   createdAt: IsoDateTime;
   updatedAt: IsoDateTime;
 }
@@ -217,9 +226,9 @@ export interface CommentThread {
 }
 
 /**
- * What kind of change an activity event records. `comment` and `sync` belong to
- * later milestones (M3 threads, M4 snapshots) — nothing emits them yet, and the
- * feed's filter chips are built from the kinds actually present in the data.
+ * What kind of change an activity event records. The feed's filter chips are
+ * built from the kinds actually present in the data, never from this list, so
+ * a project only ever shows the kinds it has.
  */
 export const ACTIVITY_KINDS = [
   'source',

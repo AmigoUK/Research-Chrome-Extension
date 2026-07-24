@@ -2,7 +2,7 @@
 
 This document outlines the planned development phases for the Scientific Context Notes extension.
 
-> **Design status.** Interactive design prototypes exist for every phase — side panel (Phase 1–2), `pdf-anchoring.html` (Phase 3), `citation-style-editor.html` (Phase 4), and `collaboration-sync.html` (Phase 5), all sharing one design system. Implementation ports these existing designs rather than designing UI from scratch. No production code has shipped yet, so the phases below are **planned / prototyped**, not released.
+> **Delivery status.** All five phases below are **shipped** as of **v0.18.0** — Phase 1 → v0.1.1, Phase 2 → v0.7.0, Phase 3 → v0.12.0, Phase 4 → v0.14.0, Phase 5 → v0.18.0. Interactive design prototypes exist for every phase (side panel, `pdf-anchoring.html`, `citation-style-editor.html`, `collaboration-sync.html`) and the implementation ports those designs rather than inventing UI. See `STATUS.md` for what was delivered and what was deliberately left out.
 
 ## Phase 1: MVP
 
@@ -57,7 +57,7 @@ Collaboration follows an **evolutionary path** rather than a single mechanism (d
 
 1. **Local only** — data stays in this browser's IndexedDB; no sync.
 2. **File-based** — a portable, encrypted JSON snapshot (projects, annotations, references, styles) shared through a drive or network share, with manual merge on conflict. Keeps the local-first, no-backend posture.
-3. **Self-hosted backend** — real-time sync to the team's own server, enabling enforced roles and presence.
+3. **Self-hosted backend** — real-time sync to the team's own server, enabling enforced roles and presence. **Out of scope for this repo** (see below): modes 1 and 2 shipped; the backend mode is shown in the UI as unavailable rather than pretended.
 
 Goals:
 - Introduce multi-user projects with **Owner / Editor / Viewer** roles and a capability matrix (read & export / annotate / edit status / manage references / manage members / delete project).
@@ -68,3 +68,5 @@ Goals:
 
 Deliverables:
 - Team-ready extension for collaborative research and investigations.
+
+**Delivered (v0.15.0 – v0.18.0):** roles & capability matrix (advisory, and said so), an activity feed recorded in the message router with before→after diffs, anchored comment threads with reply / resolve, and portable snapshots — plain or AES-GCM encrypted — that merge back with hard DOI dedup. Presence is the one goal not delivered: it needs a live channel between clients, which a file-based mode cannot provide.

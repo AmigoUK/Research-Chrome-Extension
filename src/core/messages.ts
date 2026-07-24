@@ -19,6 +19,7 @@ import type {
 import type { CaptureInput, CaptureResult } from './usecases/capture';
 import type { MemberView } from './usecases/members';
 import type { ReplyInput, StartThreadInput } from './usecases/comments';
+import type { MergeReport } from './usecases/snapshot';
 
 /** File bytes cross the messaging boundary as base64 (JSON-safe). */
 export interface FilePayload {
@@ -82,6 +83,12 @@ export interface MessageMap {
   'comments/reply': { req: ReplyInput; res: CommentThread };
   'comments/setResolved': { req: { threadId: Id; resolved: boolean }; res: CommentThread };
   'comments/delete': { req: { threadId: Id }; res: null };
+  /** Builds the file text; an empty password means plain JSON. */
+  'snapshot/export': {
+    req: { projectId: Id; includeFiles?: boolean; password?: string };
+    res: { filename: string; content: string; bytes: number };
+  };
+  'snapshot/import': { req: { content: string; password?: string }; res: MergeReport };
 }
 
 export type MessageType = keyof MessageMap;

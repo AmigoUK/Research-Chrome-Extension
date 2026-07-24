@@ -342,6 +342,70 @@ describe('activity recording (Phase 5, M2)', () => {
     expect(res).toMatchObject({ ok: false });
   });
 
+  it('exports an encrypted snapshot and imports it back', async () => {
+    await repos.projects.put({
+      id: 'p1',
+      name: 'Urban Heat',
+      sections: [],
+      members: [{ userId: 'me', role: 'owner' }],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await handleRequest(repos, { type: 'documents/put', document: makeDocument('d1', 'p1') }, deps);
+
+    const exported = await handleRequest(
+      repos,
+      { type: 'snapshot/export', projectId: 'p1', password: 'pw' },
+      deps,
+    );
+    expect(exported.ok).toBe(true);
+    const file = exported.ok
+      ? (exported.data as { filename: string; content: string; bytes: number })
+      : null;
+    // `.enc` in the name is the only clue an encrypted file gives away.
+    expect(file?.filename).toMatch(/^urban-heat-\d{4}-\d{2}-\d{2}\.enc\.json$/);
+    expect(file?.content).not.toContain('d1');
+
+    const wrong = await handleRequest(
+      repos,
+      { type: 'snapshot/import', content: file?.content ?? '', password: 'nope' },
+      deps,
+    );
+    expect(wrong).toMatchObject({ ok: false });
+
+    const imported = await handleRequest(
+      repos,
+      { type: 'snapshot/import', content: file?.content ?? '', password: 'pw' },
+      deps,
+    );
+    // Re-importing into the machine it came from must not duplicate anything.
+    expect(imported.ok && (imported.data as { projectName: string }).projectName).toBe('Urban Heat');
+    expect(await repos.documents.listByProject('p1')).toHaveLength(1);
+
+    // Both halves of the round trip are in the feed as sync events.
+    const syncEvents = (await feed()).filter((e) => e.kind === 'sync');
+    expect(syncEvents.map((e) => e.summary)).toEqual([
+      'imported a snapshot of Urban Heat',
+      'exported a snapshot of Urban Heat',
+    ]);
+  });
+
+  it('exports plain JSON when no password is given', async () => {
+    await repos.projects.put({
+      id: 'p1',
+      name: 'Urban Heat',
+      sections: [],
+      members: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    const res = await handleRequest(repos, { type: 'snapshot/export', projectId: 'p1' }, deps);
+    const file = res.ok ? (res.data as { filename: string; content: string }) : null;
+
+    expect(file?.filename).toMatch(/^urban-heat-\d{4}-\d{2}-\d{2}\.json$/);
+    expect(JSON.parse(file?.content ?? '{}')).toMatchObject({ encrypted: false });
+  });
+
   it('lists a project newest first and honours the limit', async () => {
     for (const id of ['d1', 'd2', 'd3']) {
       await handleRequest(repos, { type: 'documents/put', document: makeDocument(id, 'p1') }, deps);

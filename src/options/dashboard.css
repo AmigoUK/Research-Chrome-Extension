@@ -306,6 +306,23 @@ button.stat-tag:hover { border-color: var(--fg); }
 .diff .ar { color: var(--muted); }
 .more { display: flex; justify-content: center; padding: 4px 0 12px; }
 
+/* ---- Team: sync & snapshots (Phase 5, M4) ---- */
+.modes { display: grid; gap: 9px; margin-bottom: 4px; }
+.mode { display: grid; gap: 3px; text-align: left; font: inherit; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); color: var(--fg); cursor: pointer; transition: .12s; }
+.mode:hover:not(.off) { border-color: var(--fg); }
+.mode.on { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.mode.off { cursor: not-allowed; opacity: .6; }
+.mode-b { font-size: 13.5px; font-weight: 560; display: flex; align-items: center; gap: 8px; }
+.mode-s { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+.panel { border: 1px solid var(--border); border-radius: 11px; background: var(--surface); padding: 14px 15px; }
+.panel .row { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin: 12px 0; }
+.panel-note { font-size: 11.5px; color: var(--muted); line-height: 1.6; max-width: 78ch; }
+.panel-note b { color: var(--fg); font-weight: 560; }
+.check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--fg); cursor: pointer; }
+.check input { accent-color: var(--accent); }
+.check input:disabled { cursor: not-allowed; }
+.check:has(input:disabled) { color: var(--muted); cursor: not-allowed; }
+
 /* ---- Team: comment threads (Phase 5, M3) ---- */
 .thread { border: 1px solid var(--border); border-radius: 13px; background: var(--surface); margin-bottom: 14px; overflow: hidden; }
 .thread.resolved { opacity: .72; }

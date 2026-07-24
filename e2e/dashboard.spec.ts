@@ -442,6 +442,73 @@ test('Discuss on an annotation starts a thread, which replies and resolves in Te
   await page.close();
 });
 
+test('Sync tab exports a snapshot file, switches mode, and merges an import by DOI', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="sync"]').click();
+
+  // The local-first scope is stated, not implied: no backend on offer.
+  await expect(page.locator('.mode[data-mode="backend"]')).toBeDisabled();
+  await expect(page.locator('.mode[data-mode="backend"]')).toContainText('Unavailable');
+
+  // Switching mode persists on the project record.
+  await page.locator('.mode[data-mode="file"]').click();
+  await expect(page.locator('.mode[data-mode="file"]')).toHaveAttribute('aria-pressed', 'true');
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="sync"]').click();
+  await expect(page.locator('.mode[data-mode="file"]')).toHaveAttribute('aria-pressed', 'true');
+
+  // Export downloads a real file, named after the project.
+  const downloadPromise = page.waitForEvent('download');
+  await page.locator('#expGo').click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^my-research-project-\d{4}-\d{2}-\d{2}\.json$/);
+
+  // Import the same project back, with one source deduped by DOI: the snapshot
+  // carries a second copy of a DOI the project already has under another id.
+  const report = await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-sync-doi',
+        projectId,
+        url: 'https://example.org/sync',
+        type: 'article',
+        metadata: { title: 'Sync DOI source', doi: '10.1000/sync-e2e' },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    const exported = await chrome.runtime.sendMessage({ type: 'snapshot/export', projectId });
+    const envelope = JSON.parse(exported.data.content);
+    // Same DOI, different id — exactly what a collaborator's file looks like.
+    envelope.payload.documents = envelope.payload.documents.map((d: { id: string }) =>
+      d.id === 'e2e-sync-doi' ? { ...d, id: 'from-a-colleague' } : d,
+    );
+    const imported = await chrome.runtime.sendMessage({
+      type: 'snapshot/import',
+      content: JSON.stringify(envelope),
+    });
+    return imported.data as { dedupedByDoi: number };
+  });
+  expect(report.dedupedByDoi).toBeGreaterThan(0);
+
+  // The duplicate never landed: one row for that DOI, not two.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+  await expect(page.locator('.tbl tbody tr', { hasText: 'Sync DOI source' })).toHaveCount(1);
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

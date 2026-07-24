@@ -1,19 +1,19 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — Phase 4 complete and merged; Phase 5 in progress (M3 of 4 done)._
+_Last updated: 2026-07-24 — **all five roadmap phases delivered**; Phase 5 complete at v0.18.0._
 
 ## Where we are
 
-**Phase 4 (Citation style editor) is complete and merged to `main`.** **Phase 5 (Collaboration &
-Sync) is in progress** — M1 (members & roles), M2 (activity feed) and M3 (comment threads) shipped;
-only M4 (snapshot export/import) remains.
+**Every roadmap phase is delivered and on `main`.** Phase 5 (Collaboration & Sync) closed at
+**v0.18.0** with snapshot export/import; the roadmap's third sync mode (a self-hosted backend) stays
+out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.17.0 is on `main`** (Phases 1–5 M3). No unmerged work.
-- **Releases:** v0.15.0 → v0.17.0 (Phase 5 M1–M3); v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
+- **Branch state:** everything through **v0.18.0 is on `main`** (Phases 1–5). No unmerged work.
+- **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 181 unit + 18 E2E (5 PDF viewer + 11 dashboard + 2 side panel), all green.
+- **Tests:** 201 unit + 19 E2E (5 PDF viewer + 12 dashboard + 2 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -34,10 +34,20 @@ Consequences carried through the code and the UI:
 | M1 — Members & roles: capability matrix (`src/core/model/roles.ts`), membership use-cases, Team view (6th nav item), `members/*` + `users/*` messages | v0.15.0 | ✅ |
 | M2 — Activity feed: `ActivityEvent` entity, IDB **schema v3**, recording in the router cases, day-grouped feed with kind filters and before→after diffs | v0.16.0 | ✅ |
 | M3 — Comment threads: `CommentThread` with embedded comments, IDB **schema v4**, start / reply / resolve / delete, Comments tab + "Discuss" on an annotation | v0.17.0 | ✅ |
-| M4 — Snapshot export/import: portable JSON, optional AES-GCM password, merge on import with **hard DOI dedup**, sync-mode selector (local / file; backend shown as unavailable) | — | ⬜ |
+| M4 — Snapshot export/import: portable JSON, optional AES-GCM password, merge on import with **hard DOI dedup**, sync-mode selector (local / file; backend shown as unavailable) | v0.18.0 | ✅ |
 
 The Team view now has the design mock's full tab bar — **Activity | Comments | Members**. The
 Comments counter shows **open** threads only: a resolved thread is not a to-do.
+
+M4 decisions worth remembering: **PDF bytes are opt-in** — they dwarf everything else, and a snapshot
+you cannot send is not a way of sharing work, so `includeFiles` is a checkbox rather than the default.
+The file is an envelope with a `format` number, so an older build refuses a newer file instead of
+mangling it; an **empty password gives plain JSON** (readable, diffable) and a password gives
+AES-GCM + PBKDF2 (600k iterations, fresh salt and IV per export), with `projectName` / `exportedAt`
+left in the clear so a file is identifiable without decrypting it. Merge: **hard DOI dedup** for
+documents and references, with the folded id **remapped** so annotations and threads follow the copy
+that was already here; everything else by id with the **newer `updatedAt` winning**; project members
+**unioned**. Nothing is ever deleted by an import.
 
 M3 decisions worth remembering: comments are **embedded in the thread record** rather than a second
 store — the UI only ever reads a thread whole, so a reply is one atomic write. Threads are started
@@ -125,22 +135,17 @@ Surfaces: `src/background` (service worker), `src/sidepanel`, `src/options` (das
 
 ## Resume plan — next steps
 
-**Finish Phase 5 at M4 (snapshot export/import).** Nothing is half-finished: `main` is green at
-v0.17.0 and the working tree is clean. M4 is the last milestone of the phase:
+**The roadmap is done. What follows is polish, not phases.** `main` is green at v0.18.0 and the
+working tree is clean. The strongest candidates, roughly in order of value:
 
-1. A portable JSON snapshot of the project — projects, documents, annotations, references, styles,
-   users, activity and comment threads — with a format version, so an older build can refuse a newer
-   file rather than mangle it. PDF bytes are the open question: including them makes the file huge,
-   so decide (and state) whether `files` travel with the snapshot.
-2. **Optional** password encryption: WebCrypto **AES-GCM + PBKDF2**. An empty password gives plain
-   JSON for backup and inspection; a password gives an encrypted envelope. Import detects which it
-   is from the file itself.
-3. Merge on import with **hard DOI dedup** — the rule the roadmap states. Everything else merges by
-   id, newest `updatedAt` winning; the merge writes `sync` activity events (the kind is already
-   defined and still unused).
-4. A sync-mode selector in the Team view: **Local only** and **File-based** selectable, self-hosted
-   backend shown as unavailable — the local-first scope decision, stated in the UI rather than
-   implied.
+1. **Bundle size** — the service worker is ~1.15 MB (213 kB gzipped), most of it vendored CSL.
+   Lazy-loading base styles from `web_accessible_resources` would trim it sharply.
+2. **Import a third-party `.csl`** as a base style — the editor can already export one.
+3. **Snapshot ergonomics** — a dry-run import that reports what *would* merge before it writes, and
+   remembering the last export folder. Both are small; neither is needed for correctness.
+4. **Presence** (the one Phase 5 goal not delivered) needs a live channel between clients, which a
+   file-based mode cannot provide. It arrives only with a backend, and a backend is out of scope.
+5. The standing follow-ups below: dev-dep audit, OFL fonts, per-source status popover.
 
 **Smaller follow-ons in the citation area:** bundle size (the Chicago notes CSL is 243 kB raw —
 lazy-loading base styles from `web_accessible_resources` would trim the SW), and importing a
@@ -149,7 +154,7 @@ third-party `.csl` file as a base style.
 ### How to resume
 
 ```
-/loop work through Phase 5 (collaboration & sync) milestones M3–M4, one milestone per iteration, full loop each time
+/loop work through the polish list above, one item per iteration, full loop each time
 ```
 
 Environment is ready: Node 22, deps installed, `gh` authenticated with `workflow` scope, Playwright
