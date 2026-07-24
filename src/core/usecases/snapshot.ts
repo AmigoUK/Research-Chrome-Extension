@@ -53,6 +53,8 @@ export interface SnapshotData {
 
 export interface MergeReport {
   projectName: string;
+  /** True when this browser has never seen the project — an import, not a merge. */
+  newProject: boolean;
   documents: number;
   annotations: number;
   references: number;
@@ -153,14 +155,22 @@ function isNewer(incoming: { updatedAt: string }, local: { updatedAt: string }):
   return incoming.updatedAt > local.updatedAt;
 }
 
-export async function mergeSnapshot(
-  repos: RepositorySet,
-  deps: CaptureDeps,
-  data: SnapshotData,
-): Promise<MergeReport> {
+/**
+ * A merge worked out but not performed: the counts to show, and the writes that
+ * would produce them. Planning and applying share this one code path on purpose
+ * — a preview that could disagree with the import would be worse than none.
+ */
+export interface MergePlan {
+  report: MergeReport;
+  apply(): Promise<void>;
+}
+
+export async function planMerge(repos: RepositorySet, data: SnapshotData): Promise<MergePlan> {
   assertSnapshotData(data);
+  const writes: Array<() => Promise<void>> = [];
   const report: MergeReport = {
     projectName: data.project.name,
+    newProject: false,
     documents: 0,
     annotations: 0,
     references: 0,
@@ -177,30 +187,25 @@ export async function mergeSnapshot(
   const projectId = data.project.id;
   const localProject = await repos.projects.get(projectId);
   if (!localProject) {
-    await repos.projects.put(data.project);
+    report.newProject = true;
+    writes.push(() => repos.projects.put(data.project));
   } else {
     const members = [...localProject.members];
     for (const member of data.project.members) {
       if (!members.some((m) => m.userId === member.userId)) members.push(member);
     }
     const base = isNewer(data.project, localProject) ? data.project : localProject;
-    await repos.projects.put({ ...base, members });
+    writes.push(() => repos.projects.put({ ...base, members }));
   }
 
   // --- Users: identity, keyed by id. ---
   for (const user of data.users ?? []) {
     const local = await repos.users.get(user.id);
-    if (!local) {
-      await repos.users.put(user);
-      report.users++;
-    } else {
-      await repos.users.put({
-        ...local,
-        ...user,
-        rolesPerProject: { ...local.rolesPerProject, ...user.rolesPerProject },
-      });
-      report.users++;
-    }
+    const merged = local
+      ? { ...local, ...user, rolesPerProject: { ...local.rolesPerProject, ...user.rolesPerProject } }
+      : user;
+    writes.push(() => repos.users.put(merged));
+    report.users++;
   }
 
   // --- Documents: DOI dedup first, then id. Remap what was folded. ---
@@ -220,7 +225,7 @@ export async function mergeSnapshot(
       report.skippedOlder++;
       continue;
     }
-    await repos.documents.put(document);
+    writes.push(() => repos.documents.put(document));
     report.documents++;
   }
   const mapDocumentId = (id: Id): Id => documentIdMap.get(id) ?? id;
@@ -240,10 +245,12 @@ export async function mergeSnapshot(
       report.skippedOlder++;
       continue;
     }
-    await repos.references.put({
-      ...reference,
-      ...(reference.documentId ? { documentId: mapDocumentId(reference.documentId) } : {}),
-    });
+    writes.push(() =>
+      repos.references.put({
+        ...reference,
+        ...(reference.documentId ? { documentId: mapDocumentId(reference.documentId) } : {}),
+      }),
+    );
     report.references++;
   }
 
@@ -253,13 +260,15 @@ export async function mergeSnapshot(
       report.skippedOlder++;
       continue;
     }
-    await repos.annotations.put({ ...annotation, documentId: mapDocumentId(annotation.documentId) });
+    writes.push(() =>
+      repos.annotations.put({ ...annotation, documentId: mapDocumentId(annotation.documentId) }),
+    );
     report.annotations++;
   }
 
   for (const style of data.citationStyles ?? []) {
     if (!(await repos.citationStyles.get(style.id))) {
-      await repos.citationStyles.put(style);
+      writes.push(() => repos.citationStyles.put(style));
       report.citationStyles++;
     }
   }
@@ -270,10 +279,12 @@ export async function mergeSnapshot(
       report.skippedOlder++;
       continue;
     }
-    await repos.commentThreads.put({
-      ...thread,
-      ...(thread.documentId ? { documentId: mapDocumentId(thread.documentId) } : {}),
-    });
+    writes.push(() =>
+      repos.commentThreads.put({
+        ...thread,
+        ...(thread.documentId ? { documentId: mapDocumentId(thread.documentId) } : {}),
+      }),
+    );
     report.commentThreads++;
   }
 
@@ -282,31 +293,62 @@ export async function mergeSnapshot(
   const knownEvents = new Set(localActivity.map((e) => e.id));
   for (const event of data.activity ?? []) {
     if (knownEvents.has(event.id)) continue;
-    await repos.activity.put({
-      ...event,
-      ...(event.entityId ? { entityId: mapDocumentId(event.entityId) } : {}),
-    });
+    writes.push(() =>
+      repos.activity.put({
+        ...event,
+        ...(event.entityId ? { entityId: mapDocumentId(event.entityId) } : {}),
+      }),
+    );
     report.activity++;
   }
 
   for (const file of data.files ?? []) {
     if (await repos.files.get(file.id)) continue;
-    await repos.files.put({
-      id: file.id,
-      name: file.name,
-      mime: file.mime,
-      bytes: base64ToBytes(file.dataBase64),
-      createdAt: file.createdAt,
-    });
+    writes.push(() =>
+      repos.files.put({
+        id: file.id,
+        name: file.name,
+        mime: file.mime,
+        bytes: base64ToBytes(file.dataBase64),
+        createdAt: file.createdAt,
+      }),
+    );
     report.files++;
   }
 
+  return {
+    report,
+    async apply() {
+      for (const write of writes) await write();
+    },
+  };
+}
+
+/**
+ * What an import would do, without doing it. The counts come from the same plan
+ * the import applies, so the preview cannot promise something else.
+ */
+export async function previewMerge(
+  repos: RepositorySet,
+  data: SnapshotData,
+): Promise<MergeReport> {
+  return (await planMerge(repos, data)).report;
+}
+
+export async function mergeSnapshot(
+  repos: RepositorySet,
+  deps: CaptureDeps,
+  data: SnapshotData,
+): Promise<MergeReport> {
+  const plan = await planMerge(repos, data);
+  await plan.apply();
+
   await recordActivity(repos, deps, {
-    projectId,
+    projectId: data.project.id,
     kind: 'sync',
     summary: `imported a snapshot of ${data.project.name}`,
     entityLabel: data.project.name,
   });
 
-  return report;
+  return plan.report;
 }

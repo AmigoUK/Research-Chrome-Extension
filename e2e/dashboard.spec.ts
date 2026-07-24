@@ -468,6 +468,77 @@ test('Sync tab exports a snapshot file, switches mode, and merges an import by D
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toMatch(/^my-research-project-\d{4}-\d{2}-\d{2}\.json$/);
 
+  // Choosing a file previews the merge instead of performing it.
+  const built = await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-plan-doc',
+        projectId,
+        url: 'https://example.org/plan',
+        type: 'article',
+        metadata: { title: 'Plan preview source' },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    const exported = await chrome.runtime.sendMessage({ type: 'snapshot/export', projectId });
+    const envelope = JSON.parse(exported.data.content);
+    // A source only the file has, so the plan has something to promise.
+    envelope.payload.documents.push({
+      ...envelope.payload.documents[0],
+      id: 'only-in-the-file',
+      metadata: { title: 'Only in the file' },
+    });
+    return JSON.stringify(envelope);
+  });
+
+  const planChooser = page.waitForEvent('filechooser');
+  await page.locator('#impGo').click();
+  await (await planChooser).setFiles({
+    name: 'plan.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(built),
+  });
+
+  // The plan says what would happen, and nothing has been written yet.
+  await expect(page.locator('.plan')).toContainText('Merge into');
+  await expect(page.locator('.plan-list')).toContainText('Sources');
+  await expect(page.locator('.plan-list')).toContainText('your copy is newer');
+  expect(
+    await page.evaluate(async () => {
+      const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+      const docs = await chrome.runtime.sendMessage({
+        type: 'documents/listByProject',
+        projectId: projects.data[0].id,
+      });
+      return docs.data.some((d: { id: string }) => d.id === 'only-in-the-file');
+    }),
+  ).toBe(false);
+
+  // Cancelling leaves it that way; confirming performs the merge.
+  await page.locator('#impCancel').click();
+  await expect(page.locator('.plan')).toHaveCount(0);
+
+  const confirmChooser = page.waitForEvent('filechooser');
+  await page.locator('#impGo').click();
+  await (await confirmChooser).setFiles({
+    name: 'plan.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(built),
+  });
+  await page.locator('#impConfirm').click();
+  await expect(page.locator('.plan')).toHaveCount(0);
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+  await expect(page.locator('.tbl tbody tr', { hasText: 'Only in the file' })).toHaveCount(1);
+
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="sync"]').click();
+
   // Import the same project back, with one source deduped by DOI: the snapshot
   // carries a second copy of a DOI the project already has under another id.
   const report = await page.evaluate(async () => {

@@ -38,6 +38,7 @@ import {
   assertSnapshotData,
   buildSnapshot,
   mergeSnapshot,
+  previewMerge,
   type SnapshotData,
 } from './usecases/snapshot';
 import { openSnapshot, sealSnapshot } from './snapshot/envelope';
@@ -328,6 +329,11 @@ export async function handleRequest(
         const payload = await openSnapshot(request.content, request.password ?? '');
         assertSnapshotData(payload);
         return ok(await mergeSnapshot(repos, capture, payload as SnapshotData)) as Result;
+      }
+      case 'snapshot/preview': {
+        const payload = await openSnapshot(request.content, request.password ?? '');
+        assertSnapshotData(payload);
+        return ok(await previewMerge(repos, payload as SnapshotData)) as Result;
       }
       default: {
         // Exhaustiveness guard: `request` should be `never` here.

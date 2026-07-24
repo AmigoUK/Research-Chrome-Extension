@@ -159,4 +159,4 @@ Merge rules on import:
 | Activity | Events are immutable, so a known id is simply already here. |
 | Citation styles, files | Added when absent, never overwritten. |
 
-Nothing is ever deleted by an import, and the merge records a `sync` activity event.
+Nothing is ever deleted by an import, and the merge records a `sync` activity event. Since **v0.20.0** the same plan is computable without applying it (`previewMerge`), so the UI can show what an import would change first; preview and import share one code path so they cannot disagree.

@@ -3,7 +3,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
-import { buildSnapshot, mergeSnapshot, type SnapshotData } from '../../src/core/usecases/snapshot';
+import {
+  buildSnapshot,
+  mergeSnapshot,
+  previewMerge,
+  type SnapshotData,
+} from '../../src/core/usecases/snapshot';
 import { listActivity } from '../../src/core/usecases/activity';
 import { startThread } from '../../src/core/usecases/comments';
 import type { CaptureDeps } from '../../src/core/usecases/capture';
@@ -223,6 +228,51 @@ describe('merge rules', () => {
 
     const merged = await target.projects.get('p1');
     expect(merged?.members.map((m) => m.userId).sort()).toEqual(['me', 'u2']);
+  });
+
+  it('previews a merge without writing anything', async () => {
+    const data = await buildSnapshot(repos, 'p1');
+    const target = await otherMachine();
+
+    const preview = await previewMerge(target, data);
+    expect(preview).toMatchObject({ newProject: true, documents: 1, annotations: 1, references: 1 });
+
+    // Nothing landed — a preview that wrote would be a lie.
+    expect(await target.projects.list()).toHaveLength(0);
+    expect(await target.documents.listByProject('p1')).toHaveLength(0);
+    expect(await target.activity.listByProject('p1')).toHaveLength(0);
+  });
+
+  it('promises exactly what the import then does', async () => {
+    await repos.documents.put(makeDocument({ id: 'd2', metadata: { title: 'Second' } }));
+    const data = await buildSnapshot(repos, 'p1');
+
+    const target = await otherMachine();
+    await target.projects.put(project);
+    await target.documents.put(makeDocument({ id: 'local-doc' }));
+
+    const preview = await previewMerge(target, data);
+    const actual = await mergeSnapshot(target, deps, data);
+
+    expect(actual).toEqual(preview);
+  });
+
+  it('marks a project the machine already has as a merge, not a creation', async () => {
+    const data = await buildSnapshot(repos, 'p1');
+    const target = await otherMachine();
+    await target.projects.put(project);
+
+    expect((await previewMerge(target, data)).newProject).toBe(false);
+  });
+
+  it('shows an all-zero plan for a snapshot that is already here', async () => {
+    const data = await buildSnapshot(repos, 'p1');
+    const target = await otherMachine();
+    await mergeSnapshot(target, deps, data);
+
+    const preview = await previewMerge(target, data);
+    expect(preview).toMatchObject({ documents: 0, annotations: 0, references: 0, newProject: false });
+    expect(preview.skippedOlder).toBeGreaterThan(0);
   });
 
   it('records the import as a sync event', async () => {

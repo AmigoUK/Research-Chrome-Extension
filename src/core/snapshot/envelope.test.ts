@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   SNAPSHOT_FORMAT,
   isEncryptedSnapshot,
@@ -6,6 +6,11 @@ import {
   sealSnapshot,
   snapshotMeta,
 } from './envelope';
+
+// These tests exercise the shipped KDF parameters — 600k PBKDF2 iterations are
+// deliberately slow, and six derivations under a loaded parallel run go past
+// the 5s default. Weakening the parameters for the test would test nothing.
+vi.setConfig({ testTimeout: 30_000 });
 
 const META = { projectName: 'Urban Heat', exportedAt: '2026-07-24T12:00:00.000Z' };
 const PAYLOAD = { project: { id: 'p1', name: 'Urban Heat' }, documents: [{ id: 'd1' }] };

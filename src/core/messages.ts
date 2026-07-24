@@ -90,6 +90,8 @@ export interface MessageMap {
     res: { filename: string; content: string; bytes: number };
   };
   'snapshot/import': { req: { content: string; password?: string }; res: MergeReport };
+  /** What an import would do, without doing it. */
+  'snapshot/preview': { req: { content: string; password?: string }; res: MergeReport };
   /** CSL styles imported from a file, usable as base styles. */
   'baseStyles/list': { req: Record<never, never>; res: BaseStyleSummary[] };
   'baseStyles/import': { req: { xml: string; name?: string }; res: BaseStyleSummary };

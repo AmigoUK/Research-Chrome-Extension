@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Polish, one item at a time; see `doc/STATUS.md` for the list._
 
+## [0.20.0] — 2026-07-24
+
+### Added
+
+- **Snapshot imports say what they will do before they do it.** Choosing a file no longer merges it:
+  the snapshot is read, planned against what is already here, and the plan shown — how many sources,
+  notes, references and threads would arrive, how many records would be folded into what you already
+  have **by DOI**, and how many would be skipped because your copy is newer. Import or Cancel.
+  A snapshot that changes nothing says so, and the Import button is disabled.
+  - `planMerge` now works the merge out without performing it, and `mergeSnapshot` applies the plan
+    it produces. Preview and import share the one code path deliberately: a preview that could
+    disagree with the import would be worse than no preview at all — a test asserts they are equal.
+  - New message `snapshot/preview`; `MergeReport` gained `newProject`, so the panel can say
+    *Create* rather than *Merge into* when the project is new to this browser.
+
+### Fixed
+
+- The snapshot-encryption tests no longer flake under a loaded parallel run: 600k PBKDF2 iterations
+  are deliberately slow and six derivations went past Vitest's 5s default. The timeout was raised
+  rather than the iteration count lowered — weakening the parameters would have tested nothing.
+
+### Notes
+
+- 226 unit tests (up from 222) + 20 E2E; the new E2E previews a real file through the browser's file
+  chooser, proves nothing was written, cancels, then imports for real and finds the new source.
+- "Remember the last export folder" is dropped from the polish list: Chrome owns the download
+  location, and the `downloads` permission would buy a preference that MV3 does not honour anyway.
+
 ## [0.19.0] — 2026-07-24
 
 ### Added
@@ -586,7 +614,8 @@ _Polish, one item at a time; see `doc/STATUS.md` for the list._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...v0.18.0

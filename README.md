@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.19.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.20.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -18,7 +18,7 @@ citation-style editor, and local-first collaboration.
 | **Citations** | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere. |
 | **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. Import a journal's own `.csl` file as a base style, or export the compiled one. |
 | **Team** | Members & roles with a capability matrix, an activity feed with before→after diffs, and anchored comment threads with reply / resolve. |
-| **Sync** | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. |
+| **Sync** | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. An import shows exactly what it would change before it writes anything. |
 
 **Local-first, no backend.** Everything lives in this browser's IndexedDB. Roles are therefore
 **advisory** — every collaborator holds a full copy of the project, so nothing can enforce a role,
@@ -75,7 +75,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Testing
 
-222 unit tests (Vitest, `fake-indexeddb`) and 20 end-to-end tests that load the built extension into
+226 unit tests (Vitest, `fake-indexeddb`) and 20 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 

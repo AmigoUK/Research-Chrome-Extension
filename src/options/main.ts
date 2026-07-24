@@ -40,6 +40,7 @@ import {
 import { overrideObject } from '../core/citation/compile';
 import { isCustomBaseStyleId } from '../core/citation/parse';
 import type { BaseStyleSummary } from '../core/usecases/base-styles';
+import type { MergeReport } from '../core/usecases/snapshot';
 import {
   CAPABILITIES,
   CAPABILITY_LABELS,
@@ -182,6 +183,8 @@ interface DashState {
   selectedStyleId: Id | null;
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
+  /** A snapshot chosen for import, held until the user confirms the plan. */
+  pendingImport: { filename: string; content: string; password: string; report: MergeReport } | null;
   /** Tab within the Team view. */
   teamTab: 'activity' | 'comments' | 'members' | 'sync';
   activityFilter: ActivityKind | 'all';
@@ -206,6 +209,7 @@ const state: DashState = {
   annoFilter: { search: '', status: 'all' },
   selectedStyleId: null,
   editorTab: 'preview',
+  pendingImport: null,
   teamTab: 'activity',
   activityFilter: 'all',
   activityLimit: DEFAULT_ACTIVITY_LIMIT,
@@ -2103,6 +2107,7 @@ function renderSyncTab(body: HTMLElement): void {
           aria-label="Password for the snapshot being imported" style="width:220px">
         <button class="btn btn--sm" id="impGo">${ICON.up} Choose a file…</button>
       </div>
+      ${state.pendingImport ? importPlanHtml(state.pendingImport) : ''}
     </div>`;
 
   $$('[data-mode]', body).forEach((b) => {
@@ -2113,6 +2118,10 @@ function renderSyncTab(body: HTMLElement): void {
   });
   $('#expGo', body).onclick = () => void exportSnapshot();
   $('#impGo', body).onclick = () => pickSnapshotFile();
+  if (state.pendingImport) {
+    $('#impConfirm', body).onclick = () => void confirmImport();
+    $('#impCancel', body).onclick = () => cancelImport();
+  }
 }
 
 async function setSyncMode(mode: SyncMode): Promise<void> {
@@ -2165,27 +2174,89 @@ function pickSnapshotFile(): void {
   input.click();
 }
 
+/**
+ * Choosing a file does not import it: the snapshot is read, planned against
+ * what is already here, and the plan shown. A merge is hard to undo, so the
+ * user sees the numbers before anything is written.
+ */
 async function importSnapshot(file: File | undefined): Promise<void> {
   if (!file) return;
   const password = $<HTMLInputElement>('#impPass')?.value ?? '';
   try {
+    const content = await file.text();
+    const report = await sendRequest({ type: 'snapshot/preview', content, password });
+    state.pendingImport = { filename: file.name, content, password, report };
+    render();
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t read that snapshot', ICON.warn, true);
+  }
+}
+
+async function confirmImport(): Promise<void> {
+  const pending = state.pendingImport;
+  if (!pending) return;
+  try {
     const report = await sendRequest({
       type: 'snapshot/import',
-      content: await file.text(),
-      password,
+      content: pending.content,
+      password: pending.password,
     });
-    const merged =
-      report.documents + report.annotations + report.references + report.commentThreads;
+    state.pendingImport = null;
     await loadProjectData();
     render();
+    const merged =
+      report.documents + report.annotations + report.references + report.commentThreads;
     toast(
-      `Imported ${esc(report.projectName)} · ${merged} records` +
+      `Imported ${report.projectName} · ${merged} records` +
         (report.dedupedByDoi > 0 ? ` · ${report.dedupedByDoi} deduped by DOI` : ''),
       ICON.check,
     );
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t import the snapshot', ICON.warn, true);
   }
+}
+
+function cancelImport(): void {
+  state.pendingImport = null;
+  render();
+}
+
+/** The plan, in words. Zero rows are dropped — they are noise, not information. */
+function importPlanHtml(pending: NonNullable<DashState['pendingImport']>): string {
+  const r = pending.report;
+  const rows: Array<[string, number]> = [
+    ['Sources', r.documents],
+    ['Annotations', r.annotations],
+    ['References', r.references],
+    ['Comment threads', r.commentThreads],
+    ['Citation styles', r.citationStyles],
+    ['People', r.users],
+    ['History events', r.activity],
+    ['PDF files', r.files],
+  ];
+  const written = rows.filter(([, n]) => n > 0);
+  const nothing = written.length === 0 && r.dedupedByDoi === 0 && r.skippedOlder === 0;
+
+  return `<div class="plan">
+    <div class="plan-h">
+      <b>${r.newProject ? 'Create' : 'Merge into'} ${esc(r.projectName)}</b>
+      <span class="plan-file">${esc(pending.filename)}</span>
+    </div>
+    ${
+      nothing
+        ? `<p class="panel-note">Everything in this snapshot is already here — importing it would change nothing.</p>`
+        : `<ul class="plan-list">
+            ${written.map(([label, n]) => `<li><span class="n">+${n}</span> ${esc(label)}</li>`).join('')}
+            ${r.dedupedByDoi > 0 ? `<li class="muted"><span class="n">${r.dedupedByDoi}</span> folded into records already here, by DOI</li>` : ''}
+            ${r.skippedOlder > 0 ? `<li class="muted"><span class="n">${r.skippedOlder}</span> skipped — your copy is newer</li>` : ''}
+          </ul>
+          <p class="panel-note">Nothing is deleted by an import.</p>`
+    }
+    <div class="row">
+      <button class="btn btn--primary btn--sm" id="impConfirm"${nothing ? ' disabled' : ''}>${ICON.check} Import</button>
+      <button class="btn btn--ghost btn--sm" id="impCancel">Cancel</button>
+    </div>
+  </div>`;
 }
 
 /* ---- Team: comment threads (Phase 5, M3) ---- */
