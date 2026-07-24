@@ -109,6 +109,7 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 .ac-top { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
 .loc { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .03em; color: var(--accent); border: 1px solid oklch(82% .08 28); border-radius: 5px; padding: 3px 7px; cursor: pointer; background: none; }
 .loc:hover { background: var(--accent-soft); }
+.loc svg { width: 12px; height: 12px; flex: 0 0 auto; }
 .loc .k { color: var(--muted); }
 .ac-kind { margin-left: auto; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .quote { font-size: 11px; color: var(--muted); font-style: italic; border-left: 2px solid var(--border); padding-left: 10px; margin-bottom: 10px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }

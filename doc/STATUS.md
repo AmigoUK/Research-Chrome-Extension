@@ -9,7 +9,7 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.21.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
+- **Branch state:** everything through **v0.21.1 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).

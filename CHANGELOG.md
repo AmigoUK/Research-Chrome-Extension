@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _The polish list is done. See `doc/STATUS.md`._
 
+## [0.21.1] — 2026-07-24
+
+### Fixed
+
+Three icon-sizing defects, found by screenshotting every view rather than by a test — none of them
+is something an assertion would have caught:
+
+- **Documents**: the "open source" DOI link rendered its arrow at ~60px, four times the row height.
+  An inline SVG with no size rule takes its intrinsic size, and `.btn svg` did not reach a bare `<a>`.
+- **Style editor**: the ✕ that forgets an imported base style showed even when the base style was a
+  vendored one. `.btn` sets `display`, which overrides the `hidden` attribute — `[hidden]` is now
+  enforced globally, so the whole class of bug is closed rather than this one instance.
+- **PDF reader**: the annotation card's anchor chip rendered its pencil at ~40px, pushing the label
+  out of the chip.
+
 ## [0.21.0] — 2026-07-24
 
 ### Added
@@ -651,7 +666,8 @@ _The polish list is done. See `doc/STATUS.md`._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...v0.19.0

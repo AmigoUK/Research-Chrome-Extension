@@ -22,6 +22,9 @@
   --nav-w: 236px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
+/* `hidden` must win over the layout rules below — `.btn` sets `display`, which
+   would otherwise keep a hidden button on screen. */
+[hidden] { display: none !important; }
 a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @keyframes rowIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -152,6 +155,9 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 .tbl .sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; }
 .mono { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0; color: var(--muted); }
 .tbl a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; } .tbl a:hover { border-color: var(--accent); }
+/* An inline SVG with no size rule renders at its intrinsic size — which for a
+   24-unit viewBox in a table cell meant a 60px arrow. */
+.tbl a svg { width: 15px; height: 15px; vertical-align: middle; }
 .num { text-align: right; font-family: var(--font-mono); font-size: 12px; }
 
 /* status pill */

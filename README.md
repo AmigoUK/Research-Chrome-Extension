@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.21.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.21.1**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
