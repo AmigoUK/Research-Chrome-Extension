@@ -13,7 +13,10 @@ import {
 vi.setConfig({ testTimeout: 30_000 });
 
 const META = { projectName: 'Urban Heat', exportedAt: '2026-07-24T12:00:00.000Z' };
-const PAYLOAD = { project: { id: 'p1', name: 'Urban Heat' }, documents: [{ id: 'd1' }] };
+const PAYLOAD = {
+  project: { id: 'p1', name: 'Urban Heat' },
+  documents: [{ id: 'd1', url: 'https://example.org/d1' }],
+};
 
 describe('plain snapshots', () => {
   it('writes readable JSON when there is no password', async () => {
@@ -34,7 +37,11 @@ describe('encrypted snapshots', () => {
     const text = await sealSnapshot(PAYLOAD, META, 'correct horse');
 
     expect(isEncryptedSnapshot(text)).toBe(true);
-    expect(text).not.toContain('d1');
+    // A payload string that cannot occur in base64 — it has dots and a slash.
+    // A two-character id like `d1` turns up in random ciphertext often enough
+    // to fail about one run in three, which is how CI caught this.
+    expect(text).not.toContain('example.org');
+    expect(JSON.parse(text)).not.toHaveProperty('payload');
     expect(await openSnapshot(text, 'correct horse')).toEqual(PAYLOAD);
   });
 
