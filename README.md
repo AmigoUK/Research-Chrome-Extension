@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.21.1**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.22.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -128,8 +128,9 @@ Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mod
 - **Storage:** IndexedDB with a versioned schema and append-only migrations (currently **v5**:
   projects, documents, annotations, references, citation styles, users, files, activity, comment
   threads, imported base styles).
-- **Snapshots:** `src/core/snapshot/envelope.ts` (WebCrypto AES-GCM + PBKDF2, 600k iterations) and
-  `src/core/usecases/snapshot.ts` (build / merge, hard DOI dedup, newest record wins).
+- **Snapshots:** `src/core/snapshot/envelope.ts` (WebCrypto AES-GCM + PBKDF2, 600k iterations),
+  `src/core/snapshot/validate.ts` (the import boundary — an imported file is somebody else's data)
+  and `src/core/usecases/snapshot.ts` (build / merge, hard DOI dedup, newest record wins).
 - **Messaging:** one typed contract (`src/core/messages.ts`) shared by every surface, routed by a
   pure `handleRequest`. Domain changes are recorded to the activity feed **there**, so a change made
   in the side panel or the PDF reader shows up without either surface knowing the feed exists.
@@ -154,7 +155,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Testing
 
-226 unit tests (Vitest, `fake-indexeddb`) and 21 end-to-end tests that load the built extension into
+240 unit tests (Vitest, `fake-indexeddb`) and 22 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 

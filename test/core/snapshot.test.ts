@@ -288,10 +288,10 @@ describe('merge rules', () => {
     const target = await otherMachine();
     await expect(
       mergeSnapshot(target, deps, { documents: [] } as unknown as SnapshotData),
-    ).rejects.toThrow(/no project in it/);
+    ).rejects.toThrow(/the project is not a record/);
     await expect(
       mergeSnapshot(target, deps, { project, documents: 'nope' } as unknown as SnapshotData),
-    ).rejects.toThrow(/documents is not a list/);
+    ).rejects.toThrow(/the document list is not a list/);
     expect(await target.projects.list()).toHaveLength(0);
   });
 });

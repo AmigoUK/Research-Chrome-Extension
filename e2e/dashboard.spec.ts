@@ -634,6 +634,54 @@ test('Style editor imports a third-party .csl and formats the preview through it
   await page.close();
 });
 
+test('a hostile snapshot is refused, and nothing it carried reaches the page', async () => {
+  const page = await context.newPage();
+  const requested: string[] = [];
+  page.on('request', (r) => requested.push(r.url()));
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // A snapshot such as a collaborator might send. The id is the payload: it
+  // closes the `data-id` attribute and opens an element of the attacker's
+  // choosing, which then calls home.
+  const outcome = await page.evaluate(async () => {
+    const send = (m: unknown): Promise<{ ok: boolean; data?: unknown; error?: string }> =>
+      chrome.runtime.sendMessage(m);
+    const projects = await send({ type: 'projects/list' });
+    const projectId = (projects.data as Array<{ id: string }>)[0]!.id;
+    const exported = await send({ type: 'snapshot/export', projectId });
+    const envelope = JSON.parse((exported.data as { content: string }).content);
+    const now = new Date().toISOString();
+    envelope.payload.documents.push({
+      id: 'x"><img src="https://example.invalid/beacon.png" id="pwned"><b data-z="',
+      projectId,
+      url: 'https://example.org/x',
+      type: 'article',
+      metadata: { title: 'Looks like an ordinary source' },
+      status: 'toRead',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const preview = await send({ type: 'snapshot/preview', content: JSON.stringify(envelope) });
+    const imported = await send({ type: 'snapshot/import', content: JSON.stringify(envelope) });
+    return { preview, imported };
+  });
+
+  // Both halves fail closed, and the message names what is wrong.
+  expect(outcome.preview.ok).toBe(false);
+  expect(outcome.imported.ok).toBe(false);
+  expect(outcome.imported.error).toMatch(/is not a usable id/);
+
+  // Nothing was written, nothing was injected, and the page called nobody.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+  await expect(page.locator('#pwned')).toHaveCount(0);
+  await expect(page.locator('.tbl tbody tr', { hasText: 'Looks like an ordinary source' })).toHaveCount(0);
+  expect(requested.filter((u) => u.includes('example.invalid'))).toEqual([]);
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

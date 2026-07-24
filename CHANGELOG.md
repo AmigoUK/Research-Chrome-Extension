@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _The polish list is done. See `doc/STATUS.md`._
 
+## [0.22.0] — 2026-07-24
+
+### Security
+
+- **A crafted snapshot could inject HTML into the extension's own pages.** Record ids arrived from an
+  imported file unvalidated and were interpolated raw into `data-id` attributes, so an id such as
+  `x"><img src="https://…">` closed the attribute and opened an element of the sender's choosing.
+  Reproduced before the fix: the element rendered and **the page fetched a remote image**, which for
+  a tool whose promise is that nothing leaves the machine is the whole problem. MV3's CSP did block
+  script — an inline handler was refused with `script-src 'self'` — so this was HTML injection with
+  phishing and beacon potential, not arbitrary code execution. Snapshots are made to be shared
+  between collaborators, so the input was always going to be someone else's.
+
+  Closed at both ends:
+  - **The import boundary** (`src/core/snapshot/validate.ts`, new) validates and normalises every
+    record before a write is planned: ids must match `/^[\w.:@+-]{1,128}$/`, statuses, roles and
+    activity kinds must be in their enums, file contents must be base64, and dates are normalised to
+    UTC. Import fails closed and names what is wrong — a snapshot that cannot be trusted in part
+    cannot be trusted in whole. `planMerge` validates too, so no caller can route around it.
+  - **The sinks**: every id interpolated into an attribute is escaped, and the three places that
+    build a `querySelector` from an id use `CSS.escape`. Escaping alone would not have been enough —
+    no amount of HTML-escaping makes `[data-id="x\"><img>"]` a valid selector.
+
+### Fixed
+
+- **An imported timestamp with an offset could make an older record win the merge.** `isNewer`
+  compares ISO strings lexicographically, so `12:00+02:00` (10:00Z) sorted *after* `11:00Z`. Imported
+  dates are now normalised to UTC at the boundary.
+- **A status outside the pipeline silently hid a source.** The Kanban renders known statuses only, so
+  an imported `status: "archived"` removed the source from every column. Such a file is now refused.
+
+### Notes
+
+- 240 unit tests (up from 226) + 22 E2E. The new E2E is the reproduction itself: it imports the
+  hostile snapshot, asserts both preview and import fail closed, and then asserts the injected
+  element is absent **and that the page made no request to the attacker's host**.
+- Found by a full-codebase audit, not by a user report. The side panel was never affected — it builds
+  its DOM through `dataset` and `textContent`, which is the pattern the other surfaces should follow.
+
 ## [0.21.1] — 2026-07-24
 
 ### Fixed
@@ -666,7 +705,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...v0.20.0

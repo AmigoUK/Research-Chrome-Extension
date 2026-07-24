@@ -389,7 +389,9 @@ async function commitAnchor(withNote: boolean): Promise<void> {
   toast(quote ? 'Highlight anchored' : 'Region anchored');
   if (withNote) {
     $('#rail').classList.add('open');
-    document.querySelector<HTMLTextAreaElement>(`.ac[data-id="${annotation.id}"] .note-ta`)?.focus();
+    document.querySelector<HTMLTextAreaElement>(
+      `.ac[data-id="${CSS.escape(annotation.id)}"] .note-ta`,
+    )?.focus();
   }
 }
 
@@ -432,7 +434,7 @@ function renderRail(): void {
   }
   list.innerHTML = hint + rows.map(railCard).join('');
   rows.forEach((a) => {
-    const card = document.querySelector<HTMLElement>(`.ac[data-id="${a.id}"]`);
+    const card = document.querySelector<HTMLElement>(`.ac[data-id="${CSS.escape(a.id)}"]`);
     if (!card) return;
     card.querySelector('.loc')?.addEventListener('click', () => void focusAnnotation(a.id));
     const ta = card.querySelector<HTMLTextAreaElement>('.note-ta');
@@ -449,7 +451,7 @@ function railCard(a: Annotation): string {
   const region = pdf ? isRegionAnchor(pdf) : false;
   const quote = pdf ? anchorQuote(pdf) : undefined;
   const loc = region ? `p.${page} · Region` : `p.${page} · ¶ text`;
-  return `<article class="ac${state.activeId === a.id ? ' active' : ''}" data-id="${a.id}">
+  return `<article class="ac${state.activeId === a.id ? ' active' : ''}" data-id="${esc(a.id)}">
     <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button><span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
     ${quote ? `<div class="quote">${esc(quote)}</div>` : ''}
     <textarea class="note-ta" data-note placeholder="Add a note…">${esc(a.content)}</textarea>

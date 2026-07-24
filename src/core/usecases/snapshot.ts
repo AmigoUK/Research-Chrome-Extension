@@ -28,6 +28,7 @@ import type {
 import { bytesToBase64, base64ToBytes } from '../files/base64';
 import type { CaptureDeps } from './capture';
 import { recordActivity } from './activity';
+import { validateSnapshotData } from '../snapshot/validate';
 
 /** A stored file, JSON-safe. Same shape the messaging layer already uses. */
 export interface SnapshotFile {
@@ -129,25 +130,13 @@ export async function buildSnapshot(
   return data;
 }
 
-/** Shape check — an import must not half-apply a file that is not a snapshot. */
-export function assertSnapshotData(value: unknown): asserts value is SnapshotData {
-  const data = value as Partial<SnapshotData> | null;
-  if (!data || typeof data !== 'object' || !data.project || typeof data.project.id !== 'string') {
-    throw new Error('That snapshot has no project in it');
-  }
-  for (const key of [
-    'documents',
-    'annotations',
-    'references',
-    'citationStyles',
-    'users',
-    'activity',
-    'commentThreads',
-  ] as const) {
-    if (data[key] !== undefined && !Array.isArray(data[key])) {
-      throw new Error(`That snapshot is malformed: ${key} is not a list`);
-    }
-  }
+/**
+ * The import boundary. Everything a snapshot carries is somebody else's data,
+ * so it is validated and normalised before a write is even planned — see
+ * `src/core/snapshot/validate.ts` for what that costs and why.
+ */
+export function readSnapshotData(value: unknown): SnapshotData {
+  return validateSnapshotData(value);
 }
 
 /** Newer of the two wins; equal timestamps keep what is already stored. */
@@ -165,8 +154,10 @@ export interface MergePlan {
   apply(): Promise<void>;
 }
 
-export async function planMerge(repos: RepositorySet, data: SnapshotData): Promise<MergePlan> {
-  assertSnapshotData(data);
+export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promise<MergePlan> {
+  // Validated here as well as at the router, so no caller can reach the writes
+  // with unchecked data. It is a pure function over an already-parsed object.
+  const data = validateSnapshotData(raw);
   const writes: Array<() => Promise<void>> = [];
   const report: MergeReport = {
     projectName: data.project.name,

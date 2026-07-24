@@ -402,7 +402,7 @@ function renderProjSwitch(): void {
       .map(
         (
           pr,
-        ) => `<button class="pmi${pr.id === state.activeProjectId ? ' active' : ''}" role="menuitem" data-p="${pr.id}">
+        ) => `<button class="pmi${pr.id === state.activeProjectId ? ' active' : ''}" role="menuitem" data-p="${esc(pr.id)}">
         <span class="dot"></span><span class="nm">${esc(pr.name)}</span></button>`,
       )
       .join('') +
@@ -516,7 +516,7 @@ function kanbanCard(d: Document): string {
   const label = statusLabel(d.status);
   const title = d.metadata.title ?? d.url;
   const notes = notesFor(d.id);
-  return `<article class="kcard${state.flash === d.id ? ' flash' : ''}" draggable="true" data-id="${d.id}" tabindex="0" role="listitem" aria-label="${esc(title)} — ${label}. Arrow keys move between stages, Enter to change status.">
+  return `<article class="kcard${state.flash === d.id ? ' flash' : ''}" draggable="true" data-id="${esc(d.id)}" tabindex="0" role="listitem" aria-label="${esc(title)} — ${label}. Arrow keys move between stages, Enter to change status.">
     <div class="kt">${esc(title)}</div>
     <div class="km">${esc(authorLabel(d.metadata.authors))}${d.metadata.year ? ` · ${d.metadata.year}` : ''}</div>
     <div class="kf">
@@ -599,7 +599,7 @@ async function setStatus(doc: Document, ns: DocumentStatus, refocusId?: Id): Pro
   render();
   if (refocusId) {
     requestAnimationFrame(() => {
-      $<HTMLElement>(`#kanban .kcard[data-id="${refocusId}"]`)?.focus();
+      $<HTMLElement>(`#kanban .kcard[data-id="${CSS.escape(refocusId)}"]`)?.focus();
     });
   }
   setTimeout(() => {
@@ -722,7 +722,7 @@ function drawDocuments(): void {
       const m = d.metadata;
       const sub = [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ');
       const notes = notesFor(d.id);
-      return `<tr data-id="${d.id}">
+      return `<tr data-id="${esc(d.id)}">
         <td><div class="ttl">${esc(m.title ?? d.url)}</div><div class="sub">${esc(sub)}</div></td>
         <td>${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : '<span class="mono">—</span>'}</td>
         <td><button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${statusLabel(d.status)}</button></td>
@@ -955,14 +955,14 @@ function drawAnnotations(): void {
         ? [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ')
         : '';
       const st = ANNO_STATUS[a.status];
-      return `<article class="anno" data-id="${a.id}">
+      return `<article class="anno" data-id="${esc(a.id)}">
         <div class="anno-top"><span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
         <div class="anno-body">${esc(a.content)}</div>
         <div class="anno-foot">
           <button class="stat-tag ${st.cls}" data-status aria-label="Change review status">${st.label}</button>
           ${a.tags.map((t) => `<span class="chip">#${esc(t)}</span>`).join('')}
-          <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-discuss="${a.id}">${ICON.note} Discuss</button>
-          <button class="btn btn--ghost btn--sm" data-cite="${a.documentId}">${ICON.copy} Cite</button>
+          <button class="btn btn--ghost btn--sm" style="margin-left:auto" data-discuss="${esc(a.id)}">${ICON.note} Discuss</button>
+          <button class="btn btn--ghost btn--sm" data-cite="${esc(a.documentId)}">${ICON.copy} Cite</button>
         </div></article>`;
     })
     .join('');
@@ -1120,12 +1120,12 @@ function renderReferences(view: HTMLElement, actions: HTMLElement): void {
       const used = ref.usedInOutputs.length
         ? ref.usedInOutputs.map((u) => `<span class="chip">${esc(u)}</span>`).join(' ')
         : '<span class="mono">—</span>';
-      return `<tr data-id="${ref.id}">
+      return `<tr data-id="${esc(ref.id)}">
         <td><div class="ttl">${esc(line.title)}</div><div class="sub">${esc(line.sub)}</div>${line.doi ? `<div class="mono" style="margin-top:4px">doi:${esc(line.doi)}</div>` : ''}</td>
         <td><span class="chip chip--sec">${esc(cslTypeLabel(csl.type))}</span></td>
         <td><span class="stat-tag">${SOURCE_LABEL[ref.source]}</span></td>
         <td>${used}</td>
-        <td><button class="btn btn--ghost btn--sm" data-cite="${ref.id}" aria-label="Copy citation">${ICON.copy}</button></td>
+        <td><button class="btn btn--ghost btn--sm" data-cite="${esc(ref.id)}" aria-label="Copy citation">${ICON.copy}</button></td>
       </tr>`;
     })
     .join('')}</tbody></table>`;
@@ -1301,7 +1301,7 @@ function drawStyleList(): void {
     .map(
       (
         s,
-      ) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${s.id}">
+      ) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${esc(s.id)}">
       <div class="snm">${esc(s.name)}</div>
       <div class="sb">${systemLabel(systemOfBase(s.baseStyleId))} · base ${esc(baseLabel(s.baseStyleId))}</div>
     </button>`,
@@ -1611,11 +1611,11 @@ function drawEditorProfiles(): void {
       const info = baseStyleInfo(s.baseStyleId);
       const baseShort = info?.label ?? baseLabel(s.baseStyleId);
       return `<div class="sed-pcard${s.id === state.selectedStyleId ? ' sel' : ''}">
-        <button class="sed-pc-main" data-s="${s.id}">
+        <button class="sed-pc-main" data-s="${esc(s.id)}">
           <div class="pn">${esc(s.name)}</div>
           <div class="pb"><span class="dot"></span>${esc(systemLabel(systemOfBase(s.baseStyleId)))} · ${esc(baseShort.split(' ')[0] ?? '')}</div>
         </button>
-        <button class="sed-pc-del" data-del="${s.id}" aria-label="Delete ${esc(s.name)}" title="Delete profile">×</button>
+        <button class="sed-pc-del" data-del="${esc(s.id)}" aria-label="Delete ${esc(s.name)}" title="Delete profile">×</button>
       </div>`;
     })
     .join('');
@@ -2336,7 +2336,7 @@ async function reloadDiscussion(): Promise<void> {
 }
 
 async function postReply(threadId: Id): Promise<void> {
-  const input = $<HTMLInputElement>(`[data-reply="${threadId}"]`);
+  const input = $<HTMLInputElement>(`[data-reply="${CSS.escape(threadId)}"]`);
   const body = input?.value.trim() ?? '';
   if (!body) return;
   try {
@@ -2344,7 +2344,7 @@ async function postReply(threadId: Id): Promise<void> {
     await reloadDiscussion();
     render();
     // The re-render replaced the input, so focus the new one.
-    $<HTMLInputElement>(`[data-reply="${threadId}"]`)?.focus();
+    $<HTMLInputElement>(`[data-reply="${CSS.escape(threadId)}"]`)?.focus();
     toast('Comment posted', ICON.check);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t post the comment', ICON.warn, true);

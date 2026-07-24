@@ -35,11 +35,10 @@ import {
   startThread,
 } from './usecases/comments';
 import {
-  assertSnapshotData,
   buildSnapshot,
   mergeSnapshot,
   previewMerge,
-  type SnapshotData,
+  readSnapshotData,
 } from './usecases/snapshot';
 import { openSnapshot, sealSnapshot } from './snapshot/envelope';
 import {
@@ -327,13 +326,11 @@ export async function handleRequest(
         return ok(null) as Result;
       case 'snapshot/import': {
         const payload = await openSnapshot(request.content, request.password ?? '');
-        assertSnapshotData(payload);
-        return ok(await mergeSnapshot(repos, capture, payload as SnapshotData)) as Result;
+        return ok(await mergeSnapshot(repos, capture, readSnapshotData(payload))) as Result;
       }
       case 'snapshot/preview': {
         const payload = await openSnapshot(request.content, request.password ?? '');
-        assertSnapshotData(payload);
-        return ok(await previewMerge(repos, payload as SnapshotData)) as Result;
+        return ok(await previewMerge(repos, readSnapshotData(payload))) as Result;
       }
       default: {
         // Exhaustiveness guard: `request` should be `never` here.
