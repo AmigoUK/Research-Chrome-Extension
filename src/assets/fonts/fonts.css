@@ -1,0 +1,29 @@
+/*
+ * Bundled OFL faces, loaded by every surface.
+ *
+ * The type stacks name licensed faces first — Iowan Old Style and Charter for
+ * display, iA Writer Mono for code — which most machines do not have. These two
+ * are their open relatives, so a machine without the originals gets the design
+ * as drawn rather than whatever generic serif or mono it happens to own:
+ *
+ *   Charis SIL   is derived from Bitstream Charter, the second name in the
+ *                display stack.
+ *   IBM Plex Mono is the face iA Writer Mono itself was derived from.
+ *
+ * Only the subsets a page actually uses are fetched: each @font-face carries a
+ * `unicode-range`, so an English session downloads the latin files and nothing
+ * else, and Polish text in a note pulls latin-ext on demand. MV3 forbids remote
+ * code and these ship inside the extension, so nothing is fetched from a CDN.
+ *
+ * Weights are deliberately few. Charis ships 400 and 700 (the design's 600
+ * headings resolve to 700); Plex Mono ships 400 and 600. Every extra weight is
+ * another file for a difference nobody would notice at these sizes.
+ */
+@import '@fontsource/charis-sil/latin-400.css';
+@import '@fontsource/charis-sil/latin-ext-400.css';
+@import '@fontsource/charis-sil/latin-700.css';
+@import '@fontsource/charis-sil/latin-ext-700.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-400.css';
+@import '@fontsource/ibm-plex-mono/latin-600.css';
+@import '@fontsource/ibm-plex-mono/latin-ext-600.css';

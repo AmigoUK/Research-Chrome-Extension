@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_The audit's findings are all closed. See `doc/STATUS.md`._
+_Nothing yet._
+
+## [0.25.0] — 2026-07-24
+
+### Added
+
+- **Bundled OFL faces, so the design renders as drawn on machines that lack the licensed ones.**
+  The type stacks name Iowan Old Style and Charter for display and iA Writer Mono for code — faces
+  most machines do not have, which left Linux and Windows with whatever generic serif and mono they
+  happened to own. The two open faces chosen are not lookalikes picked by eye, they are relatives:
+  **Charis SIL** is derived from Bitstream Charter (the second name in the display stack) and
+  **IBM Plex Mono** is the face iA Writer Mono was itself derived from.
+  - They sit **after** the licensed names in each stack, so anyone who owns the originals keeps
+    seeing them; everyone else now gets Charter-like rather than Georgia-like.
+  - `latin` **and** `latin-ext` subsets ship, because Polish (ą ę ł ń ś ź ż) lives in Latin
+    Extended-A — a research tool that mangles the user's own notes is not much of a tool. Verified
+    by rendering `Śmiertelność — miejskie wyspy ciepła` in the real extension.
+  - Local only: `@font-face` points at files inside the extension, never a CDN, which MV3 requires
+    anyway.
+
+### Notes
+
+- **Cost, measured rather than guessed:** 236 kB of woff2 in the packaged extension, of which 146 kB
+  is what a dashboard actually loads. Per-weight laziness does work — Charis 400 is never fetched,
+  because the display face is only used at 600/700 — but `latin-ext` is fetched eagerly in practice,
+  so the honest figure is 146 kB, read from disk rather than over the network.
+- Charis ships 400 and 700, so the design's 600 headings resolve to 700; Plex Mono ships 400 and 600.
+  Every extra weight is another file for a difference invisible at these sizes.
+- `THIRD-PARTY-NOTICES.md` and `doc/licenses/` were added: the OFL requires its text to travel with
+  the fonts. The same file now also records the CC BY-SA licence of the vendored CSL styles, which
+  had never been stated anywhere.
 
 ## [0.24.0] — 2026-07-24
 
@@ -766,7 +796,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.1...v0.22.0

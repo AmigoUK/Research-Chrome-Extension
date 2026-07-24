@@ -9,7 +9,7 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.24.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
+- **Branch state:** everything through **v0.25.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
@@ -139,12 +139,10 @@ snapshot cryptography, the last-owner invariant, and `recordActivity` never thro
 
 ## Known follow-ups (not blocking)
 
-1. **OFL web fonts — a decision, not a chore.** The type stacks name macOS faces (Iowan Old Style,
-   Charter, iA Writer Mono) with graceful fallbacks. Bundling OFL substitutes (Source Serif, IBM
-   Plex Mono, …) would give every platform the same rendering — but it would also change the
-   typography for people who already have the real faces. Someone should choose that deliberately;
-   it is not a maintenance task to slip into a release. If it is wanted: add the fonts *after* the
-   named faces in each stack, so only the machines that lack them download anything.
+1. ~~**OFL web fonts**~~ — **done in v0.25.0**, as a decision taken rather than a chore slipped in:
+   Charis SIL (derived from Charter) and IBM Plex Mono (the ancestor of iA Writer Mono) sit after
+   the licensed names in each stack, with `latin` and `latin-ext` subsets so Polish renders. 236 kB
+   packaged, 146 kB loaded, read from disk. Licences travel with them in `THIRD-PARTY-NOTICES.md`.
 2. **DOI import and open-PDF-by-URL** still need a runtime host-permission grant and are not
    exercised in headless CI (both unit-tested and covered by seeded-path E2E).
 

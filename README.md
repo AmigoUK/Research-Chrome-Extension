@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.24.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.25.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -152,6 +152,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 | [`doc/citations.md`](doc/citations.md) | CSL, styles and user rules |
 | [`doc/ui-ux.md`](doc/ui-ux.md) | Surfaces and interaction design |
 | [`CHANGELOG.md`](CHANGELOG.md) | Every release, Keep a Changelog format |
+| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Bundled fonts, CSL styles and their licences |
 
 ## Testing
 
