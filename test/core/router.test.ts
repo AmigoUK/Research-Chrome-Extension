@@ -364,7 +364,11 @@ describe('activity recording (Phase 5, M2)', () => {
       : null;
     // `.enc` in the name is the only clue an encrypted file gives away.
     expect(file?.filename).toMatch(/^urban-heat-\d{4}-\d{2}-\d{2}\.enc\.json$/);
-    expect(file?.content).not.toContain('d1');
+    // A payload string that cannot occur in base64 (it has a dot), unlike a
+    // two-character id, which turns up in random ciphertext often enough to
+    // fail roughly one run in three.
+    expect(file?.content).not.toContain('example.org');
+    expect(JSON.parse(file?.content ?? '{}')).not.toHaveProperty('payload');
 
     const wrong = await handleRequest(
       repos,

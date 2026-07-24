@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the polish list (3 of 5 done)._
+_Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish list complete**._
 
 ## Where we are
 
@@ -9,11 +9,11 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the 
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.20.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
+- **Branch state:** everything through **v0.21.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 226 unit + 20 E2E (5 PDF viewer + 13 dashboard + 2 side panel), all green.
+- **Tests:** 226 unit + 21 E2E (5 PDF viewer + 13 dashboard + 3 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -125,13 +125,14 @@ Surfaces: `src/background` (service worker), `src/sidepanel`, `src/options` (das
 
 ## Known follow-ups (not blocking)
 
-1. **Dev-dep audit** — 5 dependabot alerts, all in dev tooling (`@crxjs` beta transitive deps).
-   `npm audit --omit=dev` = **0 production vulnerabilities**. `audit fix --force` deferred to avoid
-   breaking the build; revisit when @crxjs leaves beta.
-2. **OFL web fonts** — the side panel uses a graceful system-font stack; bundling licensed OFL
-   serif + mono for cross-platform visual fidelity is a small polish task.
-3. **Per-source status control** — the reading list advances status by click-cycling; the
-   prototype's "move to" popover is a nicety for later.
+1. **OFL web fonts — a decision, not a chore.** The type stacks name macOS faces (Iowan Old Style,
+   Charter, iA Writer Mono) with graceful fallbacks. Bundling OFL substitutes (Source Serif, IBM
+   Plex Mono, …) would give every platform the same rendering — but it would also change the
+   typography for people who already have the real faces. Someone should choose that deliberately;
+   it is not a maintenance task to slip into a release. If it is wanted: add the fonts *after* the
+   named faces in each stack, so only the machines that lack them download anything.
+2. **DOI import and open-PDF-by-URL** still need a runtime host-permission grant and are not
+   exercised in headless CI (both unit-tested and covered by seeded-path E2E).
 
 ## Resume plan — next steps
 
@@ -153,7 +154,10 @@ working tree is clean. The strongest candidates, roughly in order of value:
    `downloads` permission would buy a preference MV3 does not honour.
 4. **Presence** (the one Phase 5 goal not delivered) needs a live channel between clients, which a
    file-based mode cannot provide. It arrives only with a backend, and a backend is out of scope.
-5. The standing follow-ups below: dev-dep audit, OFL fonts, per-source status popover.
+5. ~~**Standing follow-ups**~~ — **done in v0.21.0**: dev dependencies audited (6 vulnerabilities →
+   0; they were vitest's vite/esbuild chain, not `@crxjs` as previously recorded) and `@crxjs`
+   moved off beta to 2.7.1; the side panel gained a status menu, so a source can move *back*.
+   **OFL fonts are deliberately not bundled** — see the note below.
 
 **Smaller follow-ons in the citation area:** bundle size (the Chicago notes CSL is 243 kB raw —
 lazy-loading base styles from `web_accessible_resources` would trim the SW), and importing a

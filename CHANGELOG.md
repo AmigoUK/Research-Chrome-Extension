@@ -7,7 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Polish, one item at a time; see `doc/STATUS.md` for the list._
+_The polish list is done. See `doc/STATUS.md`._
+
+## [0.21.0] — 2026-07-24
+
+### Added
+
+- **Pick a status in the side panel instead of cycling it.** The reading list's status button opened
+  nothing and only ever moved a source *forward*, so a mis-click could not be undone from the panel
+  at all — the pipeline runs one way. It now opens a menu of the whole pipeline with the current
+  position marked, and a source can move back.
+
+### Changed
+
+- **Dev dependencies audited and upgraded — 6 vulnerabilities (2 critical, 1 high) to 0.** They were
+  never in `@crxjs` as this file previously claimed: they came from the `vite`/`esbuild` chain that
+  **vitest** pulls in. `vite` 6.0 → 6.4.3, `vitest` and `@vitest/coverage-v8` 2.1 → 3.2.7.
+- **`@crxjs/vite-plugin` 2.0.0-beta.28 → 2.7.1** — it has left beta, which was the stated condition
+  for revisiting it. The built manifest, permissions and web-accessible resources are unchanged, and
+  all 21 E2E tests pass against the new build.
+
+### Fixed
+
+- A test that failed roughly one run in three, and had done since v0.18.0: it asserted an encrypted
+  snapshot did not contain the string `d1`, but a two-character string turns up in random base64
+  often enough to fail by chance. It now checks for a payload string that cannot occur in base64.
+- The status menu no longer vanishes mid-click. It closed on any scroll of the panel body, and a
+  late layout shift fires one — under a loaded test run that snatched the menu away between the
+  locator resolving and the click landing. It now follows its button instead, and closes only when
+  the button scrolls out of view.
+
+### Notes
+
+- 226 unit tests + 21 E2E, all green; each flake above was chased to its cause and fixed at the
+  source rather than papered over in the test.
+- **OFL web fonts stay unbundled.** The stacks name macOS faces (Iowan Old Style, iA Writer Mono)
+  and fall back gracefully; bundling substitutes would change the typography for the people who
+  already have the real ones, to help those who do not. That is a design decision, not a chore, and
+  it is not one to make silently in a maintenance pass.
 
 ## [0.20.0] — 2026-07-24
 
@@ -614,7 +651,8 @@ _Polish, one item at a time; see `doc/STATUS.md` for the list._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...v0.18.1

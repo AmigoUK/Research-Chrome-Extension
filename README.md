@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.20.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.21.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -75,7 +75,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Testing
 
-226 unit tests (Vitest, `fake-indexeddb`) and 20 end-to-end tests that load the built extension into
+226 unit tests (Vitest, `fake-indexeddb`) and 21 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 

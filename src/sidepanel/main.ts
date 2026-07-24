@@ -6,7 +6,7 @@ import './panel.css';
 import { sendRequest } from '../adapters/chrome/messaging';
 import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
-import { nextStatus, type DocumentStatus } from '../core/model/workflow';
+import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import type { Document, Project } from '../core/model/types';
 import type { CaptureInput } from '../core/usecases/capture';
 import {
@@ -176,11 +176,13 @@ function makeDocRow(doc: Document): HTMLElement {
 
   const statusBtn = document.createElement('button');
   statusBtn.className = 'status-btn';
-  statusBtn.title = 'Advance status';
+  statusBtn.title = 'Change status';
+  statusBtn.setAttribute('aria-haspopup', 'menu');
+  statusBtn.dataset.odId = `status-${doc.id}`;
   statusBtn.innerHTML = `<span class="sdot" style="background:${statusColor(doc.status)}"></span>${statusLabel(doc.status)}`;
   statusBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    void advanceStatus(doc);
+    openStatusMenu(statusBtn, doc);
   });
   foot.append(statusBtn);
 
@@ -278,12 +280,78 @@ async function fileCurrentPage(): Promise<void> {
   }
 }
 
-async function advanceStatus(doc: Document): Promise<void> {
-  const updated: Document = { ...doc, status: nextStatus(doc.status), updatedAt: nowIso() };
+/**
+ * Pick a status directly. Click-cycling only ever moved a source forward, so a
+ * mis-click could not be undone from the panel at all — the pipeline runs one
+ * way. The menu is the whole pipeline, current position marked.
+ */
+let statusMenuAnchor: HTMLElement | null = null;
+
+/**
+ * Keep the menu on its button. It is `position: fixed`, so it does not scroll
+ * with the list; repositioning — rather than closing on scroll — matters
+ * because a late layout shift fires a scroll event that would otherwise snatch
+ * the menu away mid-click.
+ */
+function positionStatusMenu(): void {
+  const menu = document.getElementById('statusMenu');
+  if (!menu || !statusMenuAnchor) return;
+  const box = statusMenuAnchor.getBoundingClientRect();
+  if (box.bottom < 0 || box.top > window.innerHeight) {
+    closeStatusMenu();
+    return;
+  }
+  menu.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  const below = window.innerHeight - box.bottom;
+  menu.style.top =
+    below < menu.offsetHeight + 12
+      ? `${box.top - menu.offsetHeight - 6}px`
+      : `${box.bottom + 6}px`;
+}
+
+function openStatusMenu(anchor: HTMLElement, doc: Document): void {
+  closeStatusMenu();
+  const menu = document.createElement('div');
+  menu.className = 'smenu';
+  menu.id = 'statusMenu';
+  menu.setAttribute('role', 'menu');
+
+  for (const status of DOCUMENT_STATUSES) {
+    const item = document.createElement('button');
+    item.className = 'smenu__item' + (status === doc.status ? ' is-current' : '');
+    item.setAttribute('role', 'menuitem');
+    item.dataset.status = status;
+    item.innerHTML =
+      `<span class="sdot" style="background:${statusColor(status)}"></span>` +
+      `<span class="smenu__label">${statusLabel(status)}</span>`;
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeStatusMenu();
+      if (status !== doc.status) void setStatus(doc, status);
+    });
+    menu.append(item);
+  }
+
+  document.body.append(menu);
+  statusMenuAnchor = anchor;
+  positionStatusMenu();
+  $('scrollBody').addEventListener('scroll', positionStatusMenu, { passive: true });
+}
+
+function closeStatusMenu(): void {
+  const menu = document.getElementById('statusMenu');
+  if (!menu) return;
+  menu.remove();
+  statusMenuAnchor = null;
+  $('scrollBody').removeEventListener('scroll', positionStatusMenu);
+}
+
+async function setStatus(doc: Document, status: DocumentStatus): Promise<void> {
+  const updated: Document = { ...doc, status, updatedAt: nowIso() };
   await sendRequest({ type: 'documents/put', document: updated });
   await loadDocuments();
   render();
-  toast(`Moved to “${statusLabel(updated.status)}”`);
+  toast(`Moved to “${statusLabel(status)}”`);
 }
 
 async function copyToClipboard(text: string, label: string): Promise<void> {
@@ -373,6 +441,14 @@ async function init(): Promise<void> {
   $('copyInText').addEventListener('click', () => void copyCaptureInText());
   $('copyBiblio').addEventListener('click', () => void copyCaptureBiblio());
   $('bibBtn').addEventListener('click', () => void copyProjectBibliography());
+
+  // The status menu is a light popover: anything else the user does dismisses it.
+  document.addEventListener('click', (e) => {
+    if (!(e.target as HTMLElement).closest('#statusMenu')) closeStatusMenu();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeStatusMenu();
+  });
 
   await ensureSeedProject();
   await loadDocuments();
