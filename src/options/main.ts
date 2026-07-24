@@ -38,6 +38,8 @@ import {
   templateFor,
 } from '../core/citation/styles';
 import { overrideObject } from '../core/citation/compile';
+import { isCustomBaseStyleId } from '../core/citation/parse';
+import type { BaseStyleSummary } from '../core/usecases/base-styles';
 import {
   CAPABILITIES,
   CAPABILITY_LABELS,
@@ -167,6 +169,8 @@ interface DashState {
   annotations: Annotation[];
   references: Reference[];
   styles: CitationStyle[];
+  /** CSL styles the user imported, selectable as base styles. */
+  baseStyles: BaseStyleSummary[];
   members: MemberView[];
   activity: ActivityEvent[];
   threads: CommentThread[];
@@ -191,6 +195,7 @@ const state: DashState = {
   annotations: [],
   references: [],
   styles: [],
+  baseStyles: [],
   members: [],
   activity: [],
   threads: [],
@@ -301,7 +306,8 @@ async function loadProjectData(): Promise<void> {
     return;
   }
   const projectId = state.activeProjectId;
-  const [documents, annotations, references, styles, members, activity, threads] = await Promise.all([
+  const [documents, annotations, references, styles, members, activity, threads, baseStyles] =
+    await Promise.all([
     sendRequest({ type: 'documents/listByProject', projectId }),
     sendRequest({ type: 'annotations/listByProject', projectId }),
     sendRequest({ type: 'references/listByProject', projectId }),
@@ -309,6 +315,7 @@ async function loadProjectData(): Promise<void> {
     sendRequest({ type: 'members/list', projectId }),
     sendRequest({ type: 'activity/listByProject', projectId, limit: state.activityLimit }),
     sendRequest({ type: 'comments/listByProject', projectId }),
+    sendRequest({ type: 'baseStyles/list' }),
   ]);
   state.documents = documents;
   state.annotations = annotations;
@@ -317,6 +324,7 @@ async function loadProjectData(): Promise<void> {
   state.members = members;
   state.activity = activity;
   state.threads = threads;
+  state.baseStyles = baseStyles;
 }
 
 /**
@@ -1291,7 +1299,7 @@ function drawStyleList(): void {
         s,
       ) => `<button class="style-card${s.id === state.selectedStyleId ? ' sel' : ''}" data-s="${s.id}">
       <div class="snm">${esc(s.name)}</div>
-      <div class="sb">${systemLabel(systemFor(s.baseStyleId))} · base ${esc(s.baseStyleId)}</div>
+      <div class="sb">${systemLabel(systemOfBase(s.baseStyleId))} · base ${esc(baseLabel(s.baseStyleId))}</div>
     </button>`,
     )
     .join('');
@@ -1310,7 +1318,7 @@ function drawStyleEditor(): void {
   const r = style.userRules;
   const editor = $('#editor');
   editor.innerHTML = `
-    <div class="ed-row"><div class="ed-lbl"><b>Base CSL style</b><span>Sets the citation system — ${esc(systemLabel(systemFor(style.baseStyleId)).toLowerCase())}</span></div>
+    <div class="ed-row"><div class="ed-lbl"><b>Base CSL style</b><span>Sets the citation system — ${esc(systemLabel(systemOfBase(style.baseStyleId)).toLowerCase())}</span></div>
       <select class="sel" id="baseSel" aria-label="Base CSL style">${baseOptions(style.baseStyleId)}</select></div>
     <div class="ed-row"><div class="ed-lbl"><b>Maximum authors</b><span>Before the list is truncated with “et al.”</span></div>
       <div class="stepper"><button data-step="-1" aria-label="Fewer">−</button><span class="val" id="maVal">${r.maxAuthors}</span><button data-step="1" aria-label="More">+</button></div></div>
@@ -1351,7 +1359,7 @@ function drawStyleEditor(): void {
     host,
     style,
     (rows) =>
-      `<div class="pl">Live preview · ${esc(style.name)} · ${esc(systemLabel(systemFor(style.baseStyleId)).toLowerCase())}</div>` +
+      `<div class="pl">Live preview · ${esc(style.name)} · ${esc(systemLabel(systemOfBase(style.baseStyleId)).toLowerCase())}</div>` +
       rows
         .map((row, i) => {
           const sample = PREVIEW_SAMPLES[i];
@@ -1362,18 +1370,44 @@ function drawStyleEditor(): void {
   );
 }
 
+/** The citation system of any base style — vendored or imported. */
+function systemOfBase(baseStyleId: string): CitationSystem {
+  const imported = state.baseStyles.find((b) => b.id === baseStyleId);
+  return imported ? imported.system : systemFor(baseStyleId);
+}
+
+/** Display label for any base style; an imported one that has been deleted
+ * still names itself rather than showing a bare id. */
+function baseLabel(baseStyleId: string): string {
+  const imported = state.baseStyles.find((b) => b.id === baseStyleId);
+  if (imported) return imported.name;
+  if (isCustomBaseStyleId(baseStyleId)) return `${baseStyleId.split(':')[1] ?? baseStyleId} (missing)`;
+  return baseStyleInfo(baseStyleId)?.label ?? baseStyleId;
+}
+
 /** `<option>` list for the base-style picker, with `selected` on the current one. */
 function baseOptions(current: string): string {
-  return BASE_STYLES.map(
-    (b) => `<option value="${b.id}"${b.id === current ? ' selected' : ''}>${esc(b.label)}</option>`,
-  ).join('');
+  const option = (id: string, label: string): string =>
+    `<option value="${esc(id)}"${id === current ? ' selected' : ''}>${esc(label)}</option>`;
+  const vendored = BASE_STYLES.map((b) => option(b.id, b.label)).join('');
+  const imported = state.baseStyles.map((b) => option(b.id, b.name)).join('');
+  // A profile can outlive the imported style it was built on; keep it selectable
+  // so the user sees what is wrong instead of the picker silently jumping to APA.
+  const orphan =
+    isCustomBaseStyleId(current) && !state.baseStyles.some((b) => b.id === current)
+      ? option(current, baseLabel(current))
+      : '';
+  return (
+    vendored +
+    (imported ? `<optgroup label="Imported">${imported}${orphan}</optgroup>` : orphan)
+  );
 }
 
 /** Switch the base style, keeping `userRules.system` truthful: the citation
  * system is declared by the CSL file, not chosen independently of it. */
 function setBaseStyle(style: CitationStyle, baseStyleId: string): void {
   style.baseStyleId = baseStyleId;
-  style.userRules.system = systemFor(baseStyleId);
+  style.userRules.system = systemOfBase(baseStyleId);
 }
 
 async function saveStyle(): Promise<void> {
@@ -1503,7 +1537,12 @@ function renderStyleEditor(view: HTMLElement, actions: HTMLElement): void {
         </div>
         <div class="h-field">
           <label for="sedBase">Base CSL style</label>
-          <select class="sel" id="sedBase"></select>
+          <div class="h-base">
+            <select class="sel" id="sedBase"></select>
+            <button class="btn btn--sm" id="sedImport" title="Import a .csl file as a base style">${ICON.up} Import .csl</button>
+            <button class="btn btn--ghost btn--sm" id="sedDropBase" hidden
+              title="Forget this imported style">${ICON.x}</button>
+          </div>
         </div>
       </header>
       <div class="sed-work">
@@ -1539,8 +1578,14 @@ function renderStyleEditor(view: HTMLElement, actions: HTMLElement): void {
     drawEditorPanel();
   };
 
+  $('#sedImport', view).onclick = () => pickBaseStyleFile();
+  const dropBase = $('#sedDropBase', view);
+  const currentBase = selectedStyle()?.baseStyleId ?? 'apa';
+  dropBase.hidden = !isCustomBaseStyleId(currentBase);
+  dropBase.onclick = () => void forgetBaseStyle(currentBase);
+
   const base = $<HTMLSelectElement>('#sedBase', view);
-  base.innerHTML = baseOptions(selectedStyle()?.baseStyleId ?? 'apa');
+  base.innerHTML = baseOptions(currentBase);
   base.onchange = () => {
     const style = selectedStyle();
     if (!style) return;
@@ -1560,10 +1605,11 @@ function drawEditorProfiles(): void {
   host.innerHTML = state.styles
     .map((s) => {
       const info = baseStyleInfo(s.baseStyleId);
+      const baseShort = info?.label ?? baseLabel(s.baseStyleId);
       return `<div class="sed-pcard${s.id === state.selectedStyleId ? ' sel' : ''}">
         <button class="sed-pc-main" data-s="${s.id}">
           <div class="pn">${esc(s.name)}</div>
-          <div class="pb"><span class="dot"></span>${esc(systemLabel(systemFor(s.baseStyleId)))} · ${esc((info?.label ?? s.baseStyleId).split(' ')[0] ?? '')}</div>
+          <div class="pb"><span class="dot"></span>${esc(systemLabel(systemOfBase(s.baseStyleId)))} · ${esc(baseShort.split(' ')[0] ?? '')}</div>
         </button>
         <button class="sed-pc-del" data-del="${s.id}" aria-label="Delete ${esc(s.name)}" title="Delete profile">×</button>
       </div>`;
@@ -1587,7 +1633,7 @@ function drawEditorRules(): void {
   const style = selectedStyle();
   if (!style) return;
   const r = style.userRules;
-  const system = systemFor(style.baseStyleId);
+  const system = systemOfBase(style.baseStyleId);
   const host = $('#sedRules');
 
   host.innerHTML =
@@ -1942,6 +1988,49 @@ function renderActivityTab(body: HTMLElement): void {
   });
   const olderBtn = body.querySelector<HTMLButtonElement>('#actOlder');
   if (olderBtn) olderBtn.onclick = () => void showOlderActivity();
+}
+
+/* ---- Imported base styles ---- */
+
+function pickBaseStyleFile(): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csl,application/xml,text/xml';
+  input.onchange = () => void importBaseStyle(input.files?.[0]);
+  input.click();
+}
+
+async function importBaseStyle(file: File | undefined): Promise<void> {
+  if (!file) return;
+  try {
+    const imported = await sendRequest({ type: 'baseStyles/import', xml: await file.text() });
+    state.baseStyles = await sendRequest({ type: 'baseStyles/list' });
+    const style = selectedStyle();
+    if (style) {
+      setBaseStyle(style, imported.id);
+      await saveStyle();
+    }
+    render();
+    toast(`Imported · ${imported.name}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t import that style', ICON.warn, true);
+  }
+}
+
+/**
+ * Forget an imported base style. Profiles built on it keep pointing at it and
+ * say so in the picker — deleting a user's profiles would be the worse surprise.
+ */
+async function forgetBaseStyle(id: Id): Promise<void> {
+  const name = baseLabel(id);
+  try {
+    await sendRequest({ type: 'baseStyles/delete', id });
+    state.baseStyles = await sendRequest({ type: 'baseStyles/list' });
+    render();
+    toast(`Forgot · ${name}`, ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t forget that style', ICON.warn, true);
+  }
 }
 
 /* ---- Team: sync & snapshots (Phase 5, M4) ---- */

@@ -29,4 +29,10 @@ export interface CitationFormatter {
    * Empty when the base style has no vendored CSL.
    */
   compileStyle(style: CitationStyle): Promise<string>;
+  /**
+   * Drop a cached template so the next use re-reads it. Called when an imported
+   * base style is replaced or deleted — without it the worker would serve the
+   * old XML for the rest of its life.
+   */
+  forget?(template: string): void;
 }

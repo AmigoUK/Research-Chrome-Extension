@@ -14,6 +14,7 @@ import type {
   StoredFile,
   ActivityEvent,
   CommentThread,
+  CustomBaseStyle,
   Id,
 } from '../model/types';
 
@@ -83,6 +84,13 @@ export interface CommentThreadRepository {
   delete(id: Id): Promise<void>;
 }
 
+export interface CustomBaseStyleRepository {
+  get(id: Id): Promise<CustomBaseStyle | undefined>;
+  list(): Promise<CustomBaseStyle[]>;
+  put(style: CustomBaseStyle): Promise<void>;
+  delete(id: Id): Promise<void>;
+}
+
 export interface RepositorySet {
   projects: ProjectRepository;
   documents: DocumentRepository;
@@ -93,4 +101,5 @@ export interface RepositorySet {
   files: FileRepository;
   activity: ActivityRepository;
   commentThreads: CommentThreadRepository;
+  customBaseStyles: CustomBaseStyleRepository;
 }

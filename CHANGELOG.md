@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Polish, one item at a time; see `doc/STATUS.md` for the list._
 
+## [0.19.0] — 2026-07-24
+
+### Added
+
+- **Import a third-party `.csl` file as a base style.** The editor could already
+  export a compiled style; this is the way back in.
+  - `src/core/citation/parse.ts` — validates a file before it is stored and refuses it with a reason
+    a person can act on: not CSL, wrong namespace, a **dependent style** (a pointer to another style,
+    which citeproc cannot format with), or no citation rules in it. It also reads the `<title>` for a
+    default name and the declared `citation-format`, so the picker labels the style honestly instead
+    of guessing its citation system.
+  - IndexedDB **schema v5**: a `customBaseStyles` store. Ids are `custom-base:<slug>`, so an id says
+    where a style came from, and re-importing the same style replaces it — what someone updating a
+    journal's style file expects.
+  - `src/core/usecases/base-styles.ts` and messages `baseStyles/list|import|delete`.
+  - **Style editor**: an *Import .csl* button beside the base-style picker, imported styles grouped
+    under an **Imported** heading, and a button to forget one. The live citeproc preview formats
+    through the imported file immediately.
+
+### Fixed
+
+- A re-imported style is actually used. citation-js caches its citeproc engines by template name and
+  offers no way to evict one, so re-registering a changed file under the same name kept formatting
+  with the old engine. Imported styles are now registered under a name carrying a **hash of the XML**:
+  a changed file is simply a different template. (Found by a test written for the update path, not in
+  the field.)
+
+### Changed
+
+- Deleting an imported base style leaves the citation profiles built on it alone. They keep pointing
+  at it, the picker marks the base style *missing*, and formatting degrades to an empty compile —
+  deleting someone's profiles because a base style went away would be the worse surprise.
+
+### Notes
+
+- 222 unit tests (up from 206) + 20 E2E; the new E2E imports a real `.csl` through the browser's file
+  chooser, watches the preview format through it, reloads to prove it persisted, and forgets it again.
+
 ## [0.18.1] — 2026-07-24
 
 ### Changed
@@ -548,7 +586,8 @@ _Polish, one item at a time; see `doc/STATUS.md` for the list._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...v0.17.0

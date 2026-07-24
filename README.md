@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.18.1**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.19.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -16,7 +16,7 @@ citation-style editor, and local-first collaboration.
 | **PDFs** | A bundled `pdf.js` reader: text highlights and drag-a-rectangle region anchors, stored as fraction coordinates so they survive zoom and DPR changes. |
 | **Dashboard** | Overview + Kanban by workflow status, Documents, References (with DOI import), Annotations, Citation styles, Team. |
 | **Citations** | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere. |
-| **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. |
+| **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. Import a journal's own `.csl` file as a base style, or export the compiled one. |
 | **Team** | Members & roles with a capability matrix, an activity feed with before→after diffs, and anchored comment threads with reply / resolve. |
 | **Sync** | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. |
 
@@ -46,9 +46,9 @@ Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mod
 - **Ports & adapters:** a pure domain core in `src/core` (no `chrome.*`, no storage types) with thin
   adapters in `src/adapters`. Surfaces: `src/background` (service worker), `src/sidepanel`,
   `src/options` (dashboard), `src/pdfviewer`.
-- **Storage:** IndexedDB with a versioned schema and append-only migrations (currently **v4**:
+- **Storage:** IndexedDB with a versioned schema and append-only migrations (currently **v5**:
   projects, documents, annotations, references, citation styles, users, files, activity, comment
-  threads).
+  threads, imported base styles).
 - **Snapshots:** `src/core/snapshot/envelope.ts` (WebCrypto AES-GCM + PBKDF2, 600k iterations) and
   `src/core/usecases/snapshot.ts` (build / merge, hard DOI dedup, newest record wins).
 - **Messaging:** one typed contract (`src/core/messages.ts`) shared by every surface, routed by a
@@ -75,7 +75,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Testing
 
-206 unit tests (Vitest, `fake-indexeddb`) and 19 end-to-end tests that load the built extension into
+222 unit tests (Vitest, `fake-indexeddb`) and 20 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 

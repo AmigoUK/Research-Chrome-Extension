@@ -114,6 +114,12 @@ Fields:
 - `resolved`: whether the thread is closed; resolved threads take no further replies.
 - `comments`: `{ id, authorId, body, createdAt }[]`.
 
+### CustomBaseStyle (v0.19.0)
+
+A CSL style imported from a file and usable as a base style alongside the six vendored ones. Fields: `id` (`custom-base:<slug>`), `name`, `xml` (verbatim — it is data, not code), `system` (read from the file's `citation-format` at import), `createdAt`.
+
+A file is validated before it is stored: it must be CSL, in the CSL namespace, independent (not a pointer to a parent style), and contain citation rules. Deleting one leaves the profiles built on it alone — they mark the base style *missing* rather than vanishing.
+
 ## Relationships
 
 - One `Project` has many `Documents`, `Annotations`, `References`, `ActivityEvents`, `CommentThreads`, and users with roles.
@@ -130,6 +136,7 @@ Fields:
 | 2 | `files` (PDF bytes) |
 | 3 | `activity` (index `[projectId, createdAt]`) |
 | 4 | `commentThreads` (indexes `byProject`, `byDocument`) |
+| 5 | `customBaseStyles` (imported `.csl` files) |
 
 Migrations are append-only: a shipped migration is never edited.
 

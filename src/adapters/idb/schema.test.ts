@@ -20,9 +20,9 @@ describe('migrationVersionsToRun', () => {
 });
 
 describe('schema at DB_VERSION', () => {
-  it('creates every store, up to v3 activity and v4 comment threads', async () => {
+  it('creates every store, up to v4 comment threads and v5 imported base styles', async () => {
     globalThis.indexedDB = new IDBFactory();
-    const db = await openContextNotesDB('schema-v4');
+    const db = await openContextNotesDB('schema-v5');
     expect(db.version).toBe(DB_VERSION);
     expect([...db.objectStoreNames].sort()).toEqual(
       [
@@ -30,6 +30,7 @@ describe('schema at DB_VERSION', () => {
         'annotations',
         'commentThreads',
         'citationStyles',
+        'customBaseStyles',
         'documents',
         'files',
         'projects',

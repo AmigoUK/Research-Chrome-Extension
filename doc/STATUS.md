@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the polish list (1 of 5 done)._
+_Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the polish list (2 of 5 done)._
 
 ## Where we are
 
@@ -9,11 +9,11 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the 
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.18.1 is on `main`** (Phases 1–5 + polish). No unmerged work.
+- **Branch state:** everything through **v0.19.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 206 unit + 19 E2E (5 PDF viewer + 12 dashboard + 2 side panel), all green.
+- **Tests:** 222 unit + 20 E2E (5 PDF viewer + 13 dashboard + 2 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -142,7 +142,11 @@ working tree is clean. The strongest candidates, roughly in order of value:
    first use instead of being inlined, cutting the service worker from 1.15 MB to 631 kB (45%).
    `CitationFormatter` went async and `CiteJsFormatter` takes a `CslLoader`; a miss is remembered so
    a broken asset is not retried on every citation.
-2. **Import a third-party `.csl`** as a base style — the editor can already export one.
+2. ~~**Import a third-party `.csl`**~~ — **done in v0.19.0**: validated on import (a dependent style
+   is refused, since citeproc cannot format with one), stored in **schema v5** `customBaseStyles`,
+   and selectable in the editor's picker. Imported styles are registered under a name carrying a
+   hash of their XML, because citation-js caches citeproc engines by template name with no way to
+   evict one — without that, a re-imported file kept formatting with the old engine.
 3. **Snapshot ergonomics** — a dry-run import that reports what *would* merge before it writes, and
    remembering the last export folder. Both are small; neither is needed for correctness.
 4. **Presence** (the one Phase 5 goal not delivered) needs a live channel between clients, which a

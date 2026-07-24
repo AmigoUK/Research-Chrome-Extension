@@ -20,6 +20,7 @@ import type { CaptureInput, CaptureResult } from './usecases/capture';
 import type { MemberView } from './usecases/members';
 import type { ReplyInput, StartThreadInput } from './usecases/comments';
 import type { MergeReport } from './usecases/snapshot';
+import type { BaseStyleSummary } from './usecases/base-styles';
 
 /** File bytes cross the messaging boundary as base64 (JSON-safe). */
 export interface FilePayload {
@@ -89,6 +90,10 @@ export interface MessageMap {
     res: { filename: string; content: string; bytes: number };
   };
   'snapshot/import': { req: { content: string; password?: string }; res: MergeReport };
+  /** CSL styles imported from a file, usable as base styles. */
+  'baseStyles/list': { req: Record<never, never>; res: BaseStyleSummary[] };
+  'baseStyles/import': { req: { xml: string; name?: string }; res: BaseStyleSummary };
+  'baseStyles/delete': { req: { id: Id }; res: null };
 }
 
 export type MessageType = keyof MessageMap;

@@ -181,6 +181,20 @@ export interface CitationUserRules {
   legalTemplate: boolean;
 }
 
+/**
+ * A CSL style imported from a file, usable as a base style alongside the six
+ * vendored ones. The XML is stored verbatim — it is data, not code.
+ */
+export interface CustomBaseStyle {
+  /** `custom-base:<slug>`, so an id says where the style came from. */
+  id: Id;
+  name: string;
+  xml: string;
+  /** The citation system the file declares, read at import time. */
+  system: CitationSystem;
+  createdAt: IsoDateTime;
+}
+
 export interface CitationStyle {
   id: Id;
   name: string;

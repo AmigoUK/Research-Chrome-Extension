@@ -41,6 +41,11 @@ import {
   type SnapshotData,
 } from './usecases/snapshot';
 import { openSnapshot, sealSnapshot } from './snapshot/envelope';
+import {
+  deleteCustomBaseStyle,
+  importCustomBaseStyle,
+  listCustomBaseStyles,
+} from './usecases/base-styles';
 import { roleOf } from './model/roles';
 import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
@@ -304,6 +309,21 @@ export async function handleRequest(
           bytes: content.length,
         }) as Result;
       }
+      case 'baseStyles/list':
+        return ok(await listCustomBaseStyles(repos)) as Result;
+      case 'baseStyles/import': {
+        const imported = await importCustomBaseStyle(repos, capture, {
+          xml: request.xml,
+          ...(request.name ? { name: request.name } : {}),
+        });
+        // Re-importing an updated file must not keep serving the old XML.
+        deps.formatter?.forget?.(imported.id);
+        return ok(imported) as Result;
+      }
+      case 'baseStyles/delete':
+        await deleteCustomBaseStyle(repos, request.id);
+        deps.formatter?.forget?.(request.id);
+        return ok(null) as Result;
       case 'snapshot/import': {
         const payload = await openSnapshot(request.content, request.password ?? '');
         assertSnapshotData(payload);

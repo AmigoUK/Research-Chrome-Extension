@@ -306,6 +306,10 @@ button.stat-tag:hover { border-color: var(--fg); }
 .diff .ar { color: var(--muted); }
 .more { display: flex; justify-content: center; padding: 4px 0 12px; }
 
+/* ---- Style editor: base picker with import ---- */
+.h-base { display: flex; align-items: center; gap: 7px; }
+.h-base .sel { min-width: 220px; }
+
 /* ---- Team: sync & snapshots (Phase 5, M4) ---- */
 .modes { display: grid; gap: 9px; margin-bottom: 4px; }
 .mode { display: grid; gap: 3px; text-align: left; font: inherit; padding: 12px 14px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface); color: var(--fg); cursor: pointer; transition: .12s; }

@@ -4,6 +4,7 @@
  * user rules on top of one of these.
  */
 import type { CitationSystem } from '../model/types';
+import { isCustomBaseStyleId } from './parse';
 
 export const BASE_STYLE_TEMPLATES = {
   apa: 'apa',
@@ -16,7 +17,12 @@ export const BASE_STYLE_TEMPLATES = {
 
 export type BaseStyleId = keyof typeof BASE_STYLE_TEMPLATES;
 
+/**
+ * The citation-js template name for a base style. An imported style is its own
+ * template — its id doubles as the name the formatter registers it under.
+ */
 export function templateFor(baseStyleId: string): string {
+  if (isCustomBaseStyleId(baseStyleId)) return baseStyleId;
   return (BASE_STYLE_TEMPLATES as Record<string, string>)[baseStyleId] ?? 'apa';
 }
 

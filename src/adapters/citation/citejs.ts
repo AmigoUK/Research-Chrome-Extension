@@ -13,6 +13,7 @@ import '@citation-js/plugin-csl';
 import type { CitationFormatter, CitationKind, CslItem } from '../../core/ports/citation';
 import type { CitationStyle } from '../../core/model/types';
 import { templateFor } from '../../core/citation/styles';
+import { isCustomBaseStyleId } from '../../core/citation/parse';
 import { compileCsl, applyRulesToItem, applyDoiFormat } from '../../core/citation/compile';
 
 /** Resolves a citation-js template name to its CSL XML, or undefined. */
@@ -46,27 +47,41 @@ export class CiteJsFormatter implements CitationFormatter {
   }
 
   /**
-   * Register a base style with citation-js if it is not one of the templates the
-   * plugin already ships. Registering the same name twice is harmless, so the
-   * `registered` set is an optimisation, not a correctness guard.
+   * Register a base style with citation-js and return the name to format under.
+   *
+   * An **imported** style can change under a stable id, and citation-js caches
+   * its citeproc engines by template name with no way to evict one — so the
+   * name carries a hash of the XML. A re-imported file is simply a different
+   * template, which is the only way to be sure the new rules take effect.
+   * Vendored styles keep their plain names: their XML cannot change at runtime.
    */
-  private async ensureTemplate(template: string): Promise<void> {
-    if (this.registered.has(template)) return;
-    const csl = await this.baseCsl(template);
-    if (csl) cslConfig().templates.add(template, csl);
-    this.registered.add(template);
+  private async ensureTemplate(nameOrId: string): Promise<{ template: string; csl?: string }> {
+    const csl = await this.baseCsl(nameOrId);
+    const template = csl && isCustomBaseStyleId(nameOrId) ? `${nameOrId}#${hash(csl)}` : nameOrId;
+    if (csl && !this.registered.has(template)) {
+      cslConfig().templates.add(template, csl);
+      this.registered.add(template);
+    }
+    return csl ? { template, csl } : { template };
+  }
+
+  /** Drop a cached style so the next use re-reads it from storage. */
+  forget(template: string): void {
+    this.loaded.delete(template);
   }
 
   async bibliography(items: CslItem[], template: string): Promise<string> {
-    await this.ensureTemplate(template);
+    const { template: name } = await this.ensureTemplate(template);
     return new Cite(items)
-      .format('bibliography', { format: 'text', template, lang: 'en-US' })
+      .format('bibliography', { format: 'text', template: name, lang: 'en-US' })
       .trim();
   }
 
   async inText(items: CslItem[], template: string): Promise<string> {
-    await this.ensureTemplate(template);
-    return new Cite(items).format('citation', { format: 'text', template, lang: 'en-US' }).trim();
+    const { template: name } = await this.ensureTemplate(template);
+    return new Cite(items)
+      .format('citation', { format: 'text', template: name, lang: 'en-US' })
+      .trim();
   }
 
   async compileStyle(style: CitationStyle): Promise<string> {
@@ -79,14 +94,15 @@ export class CiteJsFormatter implements CitationFormatter {
     style: CitationStyle,
     kind: CitationKind,
   ): Promise<string> {
-    const baseTemplate = templateFor(style.baseStyleId);
-    await this.ensureTemplate(baseTemplate);
-    const compiled = await this.compileStyle(style);
+    const { template: baseTemplate, csl } = await this.ensureTemplate(templateFor(style.baseStyleId));
     const rules = style.userRules;
+    const compiled = csl ? compileCsl(csl, rules) : '';
     let template = baseTemplate;
 
     if (compiled) {
-      const name = `custom:${hash(`${style.baseStyleId}:${JSON.stringify(rules)}`)}`;
+      // The base XML goes into the hash as well as the rules: a re-imported
+      // style must not be served by the engine built from the old file.
+      const name = `custom:${hash(`${baseTemplate}:${JSON.stringify(rules)}`)}`;
       if (!this.registered.has(name)) {
         cslConfig().templates.add(name, compiled);
         this.registered.add(name);

@@ -17,10 +17,11 @@ import type {
   StoredFile,
   ActivityEvent,
   CommentThread,
+  CustomBaseStyle,
 } from '../../core/model/types';
 
 export const DB_NAME = 'context-notes';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export interface ContextNotesDB extends DBSchema {
   projects: { key: string; value: Project };
@@ -55,6 +56,8 @@ export interface ContextNotesDB extends DBSchema {
     value: CommentThread;
     indexes: { byProject: string; byDocument: string };
   };
+  /** CSL styles imported from a file, usable as base styles. */
+  customBaseStyles: { key: string; value: CustomBaseStyle };
 }
 
 type UpgradeTx = IDBPTransaction<
@@ -103,6 +106,11 @@ export const migrations: Record<number, (db: IDBPDatabase<ContextNotesDB>, tx: U
       const threads = db.createObjectStore('commentThreads', { keyPath: 'id' });
       threads.createIndex('byProject', 'projectId');
       threads.createIndex('byDocument', 'documentId');
+    },
+    5(db) {
+      // Imported CSL base styles. Keyed by `custom-base:<slug>`, which is also
+      // the citation-js template name the formatter registers them under.
+      db.createObjectStore('customBaseStyles', { keyPath: 'id' });
     },
   };
 

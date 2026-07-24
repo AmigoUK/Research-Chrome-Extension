@@ -63,6 +63,7 @@ describe('schema migration (v0 → current)', () => {
         'annotations',
         'commentThreads',
         'citationStyles',
+        'customBaseStyles',
         'documents',
         'files',
         'projects',

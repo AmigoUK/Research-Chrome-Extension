@@ -15,6 +15,7 @@ import type {
   FileRepository,
   ActivityRepository,
   CommentThreadRepository,
+  CustomBaseStyleRepository,
   RepositorySet,
 } from '../../core/ports/repositories';
 import type {
@@ -27,6 +28,7 @@ import type {
   StoredFile,
   ActivityEvent,
   CommentThread,
+  CustomBaseStyle,
   Id,
 } from '../../core/model/types';
 import type { ContextNotesDatabase } from './db';
@@ -194,6 +196,22 @@ class IdbCommentThreadRepository implements CommentThreadRepository {
   }
 }
 
+class IdbCustomBaseStyleRepository implements CustomBaseStyleRepository {
+  constructor(private readonly db: ContextNotesDatabase) {}
+  get(id: Id): Promise<CustomBaseStyle | undefined> {
+    return this.db.get('customBaseStyles', id);
+  }
+  list(): Promise<CustomBaseStyle[]> {
+    return this.db.getAll('customBaseStyles');
+  }
+  async put(style: CustomBaseStyle): Promise<void> {
+    await this.db.put('customBaseStyles', style);
+  }
+  async delete(id: Id): Promise<void> {
+    await this.db.delete('customBaseStyles', id);
+  }
+}
+
 function normaliseDoi(doi: unknown): string | undefined {
   if (typeof doi !== 'string') return undefined;
   return doi
@@ -213,5 +231,6 @@ export function createRepositories(db: ContextNotesDatabase): RepositorySet {
     files: new IdbFileRepository(db),
     activity: new IdbActivityRepository(db),
     commentThreads: new IdbCommentThreadRepository(db),
+    customBaseStyles: new IdbCustomBaseStyleRepository(db),
   };
 }

@@ -509,6 +509,60 @@ test('Sync tab exports a snapshot file, switches mode, and merges an import by D
   await page.close();
 });
 
+test('Style editor imports a third-party .csl and formats the preview through it', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await page.locator('.style-card').first().click();
+  await page.locator('#sFull').click();
+  await expect(page.locator('.sed')).toBeVisible();
+
+  // A minimal but real CSL style, chosen so its output is unmistakable.
+  const csl = `<?xml version="1.0" encoding="utf-8"?>
+<style xmlns="http://purl.org/net/xbiblio/csl" class="in-text" version="1.0">
+  <info><title>E2E House Style</title><id>http://example.org/e2e</id>
+    <category citation-format="author-date"/></info>
+  <macro name="author"><names variable="author"><name form="short"/></names></macro>
+  <citation><layout prefix="(" suffix=")"><text macro="author"/></layout></citation>
+  <bibliography><layout><text value="HOUSE:"/><text macro="author" prefix=" "/></layout></bibliography>
+</style>`;
+
+  const chooser = page.waitForEvent('filechooser');
+  await page.locator('#sedImport').click();
+  await (await chooser).setFiles({
+    name: 'house.csl',
+    mimeType: 'application/xml',
+    buffer: Buffer.from(csl),
+  });
+
+  // The imported style is selected, named from the file, and grouped apart.
+  const base = page.locator('#sedBase');
+  await expect(base).toHaveValue('custom-base:e2e-house-style');
+  await expect(page.locator('#sedBase optgroup[label="Imported"] option')).toContainText(
+    'E2E House Style',
+  );
+
+  // The live preview is real citeproc output through the imported file.
+  await expect(page.locator('#sedPanel')).toContainText('HOUSE:', { timeout: 10_000 });
+
+  // It survives a reload — the style lives in IndexedDB, not in the page.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="styles"]').click();
+  await page.locator('.style-card').first().click();
+  await page.locator('#sFull').click();
+  await expect(page.locator('#sedBase')).toHaveValue('custom-base:e2e-house-style');
+
+  // Forgetting it leaves the profile alone and says the base style is missing.
+  await page.locator('#sedDropBase').click();
+  await expect(page.locator('#sedBase option[value="custom-base:e2e-house-style"]')).toContainText(
+    'missing',
+  );
+
+  await page.close();
+});
+
 test('Kanban advances a card status with the arrow keys and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
