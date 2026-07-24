@@ -276,6 +276,9 @@ test('Team view invites a member, changes their role, and states that roles are 
   await page.locator('#nav .nav-item[data-route="team"]').click();
   await expect(page.locator('#viewTitle')).toHaveText('Team');
 
+  // Team opens on Activity; members live behind their own tab.
+  await page.locator('.vtab[data-tab="members"]').click();
+
   // The advisory-roles caveat is stated, not implied.
   await expect(page.locator('.advisory')).toContainText('Roles are advisory');
 
@@ -300,11 +303,65 @@ test('Team view invites a member, changes their role, and states that roles are 
   await invited.locator('select[data-role]').selectOption('viewer');
   await page.reload();
   await page.locator('#nav .nav-item[data-route="team"]').click();
+  await page.locator('.vtab[data-tab="members"]').click();
   await expect(page.locator('.mem').nth(1).locator('select[data-role]')).toHaveValue('viewer');
 
   // Remove them again, leaving the owner alone.
   await page.locator('.mem').nth(1).locator('[data-rm]').click();
   await expect(page.locator('.mem')).toHaveCount(1);
+
+  await page.close();
+});
+
+test('Activity tab shows a status move with a before→after diff and filters by kind', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Two writes through the service worker: the source, then the status move.
+  // The feed is recorded there, so nothing in the dashboard has to know.
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    const document = {
+      id: 'e2e-feed-1',
+      projectId,
+      url: 'https://example.org/feed',
+      type: 'article',
+      metadata: { title: 'Feed status move', authors: ['Logger, A.'], year: 2026 },
+      status: 'toRead',
+      section: 'Literature',
+      createdAt: now,
+      updatedAt: now,
+    };
+    await chrome.runtime.sendMessage({ type: 'documents/put', document });
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: { ...document, status: 'inReview' },
+    });
+  });
+
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="team"]').click();
+  await expect(page.locator('#viewTitle')).toHaveText('Team');
+
+  // Activity is the tab the Team view opens on.
+  await expect(page.locator('.vtab[data-tab="activity"]')).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+  await expect(page.locator('.day').first()).toContainText('Today');
+
+  const moved = page.locator('.ev', { hasText: 'moved Feed status move' });
+  await expect(moved).toHaveCount(1);
+  await expect(moved.locator('.diff .c').first()).toHaveText('To read');
+  await expect(moved.locator('.diff .c.to')).toHaveText('In review');
+
+  // Filtering by kind narrows the feed: the move goes, the source stays.
+  await page.locator('.fchip[data-af="source"]').click();
+  await expect(page.locator('.ev', { hasText: 'moved Feed status move' })).toHaveCount(0);
+  await expect(page.locator('.ev', { hasText: 'added Feed status move' })).toHaveCount(1);
 
   await page.close();
 });

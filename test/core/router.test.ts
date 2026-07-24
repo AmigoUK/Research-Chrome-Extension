@@ -5,7 +5,7 @@ import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import { handleRequest } from '../../src/core/router';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type { Document } from '../../src/core/model/types';
+import type { ActivityEvent, Document } from '../../src/core/model/types';
 
 const NOW = '2026-07-23T00:00:00.000Z';
 
@@ -175,5 +175,136 @@ describe('handleRequest', () => {
     // Cast through unknown to simulate a malformed message off the wire.
     const res = await handleRequest(repos, { type: 'nope' } as unknown as never);
     expect(res.ok).toBe(false);
+  });
+});
+
+describe('activity recording (Phase 5, M2)', () => {
+  // A monotonic clock: events written in the same millisecond would tie in the
+  // `[projectId, createdAt]` index and make the newest-first order arbitrary.
+  let tick = 0;
+  const deps = {
+    capture: {
+      newId: () => `id-${++tick}`,
+      now: () => new Date(Date.UTC(2026, 6, 24, 12, 0, ++tick)).toISOString(),
+    },
+  };
+
+  beforeEach(() => {
+    tick = 0;
+  });
+
+  async function feed(projectId = 'p1', limit?: number): Promise<ActivityEvent[]> {
+    const res = await handleRequest(
+      repos,
+      { type: 'activity/listByProject', projectId, ...(limit === undefined ? {} : { limit }) },
+      deps,
+    );
+    return res.ok ? (res.data as ActivityEvent[]) : [];
+  }
+
+  it('records a new source once, then only the status move', async () => {
+    const document = makeDocument('d1', 'p1');
+    await handleRequest(repos, { type: 'documents/put', document }, deps);
+    await handleRequest(
+      repos,
+      { type: 'documents/put', document: { ...document, status: 'inReview' } },
+      deps,
+    );
+    // A metadata-only edit is not news and must not add a third event.
+    await handleRequest(
+      repos,
+      {
+        type: 'documents/put',
+        document: { ...document, status: 'inReview', metadata: { title: 'Renamed' } },
+      },
+      deps,
+    );
+
+    const events = await feed();
+    expect(events.map((e) => e.kind)).toEqual(['status', 'source']);
+    expect(events[0]).toMatchObject({ from: 'toRead', to: 'inReview', entityId: 'd1' });
+  });
+
+  it('records annotations added, reviewed and removed', async () => {
+    const annotation = {
+      id: 'an1',
+      projectId: 'p1',
+      documentId: 'd1',
+      anchor: { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] },
+      content: 'note',
+      tags: [],
+      status: 'draft' as const,
+      author: 'me',
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await handleRequest(repos, { type: 'annotations/put', annotation }, deps);
+    await handleRequest(
+      repos,
+      { type: 'annotations/put', annotation: { ...annotation, status: 'accepted' } },
+      deps,
+    );
+    await handleRequest(repos, { type: 'annotations/delete', id: 'an1' }, deps);
+
+    const events = await feed();
+    expect(events).toHaveLength(3);
+    expect(events.every((e) => e.kind === 'annotation')).toBe(true);
+    expect(events[0]?.summary).toMatch(/^removed an annotation/);
+    expect(events[1]).toMatchObject({ from: 'draft', to: 'accepted' });
+  });
+
+  it('records a member role change with the previous role', async () => {
+    await repos.projects.put({
+      id: 'p1',
+      name: 'Urban Heat',
+      sections: [],
+      members: [
+        { userId: 'me', role: 'owner' },
+        { userId: 'u2', role: 'editor' },
+      ],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await repos.users.put({ id: 'u2', name: 'L. Reyes', rolesPerProject: { p1: 'editor' } });
+
+    await handleRequest(
+      repos,
+      { type: 'members/setRole', projectId: 'p1', userId: 'u2', role: 'viewer' },
+      deps,
+    );
+
+    const events = await feed();
+    expect(events[0]).toMatchObject({
+      kind: 'member',
+      summary: 'changed the role of L. Reyes',
+      from: 'editor',
+      to: 'viewer',
+    });
+  });
+
+  it('records a capture once and stays silent when it dedupes', async () => {
+    const input = {
+      projectId: 'p1',
+      url: 'https://example.org/heat',
+      type: 'article' as const,
+      metadata: { title: 'Urban heat', doi: '10.1000/heat' },
+    };
+    await handleRequest(repos, { type: 'capture/page', input }, deps);
+    await handleRequest(repos, { type: 'capture/page', input }, deps);
+
+    const events = await feed();
+    expect(events.map((e) => e.kind)).toEqual(['source']);
+    expect(events[0]?.summary).toBe('added Urban heat');
+  });
+
+  it('lists a project newest first and honours the limit', async () => {
+    for (const id of ['d1', 'd2', 'd3']) {
+      await handleRequest(repos, { type: 'documents/put', document: makeDocument(id, 'p1') }, deps);
+    }
+    await handleRequest(repos, { type: 'documents/put', document: makeDocument('d4', 'p2') }, deps);
+
+    expect(await feed('p1')).toHaveLength(3);
+    expect(await feed('p1', 2)).toHaveLength(2);
+    expect(await feed('p2')).toHaveLength(1);
   });
 });

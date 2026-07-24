@@ -12,6 +12,7 @@ import type {
   CitationStyle,
   User,
   StoredFile,
+  ActivityEvent,
   Id,
 } from '../model/types';
 
@@ -67,6 +68,13 @@ export interface FileRepository {
   delete(id: Id): Promise<void>;
 }
 
+export interface ActivityRepository {
+  /** Newest first; `limit` caps the read (the feed asks for a page at a time). */
+  listByProject(projectId: Id, limit?: number): Promise<ActivityEvent[]>;
+  put(event: ActivityEvent): Promise<void>;
+  delete(id: Id): Promise<void>;
+}
+
 export interface RepositorySet {
   projects: ProjectRepository;
   documents: DocumentRepository;
@@ -75,4 +83,5 @@ export interface RepositorySet {
   citationStyles: CitationStyleRepository;
   users: UserRepository;
   files: FileRepository;
+  activity: ActivityRepository;
 }

@@ -1,18 +1,18 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — Phase 4 complete and merged; Phase 5 started (M1 of 4 done)._
+_Last updated: 2026-07-24 — Phase 4 complete and merged; Phase 5 in progress (M2 of 4 done)._
 
 ## Where we are
 
 **Phase 4 (Citation style editor) is complete and merged to `main`.** **Phase 5 (Collaboration &
-Sync) is in progress** — M1 (members & roles) shipped; M2–M4 remain.
+Sync) is in progress** — M1 (members & roles) and M2 (activity feed) shipped; M3–M4 remain.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.15.0 is on `main`** (Phases 1–5 M1). No unmerged work.
-- **Releases:** v0.15.0 (Phase 5 M1); v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3;
-  v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Branch state:** everything through **v0.16.0 is on `main`** (Phases 1–5 M2). No unmerged work.
+- **Releases:** v0.15.0 → v0.16.0 (Phase 5 M1–M2); v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
+  Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 139 unit + 16 E2E (5 PDF viewer + 9 dashboard + 2 side panel), all green.
+- **Tests:** 168 unit + 17 E2E (5 PDF viewer + 10 dashboard + 2 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -31,12 +31,20 @@ Consequences carried through the code and the UI:
 | Milestone | Version | State |
 |---|---|---|
 | M1 — Members & roles: capability matrix (`src/core/model/roles.ts`), membership use-cases, Team view (6th nav item), `members/*` + `users/*` messages | v0.15.0 | ✅ |
-| M2 — Activity feed: `ActivityEvent` entity, IDB **schema v3**, recording hooks for status / annotation / reference / member / sync events, day-grouped feed with kind filters | — | ⬜ |
+| M2 — Activity feed: `ActivityEvent` entity, IDB **schema v3**, recording in the router cases, day-grouped feed with kind filters and before→after diffs | v0.16.0 | ✅ |
 | M3 — Comment threads: anchored threads on documents & annotations, reply / resolve, Comments tab | — | ⬜ |
 | M4 — Snapshot export/import: portable JSON, optional AES-GCM password, merge on import with **hard DOI dedup**, sync-mode selector (local / file; backend shown as unavailable) | — | ⬜ |
 
-M2 and M3 add the tab bar (Activity / Comments / Members) the design mock has; M1 deliberately ships
-the Members view without dead tabs.
+The Team view now has the tab bar the design mock has, minus the tab whose milestone has not landed:
+M2 shipped **Activity | Members**, M3 adds **Comments**. No dead tabs at any point.
+
+M2 decisions worth remembering: events carry a seventh kind, **`source`**, beyond the mock's six —
+filing a page is not the same act as importing a bibliographic record, and the feed says so. Events
+are recorded in the **router cases**, so a change made in the side panel or the PDF reader is in the
+feed without either surface knowing it exists, and `recordActivity` **never throws**: the feed records
+a change, it does not gate one. Retention is a **read limit, not a purge** (200 per page, `Show
+older`) — nothing is deleted, so the M4 snapshot can carry the whole history. `from` / `to` hold raw
+domain values; labelling them is the view's job (`diffLabel` in `src/options/view-model.ts`).
 
 ### Phase 4 delivered (verified in headed Chromium + screenshots)
 
@@ -111,18 +119,18 @@ Ports & adapters: pure domain core in `src/core` (no `chrome.*`), thin adapters 
 
 ## Resume plan — next steps
 
-**Continue Phase 5 at M2 (activity feed).** Nothing is half-finished: `main` is green at v0.15.0 and
-the working tree is clean. M2 starts with the domain entity and the IDB migration:
+**Continue Phase 5 at M3 (comment threads).** Nothing is half-finished: `main` is green at v0.16.0
+and the working tree is clean. M3 starts with the domain entity and the IDB migration:
 
-1. `ActivityEvent { id, projectId, actorUserId, kind, summary, entityId?, from?, to?, createdAt }`
-   in `src/core/model/types.ts`; `kind` covers status / annotation / comment / reference / member /
-   sync (the mock's filter chips).
-2. IDB **schema v3** — an `activity` store keyed by `id` with a `projectId` index. Follow
-   `src/adapters/idb/schema.ts`: add `migrations[3]`, never touch `migrations[1]`/`[2]`.
-3. Record events where the change already happens (the router cases and `src/core/usecases/*`), not
-   in the UI — a change made from the side panel must show up in the feed too.
-4. Team view gains the tab bar; Activity tab renders day-grouped events with the kind filters and a
-   before→after diff for status and role changes.
+1. A `CommentThread` / `Comment` pair in `src/core/model/types.ts`, anchored the way annotations are
+   (`Anchor`) so a thread can hang off a document region as well as off an annotation.
+2. IDB **schema v4** — follow `src/adapters/idb/schema.ts`: append `migrations[4]`, never touch
+   `migrations[1]`–`[3]`; index by project and by the entity the thread is anchored to.
+3. Reply / resolve use-cases in `src/core/usecases/`, and recording through the **existing**
+   `recordActivity` with the already-defined `comment` kind — the filter chip appears by itself once
+   events exist.
+4. Team view gains the third tab (**Comments**) beside Activity and Members; the thread card, reply
+   box and resolve pill are in `collaboration-sync.html`.
 
 **Smaller follow-ons in the citation area:** bundle size (the Chicago notes CSL is 243 kB raw —
 lazy-loading base styles from `web_accessible_resources` would trim the SW), and importing a
@@ -131,7 +139,7 @@ third-party `.csl` file as a base style.
 ### How to resume
 
 ```
-/loop work through Phase 5 (collaboration & sync) milestones M2–M4, one milestone per iteration, full loop each time
+/loop work through Phase 5 (collaboration & sync) milestones M3–M4, one milestone per iteration, full loop each time
 ```
 
 Environment is ready: Node 22, deps installed, `gh` authenticated with `workflow` scope, Playwright

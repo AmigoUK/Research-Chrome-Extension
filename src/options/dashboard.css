@@ -276,6 +276,36 @@ button.stat-tag:hover { border-color: var(--fg); }
 .csl-note { font-size: 11.5px; color: var(--muted); line-height: 1.6; margin-top: 14px; padding: 12px 13px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .csl-note b { color: var(--fg); }
 
+/* ---- Team: view tabs (Phase 5) ---- */
+.vtabs { display: flex; gap: 2px; margin: -4px 0 20px; border-bottom: 1px solid var(--border); }
+.vtab { font: inherit; font-size: 13px; font-weight: 540; border: 0; background: none; color: var(--muted); cursor: pointer; padding: 9px 14px; border-radius: 8px 8px 0 0; position: relative; top: 1px; border-bottom: 2px solid transparent; display: inline-flex; align-items: center; gap: 7px; }
+.vtab:hover { color: var(--fg); }
+.vtab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
+.vtab .n { font-family: var(--font-mono); font-size: 10px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 20px; padding: 0 6px; }
+.vtab[aria-selected="true"] .n { color: var(--accent); }
+
+/* ---- Team: activity feed (Phase 5, M2) ---- */
+.day { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 20px 0 12px; display: flex; align-items: center; gap: 10px; }
+.day:first-child { margin-top: 0; }
+.day .ln { flex: 1; height: 1px; background: var(--border); }
+.feed { position: relative; padding-left: 34px; }
+.feed::before { content: ""; position: absolute; left: 14px; top: 4px; bottom: 4px; width: 1.5px; background: var(--border); }
+.ev { position: relative; padding: 0 0 18px; }
+.ev-dot { position: absolute; left: -27px; top: 1px; width: 26px; height: 26px; border-radius: 50%; background: var(--surface); border: 1px solid var(--border); display: grid; place-items: center; color: var(--muted); }
+.ev-dot svg { width: 14px; height: 14px; }
+.ev-dot.status { color: var(--accent); }
+.ev-dot.comment { color: oklch(58% .12 70); }
+.ev-dot.sync { color: var(--success); }
+.ev-b { font-size: 13px; line-height: 1.5; }
+.ev-b .who { font-weight: 600; }
+.ev-b .ent { font-family: var(--font-display); font-weight: 600; }
+.ev-t { font-family: var(--font-mono); font-size: 10px; color: var(--muted); margin-top: 3px; }
+.diff { display: inline-flex; align-items: center; gap: 7px; margin: 6px 0 0 8px; }
+.diff .c { font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: 5px; border: 1px solid var(--border); background: var(--surface-2); color: var(--muted); }
+.diff .c.to { color: var(--fg); border-color: var(--fg); }
+.diff .ar { color: var(--muted); }
+.more { display: flex; justify-content: center; padding: 4px 0 12px; }
+
 /* ---- Team: members & roles (Phase 5) ---- */
 .advisory { display: flex; gap: 11px; align-items: flex-start; font-size: 12px; line-height: 1.55; background: oklch(96% .04 70); border: 1px solid oklch(85% .08 70); border-radius: 10px; padding: 12px 13px; margin-bottom: 22px; }
 .advisory svg { width: 16px; height: 16px; color: oklch(58% .12 70); flex: 0 0 auto; margin-top: 1px; }

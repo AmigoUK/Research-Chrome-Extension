@@ -15,10 +15,11 @@ import type {
   CitationStyle,
   User,
   StoredFile,
+  ActivityEvent,
 } from '../../core/model/types';
 
 export const DB_NAME = 'context-notes';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export interface ContextNotesDB extends DBSchema {
   projects: { key: string; value: Project };
@@ -41,6 +42,12 @@ export interface ContextNotesDB extends DBSchema {
   users: { key: string; value: User };
   /** Binary payloads (PDF bytes), keyed by id and referenced by Document.fileId. */
   files: { key: string; value: StoredFile };
+  /** Project history. The composite index gives newest-first reads per project. */
+  activity: {
+    key: string;
+    value: ActivityEvent;
+    indexes: { byProjectTime: [string, string] };
+  };
 }
 
 type UpgradeTx = IDBPTransaction<
@@ -76,6 +83,12 @@ export const migrations: Record<number, (db: IDBPDatabase<ContextNotesDB>, tx: U
     2(db) {
       // Phase 3: binary payload store for PDF bytes (Document.fileId → files).
       db.createObjectStore('files', { keyPath: 'id' });
+    },
+    3(db) {
+      // Phase 5 M2: the activity feed. Keyed by id; the composite index is what
+      // lets the feed read a project's newest events without sorting in memory.
+      const activity = db.createObjectStore('activity', { keyPath: 'id' });
+      activity.createIndex('byProjectTime', ['projectId', 'createdAt']);
     },
   };
 

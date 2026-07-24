@@ -7,7 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 5 M1 (members & roles) shipped. Next: M2 — the activity feed._
+_Phase 5 M2 (activity feed) shipped. Next: M3 — anchored comment threads._
+
+## [0.16.0] — 2026-07-24
+
+### Added
+
+- **Activity feed (Phase 5, M2)** — the project now remembers what happened, with before→after
+  diffs, as the roadmap's change tracking requires:
+  - `ActivityEvent` in `src/core/model/types.ts` with seven kinds — `source`, `status`,
+    `annotation`, `comment`, `reference`, `member`, `sync`. `comment` and `sync` are defined for
+    M3 / M4 and emitted by nothing yet; the filter chips are built from the kinds actually present.
+  - IndexedDB **schema v3**: an `activity` store with a composite `byProjectTime`
+    (`[projectId, createdAt]`) index, so a project's newest events are read without sorting in
+    memory. `migrations[1]` and `[2]` untouched.
+  - `src/core/usecases/activity.ts` — `recordActivity` (best-effort: **never throws**, because the
+    feed records a change and must not undo one) plus the builders that decide whether an event is
+    worth writing at all: a status move yes, a metadata edit no.
+  - Recording happens in the router cases, where the change actually lands, so a status moved from
+    the side panel and an annotation added in the PDF reader reach the feed without either surface
+    knowing it exists.
+  - New message `activity/listByProject` (newest first, `limit` pages the feed at 200).
+- **Team view tabs — Activity | Members.** The Activity tab groups events by day (Today /
+  Yesterday / date), draws the timeline from the design mock, filters by kind and shows a
+  `Show older` button once a full page has been read. Comments joins them in M3; no dead tabs.
+
+### Changed
+
+- `SELF_USER_ID` moved from `src/options/main.ts` into `src/core/model/identity.ts` — the router
+  stamps it on every event, so it is no longer a dashboard-private constant.
+- The dashboard's HTML escaping (`esc`) now comes from `escapeHtml` in `src/options/view-model.ts`,
+  which `highlightEntity` reuses: a summary is escaped **before** the entity inside it is
+  emphasised, so a document title can never inject markup.
+
+### Notes
+
+- 168 unit tests (up from 139) + 17 E2E; the new E2E moves a source through the service worker and
+  finds the event in the feed with its `To read → In review` chips, then filters it away by kind.
+- Retention is a read limit, not a purge: every event is kept, so the M4 snapshot can carry the whole
+  history. The feed reads 200 at a time and `Show older` asks for the next page.
 
 ## [0.15.0] — 2026-07-24
 
@@ -412,7 +450,8 @@ _Phase 5 M1 (members & roles) shipped. Next: M2 — the activity feed._
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.12.0...v0.13.0

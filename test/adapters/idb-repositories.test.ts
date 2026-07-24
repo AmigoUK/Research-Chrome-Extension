@@ -4,7 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type { Document, Project, Reference } from '../../src/core/model/types';
+import type { ActivityEvent, Document, Project, Reference } from '../../src/core/model/types';
 
 const NOW = '2026-07-23T00:00:00.000Z';
 
@@ -58,7 +58,16 @@ describe('schema migration (v0 → current)', () => {
   it('creates every object store on first open', async () => {
     const db = await openContextNotesDB(`stores-${dbCounter++}`);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['annotations', 'citationStyles', 'documents', 'files', 'projects', 'references', 'users'].sort(),
+      [
+        'activity',
+        'annotations',
+        'citationStyles',
+        'documents',
+        'files',
+        'projects',
+        'references',
+        'users',
+      ].sort(),
     );
   });
 });
@@ -95,6 +104,43 @@ describe('document repository', () => {
     expect(hit?.id).toBe('d1');
 
     expect(await repos.documents.findByDoi('p1', '10.9999/none')).toBeUndefined();
+  });
+});
+
+describe('activity repository', () => {
+  function makeEvent(id: string, projectId: string, createdAt: string): ActivityEvent {
+    return {
+      id,
+      projectId,
+      actorUserId: 'me',
+      kind: 'status',
+      summary: `event ${id}`,
+      createdAt,
+    };
+  }
+
+  it('lists a project newest first, isolating other projects', async () => {
+    await repos.activity.put(makeEvent('a1', 'p1', '2026-07-24T09:00:00.000Z'));
+    await repos.activity.put(makeEvent('a2', 'p1', '2026-07-24T11:00:00.000Z'));
+    await repos.activity.put(makeEvent('a3', 'p1', '2026-07-24T10:00:00.000Z'));
+    await repos.activity.put(makeEvent('b1', 'p2', '2026-07-24T12:00:00.000Z'));
+
+    expect((await repos.activity.listByProject('p1')).map((e) => e.id)).toEqual(['a2', 'a3', 'a1']);
+    expect((await repos.activity.listByProject('p2')).map((e) => e.id)).toEqual(['b1']);
+  });
+
+  it('caps the read at `limit`, keeping the newest events', async () => {
+    await repos.activity.put(makeEvent('a1', 'p1', '2026-07-24T09:00:00.000Z'));
+    await repos.activity.put(makeEvent('a2', 'p1', '2026-07-24T10:00:00.000Z'));
+    await repos.activity.put(makeEvent('a3', 'p1', '2026-07-24T11:00:00.000Z'));
+
+    expect((await repos.activity.listByProject('p1', 2)).map((e) => e.id)).toEqual(['a3', 'a2']);
+  });
+
+  it('deletes an event', async () => {
+    await repos.activity.put(makeEvent('a1', 'p1', '2026-07-24T09:00:00.000Z'));
+    await repos.activity.delete('a1');
+    expect(await repos.activity.listByProject('p1')).toEqual([]);
   });
 });
 

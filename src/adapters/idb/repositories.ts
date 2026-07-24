@@ -13,6 +13,7 @@ import type {
   CitationStyleRepository,
   UserRepository,
   FileRepository,
+  ActivityRepository,
   RepositorySet,
 } from '../../core/ports/repositories';
 import type {
@@ -23,6 +24,7 @@ import type {
   CitationStyle,
   User,
   StoredFile,
+  ActivityEvent,
   Id,
 } from '../../core/model/types';
 import type { ContextNotesDatabase } from './db';
@@ -147,6 +149,33 @@ class IdbFileRepository implements FileRepository {
   }
 }
 
+class IdbActivityRepository implements ActivityRepository {
+  constructor(private readonly db: ContextNotesDatabase) {}
+  /**
+   * Walks the `[projectId, createdAt]` index backwards, so the newest events
+   * come first and `limit` stops the read instead of trimming a full scan.
+   */
+  async listByProject(projectId: Id, limit?: number): Promise<ActivityEvent[]> {
+    const range = IDBKeyRange.bound([projectId, ''], [projectId, '￿']);
+    const events: ActivityEvent[] = [];
+    let cursor = await this.db
+      .transaction('activity')
+      .store.index('byProjectTime')
+      .openCursor(range, 'prev');
+    while (cursor && (limit === undefined || events.length < limit)) {
+      events.push(cursor.value);
+      cursor = await cursor.continue();
+    }
+    return events;
+  }
+  async put(event: ActivityEvent): Promise<void> {
+    await this.db.put('activity', event);
+  }
+  async delete(id: Id): Promise<void> {
+    await this.db.delete('activity', id);
+  }
+}
+
 function normaliseDoi(doi: unknown): string | undefined {
   if (typeof doi !== 'string') return undefined;
   return doi
@@ -164,5 +193,6 @@ export function createRepositories(db: ContextNotesDatabase): RepositorySet {
     citationStyles: new IdbCitationStyleRepository(db),
     users: new IdbUserRepository(db),
     files: new IdbFileRepository(db),
+    activity: new IdbActivityRepository(db),
   };
 }

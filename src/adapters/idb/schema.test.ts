@@ -20,13 +20,30 @@ describe('migrationVersionsToRun', () => {
 });
 
 describe('schema at DB_VERSION', () => {
-  it('creates all stores including the v2 files store', async () => {
+  it('creates all stores including the v2 files and v3 activity stores', async () => {
     globalThis.indexedDB = new IDBFactory();
-    const db = await openContextNotesDB('schema-v2');
+    const db = await openContextNotesDB('schema-v3');
     expect(db.version).toBe(DB_VERSION);
     expect([...db.objectStoreNames].sort()).toEqual(
-      ['annotations', 'citationStyles', 'documents', 'files', 'projects', 'references', 'users'].sort(),
+      [
+        'activity',
+        'annotations',
+        'citationStyles',
+        'documents',
+        'files',
+        'projects',
+        'references',
+        'users',
+      ].sort(),
     );
+    db.close();
+  });
+
+  it('indexes activity by project and time, for newest-first reads', async () => {
+    globalThis.indexedDB = new IDBFactory();
+    const db = await openContextNotesDB('schema-v3-index');
+    const index = db.transaction('activity').store.index('byProjectTime');
+    expect(index.keyPath).toEqual(['projectId', 'createdAt']);
     db.close();
   });
 });

@@ -10,6 +10,7 @@ import type {
   Annotation,
   Reference,
   CitationStyle,
+  ActivityEvent,
   Id,
   ProjectRole,
   User,
@@ -71,6 +72,8 @@ export interface MessageMap {
   };
   'members/setRole': { req: { projectId: Id; userId: Id; role: ProjectRole }; res: null };
   'members/remove': { req: { projectId: Id; userId: Id }; res: null };
+  /** Newest first; `limit` pages the feed (default `DEFAULT_ACTIVITY_LIMIT`). */
+  'activity/listByProject': { req: { projectId: Id; limit?: number }; res: ActivityEvent[] };
 }
 
 export type MessageType = keyof MessageMap;

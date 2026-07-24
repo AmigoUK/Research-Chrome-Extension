@@ -15,6 +15,8 @@ import type {
   Document,
   Annotation,
   AnnotationStatus,
+  ActivityEvent,
+  ActivityKind,
   Anchor,
   Reference,
   CitationStyle,
@@ -23,6 +25,8 @@ import type {
   ProjectRole,
   Id,
 } from '../core/model/types';
+import { SELF_USER_ID } from '../core/model/identity';
+import { DEFAULT_ACTIVITY_LIMIT } from '../core/usecases/activity';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import {
   BASE_STYLES,
@@ -49,8 +53,14 @@ import {
   type ListFilter,
 } from '../sidepanel/view-model';
 import {
+  ACTIVITY_KIND_LABELS,
   ROUTE_TITLES,
   STATUS_META,
+  activityFilterKinds,
+  diffLabel,
+  escapeHtml,
+  groupActivityByDay,
+  highlightEntity,
   isFullScreenRoute,
   isNavRoute,
   statusDot,
@@ -65,11 +75,7 @@ const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = 
 const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T[] => [
   ...root.querySelectorAll<T>(sel),
 ];
-const esc = (s: unknown): string =>
-  String(s).replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
-  );
+const esc = escapeHtml;
 
 /* ---- Icons (inline SVG paths) ---- */
 const ICON = {
@@ -86,6 +92,23 @@ const ICON = {
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   invite:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>',
+};
+
+/** Timeline dot glyph per activity kind (`comment` / `sync` land in M3 / M4). */
+const ACTIVITY_ICON: Record<ActivityKind, string> = {
+  source:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  status:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  annotation:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+  comment:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 20.5l1.5-4.5A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/></svg>',
+  reference:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>',
+  member:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/></svg>',
+  sync: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-7.6-4.2M3 12a9 9 0 0 1 9-9 9 9 0 0 1 7.6 4.2"/><path d="M20 3v5h-5M4 21v-5h5"/></svg>',
 };
 
 interface NavDef {
@@ -143,6 +166,7 @@ interface DashState {
   references: Reference[];
   styles: CitationStyle[];
   members: MemberView[];
+  activity: ActivityEvent[];
   route: Route;
   flash: Id | null;
   drag: Id | null;
@@ -151,6 +175,11 @@ interface DashState {
   selectedStyleId: Id | null;
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
+  /** Tab within the Team view (Comments joins them in M3). */
+  teamTab: 'activity' | 'members';
+  activityFilter: ActivityKind | 'all';
+  /** How many events the feed has asked for — grows with "Show older". */
+  activityLimit: number;
 }
 const state: DashState = {
   projects: [],
@@ -160,6 +189,7 @@ const state: DashState = {
   references: [],
   styles: [],
   members: [],
+  activity: [],
   route: 'overview',
   flash: null,
   drag: null,
@@ -167,6 +197,9 @@ const state: DashState = {
   annoFilter: { search: '', status: 'all' },
   selectedStyleId: null,
   editorTab: 'preview',
+  teamTab: 'activity',
+  activityFilter: 'all',
+  activityLimit: DEFAULT_ACTIVITY_LIMIT,
 };
 
 const activeProject = (): Project | undefined =>
@@ -189,10 +222,6 @@ function authorLabel(authors?: string[]): string {
 }
 
 /* ---- Data ---- */
-/** The local user. Without a backend there are no accounts — this is the id the
- * side panel and the dashboard have always written as the project owner. */
-const SELF_USER_ID = 'me';
-
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -263,21 +292,24 @@ async function loadProjectData(): Promise<void> {
     state.annotations = [];
     state.styles = [];
     state.members = [];
+    state.activity = [];
     return;
   }
   const projectId = state.activeProjectId;
-  const [documents, annotations, references, styles, members] = await Promise.all([
+  const [documents, annotations, references, styles, members, activity] = await Promise.all([
     sendRequest({ type: 'documents/listByProject', projectId }),
     sendRequest({ type: 'annotations/listByProject', projectId }),
     sendRequest({ type: 'references/listByProject', projectId }),
     sendRequest({ type: 'citationStyles/list' }),
     sendRequest({ type: 'members/list', projectId }),
+    sendRequest({ type: 'activity/listByProject', projectId, limit: state.activityLimit }),
   ]);
   state.documents = documents;
   state.annotations = annotations;
   state.references = references;
   state.styles = styles;
   state.members = members;
+  state.activity = activity;
 }
 
 /**
@@ -300,6 +332,17 @@ async function reloadMembers(): Promise<void> {
   state.members = await sendRequest({ type: 'members/list', projectId: state.activeProjectId });
 }
 
+/** Reload the feed. Changes are recorded in the service worker, so the only way
+ * to see one made in the Kanban, the side panel or the PDF reader is to re-read. */
+async function reloadActivity(): Promise<void> {
+  if (!state.activeProjectId) return;
+  state.activity = await sendRequest({
+    type: 'activity/listByProject',
+    projectId: state.activeProjectId,
+    limit: state.activityLimit,
+  });
+}
+
 /* ---- Sidebar ---- */
 function renderNav(): void {
   const nav = $('#nav');
@@ -315,7 +358,8 @@ function renderNav(): void {
   $$('.nav-item', nav).forEach((b) => {
     b.onclick = () => {
       const r = b.dataset.route;
-      if (r && isNavRoute(r)) go(r);
+      if (r === 'team') void openTeam();
+      else if (r && isNavRoute(r)) go(r);
       closeSidebar();
     };
   });
@@ -352,6 +396,8 @@ async function switchProject(id: Id): Promise<void> {
   state.activeProjectId = id;
   state.docFilter = { search: '', status: 'all' };
   state.annoFilter = { search: '', status: 'all' };
+  state.activityFilter = 'all';
+  state.activityLimit = DEFAULT_ACTIVITY_LIMIT;
   await loadProjectData();
   render();
 }
@@ -1703,19 +1749,63 @@ async function exportStyleCsl(): Promise<void> {
   }
 }
 
-/* ---- Team: members & roles (Phase 5) ---- */
+/* ---- Team: activity, members & roles (Phase 5) ---- */
+
+/** Enter the Team view with a fresh feed — changes are made in other views. */
+async function openTeam(): Promise<void> {
+  go('team');
+  try {
+    await reloadActivity();
+  } catch {
+    // A stale feed is not worth a toast; the rest of the view still works.
+    return;
+  }
+  if (state.route === 'team') render();
+}
 
 function renderTeam(view: HTMLElement, actions: HTMLElement): void {
   actions.innerHTML = `<button class="btn btn--primary btn--sm" id="tInvite">${ICON.invite} Invite</button>`;
   $('#tInvite', actions).onclick = (e) => {
     e.stopPropagation();
-    openInvitePopover($('#tInvite', actions));
+    // Inviting belongs to the Members tab — go there first, then open the form.
+    if (state.teamTab !== 'members') {
+      state.teamTab = 'members';
+      render();
+    }
+    openInvitePopover($('#tInvite'));
   };
 
+  const tab = (id: 'activity' | 'members', label: string, count: number): string =>
+    `<button class="vtab" role="tab" data-tab="${id}" aria-selected="${state.teamTab === id}">
+      ${label}<span class="n">${count}</span></button>`;
+
+  view.innerHTML = `
+    <div class="vtabs" role="tablist">
+      ${tab('activity', 'Activity', state.activity.length)}
+      ${tab('members', 'Members', state.members.length)}
+    </div>
+    <div id="teamBody"></div>`;
+
+  $$('.vtab', view).forEach((b) => {
+    b.onclick = () => {
+      const t = b.dataset.tab;
+      if (t === 'activity' || t === 'members') {
+        state.teamTab = t;
+        render();
+      }
+    };
+  });
+
+  const body = $('#teamBody', view);
+  if (state.teamTab === 'members') renderMembersTab(body);
+  else renderActivityTab(body);
+}
+
+function renderMembersTab(body: HTMLElement): void {
   const yes = `<span class="cap-y">${ICON.check}</span>`;
   const no = `<span class="cap-n">${ICON.x}</span>`;
 
-  view.innerHTML = `
+  body.innerHTML = `
     <div class="advisory">${ICON.warn}<div><b>Roles are advisory.</b> Every collaborator holds a full
       copy of the project in their own browser, so a role documents intent — it is not enforced.
       Only a self-hosted backend could enforce it, and this build has no backend.</div></div>
@@ -1737,6 +1827,99 @@ function renderTeam(view: HTMLElement, actions: HTMLElement): void {
     </div>`;
 
   drawMembers();
+}
+
+/* ---- Team: activity feed ---- */
+
+/** Who the event is attributed to. The local user is "You", not an id. */
+function actorName(userId: Id): string {
+  if (userId === SELF_USER_ID) return state.members.find((m) => m.userId === userId)?.name ?? 'You';
+  return state.members.find((m) => m.userId === userId)?.name ?? userId;
+}
+
+function timeLabel(iso: string): string {
+  const d = new Date(iso);
+  return `${`${d.getHours()}`.padStart(2, '0')}:${`${d.getMinutes()}`.padStart(2, '0')}`;
+}
+
+function activityEventHtml(event: ActivityEvent): string {
+  const chip = (value: string, to = false): string =>
+    `<span class="c${to ? ' to' : ''}">${esc(diffLabel(event.kind, value))}</span>`;
+  const diff =
+    event.from && event.to
+      ? `<div class="diff">${chip(event.from)}<span class="ar">→</span>${chip(event.to, true)}</div>`
+      : event.to
+        ? `<div class="diff">${chip(event.to, true)}</div>`
+        : '';
+  return `<div class="ev">
+    <div class="ev-dot ${event.kind}">${ACTIVITY_ICON[event.kind]}</div>
+    <div class="ev-b">
+      <span class="who">${esc(actorName(event.actorUserId))}</span>
+      ${highlightEntity(event.summary, event.entityLabel)}${diff}
+      <div class="ev-t">${esc(timeLabel(event.createdAt))}</div>
+    </div>
+  </div>`;
+}
+
+function renderActivityTab(body: HTMLElement): void {
+  const kinds = activityFilterKinds(state.activity);
+  // A filter can outlive the events it matched (project switch, "Show older").
+  if (state.activityFilter !== 'all' && !kinds.includes(state.activityFilter)) {
+    state.activityFilter = 'all';
+  }
+  const events =
+    state.activityFilter === 'all'
+      ? state.activity
+      : state.activity.filter((e) => e.kind === state.activityFilter);
+
+  const chip = (value: ActivityKind | 'all', label: string): string =>
+    `<button class="fchip" data-af="${value}" aria-pressed="${state.activityFilter === value}">${esc(label)}</button>`;
+  const filters =
+    kinds.length > 1
+      ? `<div class="filters" id="actFilters" style="margin-bottom:18px">
+          ${chip('all', 'All')}${kinds.map((k) => chip(k, ACTIVITY_KIND_LABELS[k])).join('')}
+        </div>`
+      : '';
+
+  const feed = groupActivityByDay(events, nowIso())
+    .map(
+      (day) => `<div class="day">${esc(day.label)}<span class="ln"></span></div>
+        <div class="feed">${day.events.map(activityEventHtml).join('')}</div>`,
+    )
+    .join('');
+
+  // The feed reads a page at a time; a full page means there may be more.
+  const older =
+    state.activity.length >= state.activityLimit
+      ? `<div class="more"><button class="btn btn--ghost btn--sm" id="actOlder">Show older</button></div>`
+      : '';
+
+  body.innerHTML =
+    filters +
+    (events.length === 0
+      ? emptyState(
+          'Nothing recorded yet',
+          'Move a source, write a note or invite a collaborator — every change lands here.',
+        )
+      : feed + older);
+
+  $$('[data-af]', body).forEach((b) => {
+    b.onclick = () => {
+      const value = b.dataset.af;
+      state.activityFilter = value === 'all' ? 'all' : (value as ActivityKind);
+      render();
+    };
+  });
+  const olderBtn = body.querySelector<HTMLButtonElement>('#actOlder');
+  if (olderBtn) olderBtn.onclick = () => void showOlderActivity();
+}
+
+async function showOlderActivity(): Promise<void> {
+  const before = state.activity.length;
+  state.activityLimit += DEFAULT_ACTIVITY_LIMIT;
+  await reloadActivity();
+  render();
+  if (state.activity.length === before) toast('That is the whole history', ICON.check);
 }
 
 function drawMembers(): void {
@@ -1811,7 +1994,7 @@ async function invite(email: string, role: ProjectRole): Promise<void> {
       role,
     });
     closePop();
-    await reloadMembers();
+    await Promise.all([reloadMembers(), reloadActivity()]);
     render();
     toast(`Invited · ${member.name} as ${ROLE_LABELS[member.role]}`, ICON.check);
   } catch (err) {
@@ -1823,7 +2006,7 @@ async function changeRole(userId: Id, role: ProjectRole): Promise<void> {
   if (!state.activeProjectId) return;
   try {
     await sendRequest({ type: 'members/setRole', projectId: state.activeProjectId, userId, role });
-    await reloadMembers();
+    await Promise.all([reloadMembers(), reloadActivity()]);
     render();
     toast(`Role updated to ${ROLE_LABELS[role]}`, ICON.check);
   } catch (err) {
@@ -1838,7 +2021,7 @@ async function removeMemberById(userId: Id): Promise<void> {
   const member = state.members.find((m) => m.userId === userId);
   try {
     await sendRequest({ type: 'members/remove', projectId: state.activeProjectId, userId });
-    await reloadMembers();
+    await Promise.all([reloadMembers(), reloadActivity()]);
     render();
     toast(`Removed · ${member?.name ?? userId}`, ICON.check);
   } catch (err) {

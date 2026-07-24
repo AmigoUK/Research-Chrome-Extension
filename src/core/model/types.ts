@@ -186,3 +186,37 @@ export interface User {
   email?: string;
   rolesPerProject: Record<Id, ProjectRole>;
 }
+
+/**
+ * What kind of change an activity event records. `comment` and `sync` belong to
+ * later milestones (M3 threads, M4 snapshots) — nothing emits them yet, and the
+ * feed's filter chips are built from the kinds actually present in the data.
+ */
+export const ACTIVITY_KINDS = [
+  'source',
+  'status',
+  'annotation',
+  'comment',
+  'reference',
+  'member',
+  'sync',
+] as const;
+export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
+
+/** One recorded change in a project's history — the activity feed's unit. */
+export interface ActivityEvent {
+  id: Id;
+  projectId: Id;
+  actorUserId: Id;
+  kind: ActivityKind;
+  /** Plain text, e.g. `moved Gasparrini et al. 2015 forward`. Escaped at render. */
+  summary: string;
+  /** The part of `summary` to emphasise (document title, member name). */
+  entityLabel?: string;
+  /** The entity the event is about — documentId / annotationId / userId. */
+  entityId?: Id;
+  /** Raw domain values (status ids, role ids), never display labels. */
+  from?: string;
+  to?: string;
+  createdAt: IsoDateTime;
+}
