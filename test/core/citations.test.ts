@@ -18,12 +18,12 @@ const NOW = '2026-07-23T00:00:00.000Z';
 // without pinning citeproc output (that is covered by the golden test).
 const stubFormatter: CitationFormatter = {
   bibliography: (items: CslItem[], template: string) =>
-    `[${template}] ${items.map((i) => i['id']).join('; ')}`,
+    Promise.resolve(`[${template}] ${items.map((i) => i['id']).join('; ')}`),
   inText: (items: CslItem[], template: string) =>
-    `(${template}:${items.map((i) => i['id']).join(',')})`,
+    Promise.resolve(`(${template}:${items.map((i) => i['id']).join(',')})`),
   formatWithStyle: (items: CslItem[], style, kind) =>
-    `[${style.id}:${kind}] ${items.map((i) => i['id']).join('; ')}`,
-  compileStyle: (style) => `<style id="${style.id}"/>`,
+    Promise.resolve(`[${style.id}:${kind}] ${items.map((i) => i['id']).join('; ')}`),
+  compileStyle: (style) => Promise.resolve(`<style id="${style.id}"/>`),
 };
 
 function makeRef(id: string, projectId: string): Reference {

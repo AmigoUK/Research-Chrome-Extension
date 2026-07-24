@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Phase 5 is complete — the whole roadmap is delivered. What follows is polish; see `doc/STATUS.md`._
+_Polish, one item at a time; see `doc/STATUS.md` for the list._
+
+## [0.18.1] — 2026-07-24
+
+### Changed
+
+- **The service worker is 45% smaller: 1.15 MB → 631 kB (213 kB → 151 kB gzipped).** The six
+  vendored CSL styles are ~520 kB of XML — Chicago notes alone is 243 kB — and every cold start
+  parsed the lot whether or not a citation was ever formatted. They are now emitted as separate
+  extension assets (`?url`) and fetched on first use, cached for the worker's lifetime. An APA
+  session never touches the Chicago file.
+- **BREAKING (internal port)** — `CitationFormatter`'s four methods return promises now, because
+  loading a style is I/O and pretending otherwise would only hide it. `formatPreview` follows.
+  Same-origin extension assets need no `web_accessible_resources` entry, so the manifest is
+  unchanged.
+- `CiteJsFormatter` takes a `CslLoader` — one function, `(template) => Promise<string | undefined>`.
+  Production fetches (`src/adapters/citation/csl-assets.ts`); tests read the same files from disk
+  (`test/support/csl-loader.ts`). `BASE_CSL` is gone with the static imports that fed it.
+
+### Notes
+
+- 206 unit tests (up from 201) + 19 E2E, all green; five of the new ones pin the laziness itself —
+  that only the style in play is loaded, that it is loaded once, and that a miss is remembered
+  rather than retried.
+- Citation output is unchanged: the golden tests (4 base styles × author counts) still match
+  character for character.
 
 ## [0.18.0] — 2026-07-24
 
@@ -523,7 +548,8 @@ _Phase 5 is complete — the whole roadmap is delivered. What follows is polish;
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.15.0...v0.16.0

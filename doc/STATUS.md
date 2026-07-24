@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — **all five roadmap phases delivered**; Phase 5 complete at v0.18.0._
+_Last updated: 2026-07-24 — **all five roadmap phases delivered**; now on the polish list (1 of 5 done)._
 
 ## Where we are
 
@@ -9,11 +9,11 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; Phase 5 com
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.18.0 is on `main`** (Phases 1–5). No unmerged work.
+- **Branch state:** everything through **v0.18.1 is on `main`** (Phases 1–5 + polish). No unmerged work.
 - **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
   Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 201 unit + 19 E2E (5 PDF viewer + 12 dashboard + 2 side panel), all green.
+- **Tests:** 206 unit + 19 E2E (5 PDF viewer + 12 dashboard + 2 side panel), all green.
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 
@@ -138,8 +138,10 @@ Surfaces: `src/background` (service worker), `src/sidepanel`, `src/options` (das
 **The roadmap is done. What follows is polish, not phases.** `main` is green at v0.18.0 and the
 working tree is clean. The strongest candidates, roughly in order of value:
 
-1. **Bundle size** — the service worker is ~1.15 MB (213 kB gzipped), most of it vendored CSL.
-   Lazy-loading base styles from `web_accessible_resources` would trim it sharply.
+1. ~~**Bundle size**~~ — **done in v0.18.1**: base CSL styles are fetched as extension assets on
+   first use instead of being inlined, cutting the service worker from 1.15 MB to 631 kB (45%).
+   `CitationFormatter` went async and `CiteJsFormatter` takes a `CslLoader`; a miss is remembered so
+   a broken asset is not retried on every citation.
 2. **Import a third-party `.csl`** as a base style — the editor can already export one.
 3. **Snapshot ergonomics** — a dry-run import that reports what *would* merge before it writes, and
    remembering the last export folder. Both are small; neither is needed for correctness.

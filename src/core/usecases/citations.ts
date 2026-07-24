@@ -16,26 +16,24 @@ function bibliographyWith(
   items: CslItem[],
   template: string,
   style?: CitationStyle,
-): string {
+): Promise<string> {
   return style
     ? formatter.formatWithStyle(items, style, 'bibliography')
     : formatter.bibliography(items, template);
 }
-function pairWith(
+async function pairWith(
   formatter: CitationFormatter,
   items: CslItem[],
   template: string,
   style?: CitationStyle,
-): { inText: string; bibliography: string } {
-  return style
-    ? {
-        inText: formatter.formatWithStyle(items, style, 'inText'),
-        bibliography: formatter.formatWithStyle(items, style, 'bibliography'),
-      }
-    : {
-        inText: formatter.inText(items, template),
-        bibliography: formatter.bibliography(items, template),
-      };
+): Promise<{ inText: string; bibliography: string }> {
+  const [inText, bibliography] = style
+    ? await Promise.all([
+        formatter.formatWithStyle(items, style, 'inText'),
+        formatter.formatWithStyle(items, style, 'bibliography'),
+      ])
+    : await Promise.all([formatter.inText(items, template), formatter.bibliography(items, template)]);
+  return { inText, bibliography };
 }
 
 export async function formatProjectBibliography(
@@ -79,12 +77,15 @@ export function formatPreview(
   formatter: CitationFormatter,
   style: CitationStyle,
   items: CslItem[],
-): Array<{ inText: string; bibliography: string }> {
-  return items.map((item, i) => {
-    const withId = [{ ...item, id: `preview-${i}` }];
-    return {
-      inText: formatter.formatWithStyle(withId, style, 'inText'),
-      bibliography: formatter.formatWithStyle(withId, style, 'bibliography'),
-    };
-  });
+): Promise<Array<{ inText: string; bibliography: string }>> {
+  return Promise.all(
+    items.map(async (item, i) => {
+      const withId = [{ ...item, id: `preview-${i}` }];
+      const [inText, bibliography] = await Promise.all([
+        formatter.formatWithStyle(withId, style, 'inText'),
+        formatter.formatWithStyle(withId, style, 'bibliography'),
+      ]);
+      return { inText, bibliography };
+    }),
+  );
 }

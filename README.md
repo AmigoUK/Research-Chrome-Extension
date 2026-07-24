@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.18.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.18.1**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -54,7 +54,9 @@ Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mod
 - **Messaging:** one typed contract (`src/core/messages.ts`) shared by every surface, routed by a
   pure `handleRequest`. Domain changes are recorded to the activity feed **there**, so a change made
   in the side panel or the PDF reader shows up without either surface knowing the feed exists.
-- **Citations:** citeproc-js + CSL, vendored locally — MV3 forbids remote code.
+- **Citations:** citeproc-js + CSL, vendored locally — MV3 forbids remote code. The base styles are
+  fetched as extension assets on first use rather than bundled, keeping ~520 kB of XML out of the
+  service worker.
 
 See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data-model.md) and
 [`doc/citations.md`](doc/citations.md).
@@ -73,7 +75,7 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Testing
 
-201 unit tests (Vitest, `fake-indexeddb`) and 19 end-to-end tests that load the built extension into
+206 unit tests (Vitest, `fake-indexeddb`) and 19 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 

@@ -199,9 +199,11 @@ export async function handleRequest(
           }),
         ) as Result;
       case 'citations/preview':
-        return ok(formatPreview(requireFormatter(deps), request.style, request.items)) as Result;
+        return ok(
+          await formatPreview(requireFormatter(deps), request.style, request.items),
+        ) as Result;
       case 'citations/compiledCsl':
-        return ok(requireFormatter(deps).compileStyle(request.style)) as Result;
+        return ok(await requireFormatter(deps).compileStyle(request.style)) as Result;
       case 'users/list':
         return ok(await repos.users.list()) as Result;
       case 'users/put':

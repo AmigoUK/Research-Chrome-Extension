@@ -5,7 +5,7 @@ This document details how citations and bibliographies are generated using CSL a
 ## CSL Integration
 
 - The extension uses Citation Style Language (CSL) as the core formatting engine for citations and bibliographies. The **citeproc-js** engine and its **locale** files are **bundled locally** as extension assets — MV3's CSP forbids loading or executing remote code, so the engine is never fetched from a CDN.
-- CSL **styles** (`.csl`) are treated as *data*, not code: a small set (e.g. APA, Chicago, Harvard, MLA) ships built-in for Phase 1, and additional styles are fetched from the Zotero style repository as data and cached in IndexedDB.
+- CSL **styles** (`.csl`) are treated as *data*, not code. Six ship with the extension — APA, Harvard, Vancouver, MLA and Chicago in both author–date and notes form — vendored under `src/assets/csl`. Since **v0.18.1** they are **not** inlined into the bundle: each is emitted as a separate extension asset and fetched on first use (`src/adapters/citation/csl-assets.ts`), so a session that formats APA never loads the 243 kB Chicago notes file. Importing a third-party `.csl` as a base style is a known follow-up.
 - Each `Reference` stores bibliographic data as CSL JSON (`cslData`).
 - A `CitationStyle` profile combines a base CSL style (`baseStyleId`) with optional overrides and user-facing rules.
 

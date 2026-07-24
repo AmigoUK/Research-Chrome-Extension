@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { CiteJsFormatter } from '../../src/adapters/citation/citejs';
+import { createFsCslLoader } from '../support/csl-loader';
 import type { CslItem } from '../../src/core/ports/citation';
 
-const formatter = new CiteJsFormatter();
+const formatter = new CiteJsFormatter(createFsCslLoader());
 
 const ITEMS: Record<'one' | 'three' | 'four', CslItem> = {
   one: {
@@ -83,14 +84,14 @@ const GOLDEN: Record<string, Record<'one' | 'three' | 'four', string>> = {
 describe('citation golden output (4 base styles × author counts)', () => {
   for (const [template, cases] of Object.entries(GOLDEN)) {
     for (const count of ['one', 'three', 'four'] as const) {
-      it(`${template} — ${count} author(s)`, () => {
-        expect(formatter.bibliography([ITEMS[count]], template)).toBe(cases[count]);
+      it(`${template} — ${count} author(s)`, async () => {
+        expect(await formatter.bibliography([ITEMS[count]], template)).toBe(cases[count]);
       });
     }
   }
 
-  it('renders an in-text citation', () => {
-    const inText = formatter.inText([ITEMS.one], 'apa');
+  it('renders an in-text citation', async () => {
+    const inText = await formatter.inText([ITEMS.one], 'apa');
     expect(inText).toContain('Oke');
     expect(inText).toContain('1982');
   });

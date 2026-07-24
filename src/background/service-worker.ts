@@ -9,6 +9,7 @@ import { openContextNotesDB } from '../adapters/idb/db';
 import { createRepositories } from '../adapters/idb/repositories';
 import { registerMessageRouter } from '../adapters/chrome/messaging';
 import { CiteJsFormatter } from '../adapters/citation/citejs';
+import { createFetchCslLoader } from '../adapters/citation/csl-assets';
 import type { RepositorySet } from '../core/ports/repositories';
 
 let reposPromise: Promise<RepositorySet> | undefined;
@@ -26,4 +27,6 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 // Route typed messages from the UI to the pure domain router.
-registerMessageRouter(getRepositories, { formatter: new CiteJsFormatter() });
+registerMessageRouter(getRepositories, {
+  formatter: new CiteJsFormatter(createFetchCslLoader()),
+});
