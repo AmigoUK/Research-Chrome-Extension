@@ -76,6 +76,11 @@ interface ViewerState {
   scope: 'page' | 'all';
   pending: PendingSelection | null;
   activeId: Id | null;
+  /** Ids of text-highlight anchors whose stored quote no longer matches the
+   *  text under their coordinates — i.e. the PDF was replaced or reflowed and
+   *  the highlight is likely on the wrong content. Only current-page anchors
+   *  are ever verified (the text layer for other pages isn't rendered). */
+  movedIds: Set<Id>;
 }
 const state: ViewerState = {
   documentId: null,
@@ -89,6 +94,7 @@ const state: ViewerState = {
   scope: 'page',
   pending: null,
   activeId: null,
+  movedIds: new Set(),
 };
 
 function nowIso(): string {
@@ -188,11 +194,69 @@ async function renderPage(): Promise<void> {
   });
   await textLayer.render();
 
+  verifyAnchors(pageEl);
   renderOverlays(annoLayer, { width: w, height: h });
 
   $('#pgCur').textContent = String(state.pageNum);
   $('#pagewrap').scrollTop = 0;
   syncControls();
+}
+
+const normText = (s: string): string => s.toLowerCase().replace(/\s+/g, ' ').trim();
+
+/** The text-layer content that falls under a set of page-relative rects. */
+function textUnderRects(textLayer: HTMLElement, pageEl: HTMLElement, rects: PxRect[]): string {
+  const pageBox = pageEl.getBoundingClientRect();
+  let out = '';
+  for (const span of textLayer.querySelectorAll('span')) {
+    const sb = span.getBoundingClientRect();
+    const cx = sb.left - pageBox.left + sb.width / 2;
+    const cy = sb.top - pageBox.top + sb.height / 2;
+    if (rects.some((r) => cx >= r.left && cx <= r.left + r.width && cy >= r.top && cy <= r.top + r.height)) {
+      out += `${span.textContent ?? ''} `;
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether a stored quote still matches the text now under its coordinates.
+ * Conservative on purpose — a normal reload of the same PDF matches ~fully, so
+ * this only trips when the content genuinely differs (replaced/reflowed file).
+ */
+function quoteMatches(quote: string, found: string): boolean {
+  const q = normText(quote);
+  const f = normText(found);
+  if (!q) return true;
+  if (f.includes(q) || q.includes(f)) return true;
+  const words = q.split(' ').filter(Boolean);
+  if (words.length === 0) return true;
+  const fset = new Set(f.split(' ').filter(Boolean));
+  const hits = words.filter((w) => fset.has(w)).length;
+  return hits / words.length >= 0.5;
+}
+
+/**
+ * Check every current-page text highlight against the rendered text layer and
+ * record the ones that no longer match. `resolvePdfAnchor` is pure coordinate
+ * math and always paints *something*; without this a replaced PDF would show
+ * highlights confidently over unrelated text, with no signal to the user.
+ */
+function verifyAnchors(pageEl: HTMLElement): void {
+  const textLayer = pageEl.querySelector<HTMLElement>('.textLayer');
+  const box = { width: pageEl.clientWidth, height: pageEl.clientHeight };
+  for (const anno of state.annotations) {
+    if (anno.anchor.kind !== 'pdf' || anchorPage(anno.anchor) !== state.pageNum) continue;
+    const quote = anchorQuote(anno.anchor);
+    if (!quote) {
+      state.movedIds.delete(anno.id); // a drawn region has no quote to verify
+      continue;
+    }
+    const rects = resolvePdfAnchor(anno.anchor, box);
+    const found = textLayer ? textUnderRects(textLayer, pageEl, rects) : '';
+    if (quoteMatches(quote, found)) state.movedIds.delete(anno.id);
+    else state.movedIds.add(anno.id);
+  }
 }
 
 function renderOverlays(layer: HTMLElement, box: { width: number; height: number }): void {
@@ -201,18 +265,21 @@ function renderOverlays(layer: HTMLElement, box: { width: number; height: number
     if (anno.anchor.kind !== 'pdf') continue;
     if (anchorPage(anno.anchor) !== state.pageNum) continue;
     const region = isRegionAnchor(anno.anchor);
+    const moved = state.movedIds.has(anno.id);
     const rects = resolvePdfAnchor(anno.anchor, box);
     rects.forEach((r, i) => {
       const ov = document.createElement('div');
-      ov.className = `ov ${region ? 'region' : 'text'}${state.activeId === anno.id ? ' on' : ''}`;
+      ov.className = `ov ${region ? 'region' : 'text'}${moved ? ' moved' : ''}${state.activeId === anno.id ? ' on' : ''}`;
       ov.style.left = `${r.left}px`;
       ov.style.top = `${r.top}px`;
       ov.style.width = `${r.width}px`;
       ov.style.height = `${r.height}px`;
-      if (region && i === 0) {
+      if (i === 0 && (region || moved)) {
         const cnr = document.createElement('span');
         cnr.className = 'cnr';
-        cnr.textContent = 'Region';
+        // "moved" wins the label: a mismatched highlight is the more important
+        // thing to surface than whether it was a region.
+        cnr.textContent = moved ? 'Moved?' : 'Region';
         ov.appendChild(cnr);
       }
       ov.addEventListener('click', () => focusAnnotation(anno.id));
@@ -426,7 +493,7 @@ function railData(): Annotation[] {
 function renderRail(): void {
   $('#railN').textContent = `${state.annotations.length} on ${state.numPages} page${state.numPages === 1 ? '' : 's'}`;
   const list = $('#railList');
-  const hint = `<div class="hint"><b>Anchoring.</b> Notes store <b>page + coordinate rects</b> plus the quoted text — the basis for re-anchoring after reload.</div>`;
+  const hint = `<div class="hint"><b>Anchoring.</b> A PDF is fixed-layout, so notes are pinned by <b>page + coordinate rectangles</b>. The quoted text is checked against the page — if the PDF is replaced and the text no longer matches, the note is flagged as possibly moved.</div>`;
   const rows = railData();
   if (rows.length === 0) {
     list.innerHTML = `${hint}<div class="rail-empty"><div class="et">No annotations ${state.scope === 'page' ? 'on this page' : 'yet'}</div><div class="ed">Select text or drag a region on the page to anchor a note.</div></div>`;
@@ -451,8 +518,10 @@ function railCard(a: Annotation): string {
   const region = pdf ? isRegionAnchor(pdf) : false;
   const quote = pdf ? anchorQuote(pdf) : undefined;
   const loc = region ? `p.${page} · Region` : `p.${page} · ¶ text`;
-  return `<article class="ac${state.activeId === a.id ? ' active' : ''}" data-id="${esc(a.id)}">
+  const moved = state.movedIds.has(a.id);
+  return `<article class="ac${state.activeId === a.id ? ' active' : ''}${moved ? ' moved' : ''}" data-id="${esc(a.id)}">
     <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button><span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
+    ${moved ? `<div class="anno-moved">${ICON.warn}<span>The text here no longer matches this note’s quote — the PDF may have changed.</span></div>` : ''}
     ${quote ? `<div class="quote">${esc(quote)}</div>` : ''}
     <textarea class="note-ta" data-note placeholder="Add a note…">${esc(a.content)}</textarea>
     <div class="ac-foot">

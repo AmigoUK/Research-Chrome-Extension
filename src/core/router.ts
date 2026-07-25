@@ -21,11 +21,13 @@ import {
   recordActivity,
   recordAnnotationDelete,
   recordAnnotationPut,
+  recordDocumentDelete,
   recordDocumentPut,
   recordMemberInvited,
   recordMemberRemoved,
   recordMemberRoleChanged,
   recordReferenceAdded,
+  recordReferenceDelete,
 } from './usecases/activity';
 import {
   deleteThread,
@@ -109,6 +111,19 @@ export async function handleRequest(
         await recordDocumentPut(repos, capture, previous, request.document);
         return ok(null) as Result;
       }
+      case 'documents/delete': {
+        // Cascade: a document owns its stored PDF bytes and its annotations, so
+        // deleting the document without them would leak orphaned rows. References
+        // are left intact — a bibliography entry can outlive its reading-list
+        // source, and the References view deletes those on its own.
+        const previous = await repos.documents.get(request.id);
+        const annotations = await repos.annotations.listByDocument(request.id);
+        for (const annotation of annotations) await repos.annotations.delete(annotation.id);
+        if (previous?.fileId) await repos.files.delete(previous.fileId);
+        await repos.documents.delete(request.id);
+        if (previous) await recordDocumentDelete(repos, capture, previous);
+        return ok(null) as Result;
+      }
       case 'documents/listByProject':
         return ok(await repos.documents.listByProject(request.projectId)) as Result;
       case 'annotations/listByProject':
@@ -155,6 +170,13 @@ export async function handleRequest(
         const previous = await repos.references.get(request.reference.id);
         await repos.references.put(request.reference);
         if (!previous) await recordReferenceAdded(repos, capture, request.reference, 'added');
+        return ok(null) as Result;
+      }
+      case 'references/delete': {
+        // Read first: once it is gone there is no projectId left to file under.
+        const previous = await repos.references.get(request.id);
+        await repos.references.delete(request.id);
+        if (previous) await recordReferenceDelete(repos, capture, previous);
         return ok(null) as Result;
       }
       case 'references/importByDoi': {

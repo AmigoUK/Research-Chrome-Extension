@@ -12,6 +12,7 @@
   --fg: oklch(20% 0.018 70); --muted: oklch(45% 0.014 70); --border: oklch(90% 0.006 95);
   --accent: oklch(52% 0.10 28); --accent-soft: oklch(52% 0.10 28 / 0.14); --accent-line: oklch(52% 0.10 28 / 0.55);
   --danger: oklch(53% 0.17 27); --success: oklch(52% 0.09 155);
+  --warn: oklch(62% 0.13 70); --warn-soft: oklch(62% 0.13 70 / 0.16); --warn-line: oklch(62% 0.13 70 / 0.55); --warn-fg: oklch(42% 0.10 70);
   --font-display: 'Iowan Old Style', 'Charter', 'Charis SIL', Georgia, serif;
   --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'iA Writer Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
@@ -78,6 +79,9 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 .ov.region { border: 1.6px solid var(--accent); border-radius: 4px; background: var(--accent-soft); }
 .ov.region .cnr { position: absolute; top: -9px; left: -1px; font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .04em; text-transform: uppercase; background: var(--accent); color: oklch(99% .01 95); padding: 1px 5px; border-radius: 3px; }
 .ov.on { animation: pulse .9s var(--ease); }
+.ov.moved.text { background: var(--warn-soft); box-shadow: inset 0 -2px 0 var(--warn-line); }
+.ov.moved.region { border-color: var(--warn); background: var(--warn-soft); }
+.ov.moved .cnr { background: var(--warn); }
 /* Region drag rubber-band */
 .rubber { position: absolute; z-index: 4; border: 1.6px dashed var(--accent); background: var(--accent-soft); pointer-events: none; }
 
@@ -127,6 +131,9 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 
 .hint { font-size: 11.5px; line-height: 1.6; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; margin-bottom: 13px; }
 .hint b { color: var(--fg); font-weight: 560; }
+.anno-moved { display: flex; gap: 7px; align-items: flex-start; font-size: 11px; line-height: 1.45; color: var(--warn-fg); background: var(--warn-soft); border: 1px solid var(--warn-line); border-radius: 8px; padding: 8px 9px; margin-bottom: 10px; }
+.anno-moved svg { width: 14px; height: 14px; flex: none; margin-top: 1px; }
+.ac.moved { border-color: var(--warn-line); }
 .rail-empty { text-align: center; padding: 32px 18px; color: var(--muted); }
 .rail-empty .et { font-family: var(--font-display); font-size: 15px; color: var(--fg); margin-bottom: 6px; }
 .rail-empty .ed { font-size: 12px; line-height: 1.5; }

@@ -98,6 +98,8 @@ body { font-family: var(--font-body); color: var(--fg); background: var(--bg); -
 .btn--primary:hover { background: oklch(48% .10 28); border-color: oklch(48% .10 28); }
 .btn--ghost { border-color: transparent; background: none; color: var(--muted); } .btn--ghost:hover { background: var(--surface-2); color: var(--fg); }
 .btn--sm { min-height: 30px; padding: 5px 10px; font-size: 12px; }
+.btn--danger { border-color: var(--danger); background: none; color: var(--danger); }
+.btn--danger:hover { background: oklch(53% 0.17 27 / 0.1); border-color: var(--danger); color: var(--danger); }
 .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
 /* ---- Stat tiles ---- */
@@ -416,6 +418,10 @@ button.stat-tag:hover { border-color: var(--fg); }
 .popover .imp-src { justify-content: space-between; }
 .popover .imp-src .soon { font-family: var(--font-mono); font-size: 8.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; margin-left: auto; }
 .popover .pop-form { display: flex; align-items: center; gap: 8px; padding: 6px 8px 8px; }
+.popover .pop-form--col { flex-direction: column; align-items: stretch; min-width: 264px; }
+.popover .pop-form--col > .sel { width: 100%; }
+.popover .pop-form--col > .pop-form { width: 100%; padding: 0; }
+.popover .pop-confirm { padding: 2px 8px 8px; font-size: 12.5px; line-height: 1.5; color: var(--muted); max-width: 300px; }
 
 /* ---- Credit footer (dashboard only — see project memory) ---- */
 .credit { border-top: 1px solid var(--border); background: var(--surface); padding: 9px 18px; text-align: center; font-size: 11px; color: var(--muted); line-height: 1.5; flex: 0 0 auto; }

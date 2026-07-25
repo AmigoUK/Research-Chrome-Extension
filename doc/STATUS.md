@@ -1,6 +1,7 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish list complete**._
+_Last updated: 2026-07-25 — **all five roadmap phases delivered**; **polish list complete**;
+**v0.26.0 user-centred hardening pass shipped** (see `doc/audit-2026-07-25.md`)._
 
 ## Where we are
 
@@ -9,11 +10,23 @@ _Last updated: 2026-07-24 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.25.0 is on `main`** (Phases 1–5 + polish). No unmerged work.
-- **Releases:** v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0
-  Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Branch state:** everything through **v0.26.0 is on `main`** (Phases 1–5 + polish + hardening).
+  No unmerged work.
+- **Releases:** v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0
+  Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 241 unit + 24 E2E (5 PDF viewer + 16 dashboard + 3 side panel), all green.
+- **Tests:** 243 unit + 24 E2E (5 PDF viewer + 16 dashboard + 3 side panel), all green.
+
+### v0.26.0 — user-centred hardening (2026-07-25)
+
+An audit of the three surfaces (`doc/audit-2026-07-25.md`) for logical errors and usage-blocking
+dead ends. Blockers and logic errors fixed: capture card re-scans on tab change (no more filing the
+wrong page); the side-panel project switcher works and is remembered; bibliography export gates on
+references not documents; PDF highlights flag themselves as "Moved?" when the quote no longer matches;
+side-panel citations honour the configured style; references can be added / edited / deleted; sources
+can be deleted with a cascade to their file bytes and annotations. **Deferred to its own spec:**
+web-page text annotation (`web.ts` anchoring is built and tested but not yet wired to a content
+script — the one remaining blocker from the audit).
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 

@@ -36,6 +36,8 @@ export interface MessageMap {
   'projects/put': { req: { project: Project }; res: null };
   'documents/get': { req: { id: Id }; res: Document | undefined };
   'documents/put': { req: { document: Document }; res: null };
+  /** Delete a document and cascade: its stored file bytes and its annotations. */
+  'documents/delete': { req: { id: Id }; res: null };
   'documents/listByProject': { req: { projectId: Id }; res: Document[] };
   'annotations/listByProject': { req: { projectId: Id }; res: Annotation[] };
   'annotations/listByDocument': { req: { documentId: Id }; res: Annotation[] };
@@ -45,6 +47,7 @@ export interface MessageMap {
   'files/get': { req: { id: Id }; res: FilePayload | undefined };
   'references/listByProject': { req: { projectId: Id }; res: Reference[] };
   'references/put': { req: { reference: Reference }; res: null };
+  'references/delete': { req: { id: Id }; res: null };
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
   'citationStyles/put': { req: { style: CitationStyle }; res: null };

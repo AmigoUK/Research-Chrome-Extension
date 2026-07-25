@@ -97,6 +97,10 @@ const ICON = {
   x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   invite:
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>',
+  trash:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>',
+  pencil:
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
 };
 
 /** Timeline dot glyph per activity kind (`comment` / `sync` land in M3 / M4). */
@@ -609,8 +613,12 @@ async function setStatus(doc: Document, ns: DocumentStatus, refocusId?: Id): Pro
 }
 
 async function exportBibliography(): Promise<void> {
-  if (!state.activeProjectId || state.documents.length === 0) {
-    toast('No sources to export yet', ICON.warn, true);
+  // The bibliography compiles from references, not documents
+  // (`formatProjectBibliography` reads references.listByProject). Gating on
+  // documents blocked DOI-imported references — which have no document — from
+  // ever exporting.
+  if (!state.activeProjectId || state.references.length === 0) {
+    toast('No references to export yet', ICON.warn, true);
     return;
   }
   const { template, styleId } = citeArgs();
@@ -622,7 +630,7 @@ async function exportBibliography(): Promise<void> {
       styleId,
     });
     await navigator.clipboard.writeText(bibliography);
-    toast(`Bibliography copied · ${state.documents.length} entries`, ICON.copy);
+    toast(`Bibliography copied · ${state.references.length} entries`, ICON.copy);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t export bibliography', ICON.warn, true);
   }
@@ -730,10 +738,19 @@ function drawDocuments(): void {
         <td style="white-space:nowrap">
           ${canOpenInReader(d) ? `<button class="btn btn--ghost btn--sm" data-open title="Open in reader" aria-label="Open in reader">${ICON.open}</button>` : ''}
           ${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}
+          <button class="btn btn--ghost btn--sm" data-del title="Delete source" aria-label="Delete source">${ICON.trash}</button>
         </td>
       </tr>`;
     })
     .join('')}</tbody></table>`;
+  $$('[data-del]', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('tr')?.getAttribute('data-id');
+      const doc = id ? docById(id) : undefined;
+      if (doc) confirmDeleteDocument(e.currentTarget as HTMLElement, doc);
+    });
+  });
   $$('.spill', box).forEach((b) => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -1100,7 +1117,11 @@ function cslTypeLabel(type?: string): string {
 }
 
 function renderReferences(view: HTMLElement, actions: HTMLElement): void {
-  actions.innerHTML = `<button class="btn btn--sm" id="rImport">${ICON.up} Import</button><button class="btn btn--sm" id="rExport">${ICON.down} Export</button>`;
+  actions.innerHTML = `<button class="btn btn--sm" id="rAdd">${ICON.plus} Add</button><button class="btn btn--sm" id="rImport">${ICON.up} Import</button><button class="btn btn--sm" id="rExport">${ICON.down} Export</button>`;
+  $('#rAdd', actions).onclick = (e) => {
+    e.stopPropagation();
+    openReferenceForm(e.currentTarget as HTMLElement);
+  };
   $('#rImport', actions).onclick = (e) => {
     e.stopPropagation();
     openImportPopover(e.currentTarget as HTMLElement);
@@ -1126,7 +1147,11 @@ function renderReferences(view: HTMLElement, actions: HTMLElement): void {
         <td><span class="chip chip--sec">${esc(cslTypeLabel(csl.type))}</span></td>
         <td><span class="stat-tag">${SOURCE_LABEL[ref.source]}</span></td>
         <td>${used}</td>
-        <td><button class="btn btn--ghost btn--sm" data-cite="${esc(ref.id)}" aria-label="Copy citation">${ICON.copy}</button></td>
+        <td style="white-space:nowrap">
+          <button class="btn btn--ghost btn--sm" data-cite="${esc(ref.id)}" aria-label="Copy citation">${ICON.copy}</button>
+          <button class="btn btn--ghost btn--sm" data-edit="${esc(ref.id)}" aria-label="Edit reference">${ICON.pencil}</button>
+          <button class="btn btn--ghost btn--sm" data-del="${esc(ref.id)}" aria-label="Delete reference">${ICON.trash}</button>
+        </td>
       </tr>`;
     })
     .join('')}</tbody></table>`;
@@ -1134,6 +1159,18 @@ function renderReferences(view: HTMLElement, actions: HTMLElement): void {
     b.onclick = () => {
       const id = b.dataset.cite;
       if (id) void copyReferenceCitation(id);
+    };
+  });
+  $$('[data-edit]', view).forEach((b) => {
+    b.onclick = (e) => {
+      const ref = state.references.find((r) => r.id === b.dataset.edit);
+      if (ref) openReferenceForm(e.currentTarget as HTMLElement, ref);
+    };
+  });
+  $$('[data-del]', view).forEach((b) => {
+    b.onclick = (e) => {
+      const ref = state.references.find((r) => r.id === b.dataset.del);
+      if (ref) confirmDeleteReference(e.currentTarget as HTMLElement, ref);
     };
   });
 }
@@ -1223,6 +1260,161 @@ async function copyReferenceCitation(referenceId: Id): Promise<void> {
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t copy citation', ICON.warn, true);
   }
+}
+
+/* ---- Add / edit / delete a reference ----
+ * `references/put` had a handler but no UI, so a reference with wrong metadata
+ * (a bad DOI import, a metadata-poor capture) could never be corrected. */
+function parseAuthors(raw: string): CslName[] {
+  // "Family, Given; Family2, Given2" — the shape the table renders back.
+  return raw
+    .split(';')
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .map((chunk) => {
+      const [family, given] = chunk.split(',').map((s) => s.trim());
+      // A single token with no comma is an organisation/literal name.
+      return family && given ? { family, given } : { literal: chunk };
+    });
+}
+
+function authorsToInput(names: CslName[] | undefined): string {
+  return (names ?? [])
+    .map((n) => (n.literal ? n.literal : [n.family, n.given].filter(Boolean).join(', ')))
+    .join('; ');
+}
+
+function openReferenceForm(anchor: HTMLElement, existing?: Reference): void {
+  const csl = (existing?.cslData ?? {}) as Csl;
+  const year = csl.issued?.['date-parts']?.[0]?.[0];
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">${existing ? 'Edit reference' : 'Add a reference'}</div>
+    <div class="pop-form pop-form--col">
+      <input id="rfTitle" class="sel" placeholder="Title" aria-label="Title" value="${esc(csl.title ?? '')}">
+      <input id="rfAuthors" class="sel" placeholder="Authors — Family, Given; Family, Given" aria-label="Authors" value="${esc(authorsToInput(csl.author))}">
+      <div class="pop-form">
+        <input id="rfYear" class="sel" placeholder="Year" aria-label="Year" inputmode="numeric" style="width:84px" value="${esc(year ?? '')}">
+        <input id="rfContainer" class="sel" placeholder="Journal / container" aria-label="Journal or container" value="${esc(csl['container-title'] ?? '')}">
+      </div>
+      <input id="rfDoi" class="sel" placeholder="DOI (optional)" aria-label="DOI" value="${esc(csl.DOI ?? '')}">
+      <button class="btn btn--primary btn--sm" id="rfSave">${ICON.check} ${existing ? 'Save changes' : 'Add reference'}</button>
+    </div>`;
+  $('#rfSave', pop).onclick = () => void saveReference(existing);
+  placePop(anchor);
+  $<HTMLInputElement>('#rfTitle', pop).focus();
+}
+
+async function saveReference(existing?: Reference): Promise<void> {
+  if (!state.activeProjectId) return;
+  const pop = $('#pop');
+  const val = (sel: string): string => $<HTMLInputElement>(sel, pop).value.trim();
+  const title = val('#rfTitle');
+  if (!title) {
+    toast('A title is needed', ICON.warn, true);
+    return;
+  }
+  const prev = (existing?.cslData ?? {}) as Csl;
+  const csl: Csl = {
+    ...prev,
+    type: prev.type ?? 'article-journal',
+    title,
+    author: parseAuthors(val('#rfAuthors')),
+  };
+  const yearNum = Number(val('#rfYear'));
+  if (val('#rfYear') && Number.isFinite(yearNum)) csl.issued = { 'date-parts': [[yearNum]] };
+  else delete csl.issued;
+  if (val('#rfContainer')) csl['container-title'] = val('#rfContainer');
+  else delete csl['container-title'];
+  if (val('#rfDoi')) csl.DOI = val('#rfDoi');
+  else delete csl.DOI;
+
+  const now = nowIso();
+  const reference: Reference = existing
+    ? { ...existing, cslData: csl as Record<string, unknown>, updatedAt: now }
+    : {
+        id: crypto.randomUUID(),
+        projectId: state.activeProjectId,
+        cslData: csl as Record<string, unknown>,
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+  try {
+    await sendRequest({ type: 'references/put', reference });
+    closePop();
+    await loadProjectData();
+    render();
+    toast(existing ? 'Reference updated' : 'Reference added', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t save reference', ICON.warn, true);
+  }
+}
+
+function confirmDeleteReference(anchor: HTMLElement, ref: Reference): void {
+  openConfirmPop(anchor, {
+    title: 'Delete this reference?',
+    body: `“${referenceLine(ref.cslData as Csl).title}” will be removed from the bibliography. This cannot be undone.`,
+    confirmLabel: 'Delete reference',
+    onConfirm: () => void deleteReference(ref.id),
+  });
+}
+
+async function deleteReference(id: Id): Promise<void> {
+  try {
+    await sendRequest({ type: 'references/delete', id });
+    closePop();
+    await loadProjectData();
+    render();
+    toast('Reference removed', ICON.trash);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t remove reference', ICON.warn, true);
+  }
+}
+
+/* ---- Delete a document (with cascade) ----
+ * There was no way to remove a source once added; the PDF bytes were permanent. */
+function confirmDeleteDocument(anchor: HTMLElement, doc: Document): void {
+  const notes = notesFor(doc.id);
+  const extras = ['its stored PDF', notes ? `${notes} note${notes === 1 ? '' : 's'}` : null].filter(
+    Boolean,
+  );
+  openConfirmPop(anchor, {
+    title: 'Delete this source?',
+    body: `“${doc.metadata.title ?? doc.url}” will be removed${extras.length ? `, along with ${extras.join(' and ')}` : ''}. This cannot be undone.`,
+    confirmLabel: 'Delete source',
+    onConfirm: () => void deleteDocument(doc.id),
+  });
+}
+
+async function deleteDocument(id: Id): Promise<void> {
+  try {
+    await sendRequest({ type: 'documents/delete', id });
+    closePop();
+    await loadProjectData();
+    render();
+    toast('Source removed', ICON.trash);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t remove source', ICON.warn, true);
+  }
+}
+
+/** A small confirm step for destructive actions — the dashboard has no modal, and
+ *  a one-click delete with only an after-the-fact toast is too easy to trigger. */
+function openConfirmPop(
+  anchor: HTMLElement,
+  opts: { title: string; body: string; confirmLabel: string; onConfirm: () => void },
+): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">${esc(opts.title)}</div>
+    <div class="pop-confirm">${esc(opts.body)}</div>
+    <div class="pop-form">
+      <button class="btn btn--sm" id="cfCancel">Cancel</button>
+      <button class="btn btn--danger btn--sm" id="cfGo">${ICON.trash} ${esc(opts.confirmLabel)}</button>
+    </div>`;
+  $('#cfCancel', pop).onclick = () => closePop();
+  $('#cfGo', pop).onclick = () => opts.onConfirm();
+  placePop(anchor);
 }
 
 /* ---- Citation styles ---- */

@@ -7,7 +7,8 @@ import { sendRequest } from '../adapters/chrome/messaging';
 import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
-import type { Document, Project } from '../core/model/types';
+import type { CitationStyle, Document, Id, Project } from '../core/model/types';
+import { templateFor } from '../core/citation/styles';
 import type { CaptureInput } from '../core/usecases/capture';
 import {
   STATUS_META,
@@ -19,24 +20,30 @@ import {
   type ListFilter,
 } from './view-model';
 
-const DEFAULT_TEMPLATE = 'apa';
-
 interface State {
   projects: Project[];
   activeProjectId: string | null;
   documents: Document[];
+  styles: CitationStyle[];
   filter: ListFilter;
   preview: CaptureInput | null;
+  /** Id of the most recently filed reference — drives the cite buttons. */
   filedReferenceId: string | null;
+  /** URL of the most recently filed page — so "Filed ✓" tracks the *page*, not
+   *  the session. Without this the button stuck on "Filed ✓" forever and only
+   *  one page could be filed per panel open. */
+  filedUrl: string | null;
 }
 
 const state: State = {
   projects: [],
   activeProjectId: null,
   documents: [],
+  styles: [],
   filter: { search: '', status: 'all' },
   preview: null,
   filedReferenceId: null,
+  filedUrl: null,
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
@@ -45,6 +52,24 @@ const nowIso = (): string => new Date().toISOString();
 
 function activeProject(): Project | undefined {
   return state.projects.find((p) => p.id === state.activeProjectId);
+}
+
+/**
+ * The style the panel cites with. Mirrors the dashboard's `activeStyle`: the
+ * project's configured default, else the first style. The panel used to hardcode
+ * APA, silently ignoring whatever style the user had set up in the dashboard.
+ */
+function activeStyle(): CitationStyle | undefined {
+  return state.styles.find((s) => s.id === activeProject()?.defaultCitationStyleId) ?? state.styles[0];
+}
+
+function citeArgs(): { template: string; styleId: Id | undefined } {
+  const style = activeStyle();
+  return { template: templateFor(style?.baseStyleId ?? 'apa'), styleId: style?.id };
+}
+
+function styleLabel(): string {
+  return activeStyle()?.name ?? 'APA';
 }
 
 // --------------------------------------------------------------------------
@@ -68,6 +93,32 @@ async function ensureSeedProject(): Promise<void> {
   state.activeProjectId ??= state.projects[0]?.id ?? null;
 }
 
+// The active project is kept in session storage so it survives a panel reopen
+// (the panel used to reset to projects[0] every time). `session` is chosen over
+// `local` so it clears when the browser session ends — an active selection is
+// ephemeral, not a saved setting.
+const ACTIVE_PROJECT_KEY = 'sidepanel.activeProjectId';
+
+async function persistActiveProject(id: string): Promise<void> {
+  try {
+    await chrome.storage.session.set({ [ACTIVE_PROJECT_KEY]: id });
+  } catch {
+    // Best-effort: a failed persist just means the next open falls back to [0].
+  }
+}
+
+async function restoreActiveProject(): Promise<void> {
+  try {
+    const got = await chrome.storage.session.get(ACTIVE_PROJECT_KEY);
+    const id = got[ACTIVE_PROJECT_KEY];
+    if (typeof id === 'string' && state.projects.some((p) => p.id === id)) {
+      state.activeProjectId = id;
+    }
+  } catch {
+    // Ignore — keep the seeded default.
+  }
+}
+
 async function loadDocuments(): Promise<void> {
   if (!state.activeProjectId) {
     state.documents = [];
@@ -77,6 +128,10 @@ async function loadDocuments(): Promise<void> {
     type: 'documents/listByProject',
     projectId: state.activeProjectId,
   });
+}
+
+async function loadStyles(): Promise<void> {
+  state.styles = await sendRequest({ type: 'citationStyles/list' });
 }
 
 async function loadPreview(): Promise<void> {
@@ -89,6 +144,17 @@ async function loadPreview(): Promise<void> {
   }
 }
 
+/**
+ * Re-scan the active tab and repaint the capture card. Wired to tab-activation,
+ * tab-load and window-focus events so the card reflects the page the user is
+ * actually looking at — the panel used to scan once at open and then file the
+ * wrong page after any tab switch.
+ */
+async function refreshPreview(): Promise<void> {
+  await loadPreview();
+  renderCaptureCard();
+}
+
 // --------------------------------------------------------------------------
 // Rendering
 // --------------------------------------------------------------------------
@@ -96,7 +162,9 @@ async function loadPreview(): Promise<void> {
 function renderHeader(): void {
   const project = activeProject();
   $('activeName').textContent = project?.name ?? '—';
-  $('activeSub').textContent = project ? `${state.documents.length} sources · APA` : '';
+  $('activeSub').textContent = project
+    ? `${state.documents.length} sources · ${styleLabel()}`
+    : '';
 }
 
 function renderCaptureCard(): void {
@@ -119,8 +187,11 @@ function renderCaptureCard(): void {
   meta.textContent = [m.authors?.join(', '), m.year, m.journal, m.doi ? `doi:${m.doi}` : null]
     .filter(Boolean)
     .join(' · ');
-  fileBtn.disabled = state.filedReferenceId !== null;
-  fileBtn.textContent = state.filedReferenceId
+  // "Filed ✓" tracks the previewed page, so switching to a new page re-enables
+  // filing instead of leaving the button stuck from the previous capture.
+  const alreadyFiled = state.filedUrl !== null && state.filedUrl === state.preview.url;
+  fileBtn.disabled = alreadyFiled;
+  fileBtn.textContent = alreadyFiled
     ? 'Filed ✓'
     : `File into “${activeProject()?.name ?? 'project'}”`;
 
@@ -272,6 +343,7 @@ async function fileCurrentPage(): Promise<void> {
   try {
     const result = await captureActiveTab(state.activeProjectId);
     state.filedReferenceId = result.reference.id;
+    state.filedUrl = state.preview?.url ?? null;
     await loadDocuments();
     render();
     toast(result.deduped ? 'Already filed — reused existing source' : 'Filed into project');
@@ -370,12 +442,112 @@ function closeStatusMenu(): void {
   $('scrollBody').removeEventListener('scroll', positionStatusMenu);
 }
 
-async function setStatus(doc: Document, status: DocumentStatus): Promise<void> {
-  const updated: Document = { ...doc, status, updatedAt: nowIso() };
-  await sendRequest({ type: 'documents/put', document: updated });
+// --------------------------------------------------------------------------
+// Project switcher — the header button was inert markup, pinning the panel to
+// an arbitrary projects[0]. Captures from the panel could silently land in a
+// project the user was not looking at, with no way to change it.
+// --------------------------------------------------------------------------
+
+function closeProjectMenu(): void {
+  const menu = document.getElementById('projectMenu');
+  if (!menu) return;
+  menu.remove();
+  $('switchBtn').setAttribute('aria-expanded', 'false');
+}
+
+function openProjectMenu(anchor: HTMLElement): void {
+  // Toggle: a second click on the button closes an open menu.
+  if (document.getElementById('projectMenu')) {
+    closeProjectMenu();
+    return;
+  }
+  closeStatusMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'smenu';
+  menu.id = 'projectMenu';
+  menu.setAttribute('role', 'menu');
+
+  for (const project of state.projects) {
+    const item = document.createElement('button');
+    item.className = 'smenu__item' + (project.id === state.activeProjectId ? ' is-current' : '');
+    item.setAttribute('role', 'menuitem');
+    const label = document.createElement('span');
+    label.className = 'smenu__label';
+    label.textContent = project.name;
+    item.append(label);
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeProjectMenu();
+      if (project.id !== state.activeProjectId) void switchProject(project.id);
+    });
+    menu.append(item);
+  }
+
+  const create = document.createElement('button');
+  create.className = 'smenu__item smenu__item--create';
+  create.setAttribute('role', 'menuitem');
+  create.textContent = '+ New project';
+  create.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeProjectMenu();
+    void createProject();
+  });
+  menu.append(create);
+
+  document.body.append(menu);
+
+  // The header is fixed, so a static position under the button is enough — no
+  // scroll repositioning like the status menu needs.
+  const box = anchor.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${box.bottom + 6}px`;
+  anchor.setAttribute('aria-expanded', 'true');
+}
+
+async function switchProject(projectId: string): Promise<void> {
+  state.activeProjectId = projectId;
+  // A new project means the previous capture context no longer applies.
+  state.filedReferenceId = null;
+  state.filedUrl = null;
+  await persistActiveProject(projectId);
   await loadDocuments();
   render();
-  toast(`Moved to “${statusLabel(status)}”`);
+  await refreshPreview();
+  toast(`Switched to “${activeProject()?.name ?? 'project'}”`);
+}
+
+async function createProject(): Promise<void> {
+  const name = `Project ${state.projects.length + 1}`;
+  const project: Project = {
+    id: crypto.randomUUID(),
+    name,
+    sections: ['Literature', 'Methods', 'Data', 'Report'],
+    members: [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+  try {
+    await sendRequest({ type: 'projects/put', project });
+    state.projects = await sendRequest({ type: 'projects/list' });
+    await switchProject(project.id);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t create project', true);
+  }
+}
+
+async function setStatus(doc: Document, status: DocumentStatus): Promise<void> {
+  const updated: Document = { ...doc, status, updatedAt: nowIso() };
+  try {
+    await sendRequest({ type: 'documents/put', document: updated });
+    await loadDocuments();
+    render();
+    toast(`Moved to “${statusLabel(status)}”`);
+  } catch (err) {
+    // Without this the write rejected unhandled: the list never updated and the
+    // user got no signal that the status change was lost.
+    toast(err instanceof Error ? err.message : 'Couldn’t change status', true);
+  }
 }
 
 async function copyToClipboard(text: string, label: string): Promise<void> {
@@ -392,7 +564,7 @@ async function copyDocCitation(doc: Document): Promise<void> {
     const out = await sendRequest({
       type: 'citations/document',
       documentId: doc.id,
-      template: DEFAULT_TEMPLATE,
+      ...citeArgs(),
     });
     await copyToClipboard(out.inText, 'In-text citation');
   } catch {
@@ -402,36 +574,48 @@ async function copyDocCitation(doc: Document): Promise<void> {
 
 async function copyCaptureInText(): Promise<void> {
   if (!state.filedReferenceId) return;
-  const out = await sendRequest({
-    type: 'citations/reference',
-    referenceId: state.filedReferenceId,
-    template: DEFAULT_TEMPLATE,
-  });
-  await copyToClipboard(out.inText, 'In-text citation');
+  try {
+    const out = await sendRequest({
+      type: 'citations/reference',
+      referenceId: state.filedReferenceId,
+      ...citeArgs(),
+    });
+    await copyToClipboard(out.inText, 'In-text citation');
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t build citation', true);
+  }
 }
 
 async function copyCaptureBiblio(): Promise<void> {
   if (!state.filedReferenceId) return;
-  const out = await sendRequest({
-    type: 'citations/reference',
-    referenceId: state.filedReferenceId,
-    template: DEFAULT_TEMPLATE,
-  });
-  await copyToClipboard(out.bibliography, 'Bibliography entry');
+  try {
+    const out = await sendRequest({
+      type: 'citations/reference',
+      referenceId: state.filedReferenceId,
+      ...citeArgs(),
+    });
+    await copyToClipboard(out.bibliography, 'Bibliography entry');
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t build bibliography entry', true);
+  }
 }
 
 async function copyProjectBibliography(): Promise<void> {
   if (!state.activeProjectId) return;
-  const bib = await sendRequest({
-    type: 'citations/bibliography',
-    projectId: state.activeProjectId,
-    template: DEFAULT_TEMPLATE,
-  });
-  if (!bib) {
-    toast('No sources to compile yet');
-    return;
+  try {
+    const bib = await sendRequest({
+      type: 'citations/bibliography',
+      projectId: state.activeProjectId,
+      ...citeArgs(),
+    });
+    if (!bib) {
+      toast('No sources to compile yet');
+      return;
+    }
+    await copyToClipboard(bib, 'Bibliography');
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t compile bibliography', true);
   }
-  await copyToClipboard(bib, 'Bibliography');
 }
 
 // --------------------------------------------------------------------------
@@ -465,16 +649,37 @@ async function init(): Promise<void> {
   $('copyInText').addEventListener('click', () => void copyCaptureInText());
   $('copyBiblio').addEventListener('click', () => void copyCaptureBiblio());
   $('bibBtn').addEventListener('click', () => void copyProjectBibliography());
+  $('switchBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    openProjectMenu($('switchBtn'));
+  });
 
-  // The status menu is a light popover: anything else the user does dismisses it.
+  // The popovers are light: anything else the user does dismisses them.
   document.addEventListener('click', (e) => {
-    if (!(e.target as HTMLElement).closest('#statusMenu')) closeStatusMenu();
+    const t = e.target as HTMLElement;
+    if (!t.closest('#statusMenu')) closeStatusMenu();
+    if (!t.closest('#projectMenu') && !t.closest('#switchBtn')) closeProjectMenu();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeStatusMenu();
+    if (e.key === 'Escape') {
+      closeStatusMenu();
+      closeProjectMenu();
+    }
+  });
+
+  // Keep the capture card pinned to the page the user is actually looking at.
+  chrome.tabs.onActivated.addListener(() => void refreshPreview());
+  chrome.tabs.onUpdated.addListener((_tabId, info, tab) => {
+    if (info.status === 'complete' && tab.active) void refreshPreview();
+  });
+  window.addEventListener('focus', () => void refreshPreview());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void refreshPreview();
   });
 
   await ensureSeedProject();
+  await restoreActiveProject();
+  await loadStyles();
   await loadDocuments();
   render();
   await loadPreview();

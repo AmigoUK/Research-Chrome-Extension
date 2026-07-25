@@ -152,6 +152,61 @@ describe('handleRequest', () => {
     expect(after.ok && Array.isArray(after.data) && after.data).toHaveLength(0);
   });
 
+  it('cascades a document delete to its stored file and annotations', async () => {
+    await handleRequest(repos, {
+      type: 'documents/put',
+      document: { ...makeDocument('d1', 'p1'), fileId: 'f1' },
+    });
+    await handleRequest(repos, {
+      type: 'files/put',
+      file: { id: 'f1', name: 'paper.pdf', mime: 'application/pdf', dataBase64: 'JVBERi0xLjc=' },
+    });
+    await handleRequest(repos, {
+      type: 'annotations/put',
+      annotation: {
+        id: 'an1',
+        projectId: 'p1',
+        documentId: 'd1',
+        anchor: { kind: 'pdf' as const, selectors: [{ type: 'pdfRegion' as const, page: 1, rects: [] }] },
+        content: '',
+        tags: [],
+        status: 'draft' as const,
+        author: 'me',
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    });
+
+    const del = await handleRequest(repos, { type: 'documents/delete', id: 'd1' });
+    expect(del).toEqual({ ok: true, data: null });
+
+    const gotDoc = await handleRequest(repos, { type: 'documents/get', id: 'd1' });
+    expect(gotDoc.ok && gotDoc.data).toBeUndefined();
+    const gotFile = await handleRequest(repos, { type: 'files/get', id: 'f1' });
+    expect(gotFile.ok && gotFile.data).toBeUndefined();
+    const notes = await handleRequest(repos, { type: 'annotations/listByDocument', documentId: 'd1' });
+    expect(notes.ok && (notes.data as unknown[])).toHaveLength(0);
+  });
+
+  it('deletes a reference', async () => {
+    await handleRequest(repos, {
+      type: 'references/put',
+      reference: {
+        id: 'r1',
+        projectId: 'p1',
+        cslData: { title: 'X' },
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: NOW,
+        updatedAt: NOW,
+      },
+    });
+    const del = await handleRequest(repos, { type: 'references/delete', id: 'r1' });
+    expect(del).toEqual({ ok: true, data: null });
+    const list = await handleRequest(repos, { type: 'references/listByProject', projectId: 'p1' });
+    expect(list.ok && (list.data as unknown[])).toHaveLength(0);
+  });
+
   it('stores and reads back file bytes as base64 (write→read round trip)', async () => {
     // "%PDF-1.7" → base64
     const dataBase64 = 'JVBERi0xLjc=';

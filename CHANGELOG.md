@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.26.0] — 2026-07-25
+
+A user-centred hardening pass, from an audit of the three surfaces for logical errors and
+usage-blocking dead ends (`doc/audit-2026-07-25.md`). Every fix below closes a place where the tool
+either did the wrong thing silently or gave the user no way forward.
+
+### Fixed
+
+- **The side-panel capture card no longer files the wrong page.** It scanned the active tab once,
+  at open, and never again — so after switching tabs, "File into project" filed the _previous_ page
+  (and often failed silently, because the `activeTab` grant had moved on). The card now re-scans on
+  tab switch, tab load and window focus. The "Filed ✓" state also tracks the _page_ rather than the
+  session, so a second page can be filed without reopening the panel.
+- **The side-panel project switcher works.** The header button was inert markup: the panel was
+  pinned to an arbitrary first project, so a capture could silently land in a project the user was
+  not looking at. It now opens a menu to switch project or create one, and the choice is remembered
+  across reopens (`chrome.storage.session`).
+- **"References → Export" no longer reports "no sources" when you have references but no documents.**
+  The bibliography compiles from references, but the button was gated on the document count — so a
+  DOI-imported reference could never be exported. Gated on references now.
+- **PDF highlights admit when they may be wrong.** Anchors are pure coordinate math that always
+  paint _something_; a replaced or reflowed PDF showed highlights confidently over unrelated text.
+  Each highlight's stored quote is now checked against the page, and a mismatch is flagged ("Moved?")
+  on the overlay and in the rail. The rail hint no longer claims the quote re-anchors when it did not.
+- **Side-panel citations honour the configured style.** Every citation copied from the panel was
+  hardcoded to APA, ignoring the styles set up in the dashboard. It now uses the project's style.
+- **Silent failures in the side panel now surface.** Status changes and citation copies swallowed
+  errors — a failed write left the list stale with no message. They toast the error now.
+
+### Added
+
+- **Add, edit and delete references.** The References view gains an "Add" form and per-row edit /
+  delete. A metadata-poor capture or a wrong DOI import can finally be corrected or removed;
+  previously `references/put` had a handler but no way to reach it.
+- **Delete a source.** The Documents view gains a delete action that removes the document and
+  cascades to its stored PDF bytes and its annotations — sources and their bytes were permanent
+  once added. Destructive actions ask for confirmation first (`documents/delete`, `references/delete`
+  — both append-only additions to the message router).
+
 ## [0.25.0] — 2026-07-24
 
 ### Added
@@ -796,7 +835,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.22.0...v0.23.0

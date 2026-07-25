@@ -425,6 +425,13 @@ body {
 .smenu__item:hover { background: var(--bg); }
 .smenu__item.is-current { font-weight: 600; }
 .smenu__item.is-current .smenu__label::after { content: " ·"; color: var(--muted); }
+.smenu__item--create {
+  margin-top: 4px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 0 0 7px 7px;
+}
 
 .chip {
   font-family: var(--font-mono);

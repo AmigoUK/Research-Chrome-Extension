@@ -194,6 +194,36 @@ export async function recordReferenceAdded(
   });
 }
 
+export async function recordReferenceDelete(
+  repos: RepositorySet,
+  deps: CaptureDeps,
+  reference: Reference,
+): Promise<void> {
+  const label = referenceLabel(reference);
+  await recordActivity(repos, deps, {
+    projectId: reference.projectId,
+    kind: 'reference',
+    summary: `removed ${label}`,
+    entityLabel: label,
+    entityId: reference.id,
+  });
+}
+
+export async function recordDocumentDelete(
+  repos: RepositorySet,
+  deps: CaptureDeps,
+  document: Document,
+): Promise<void> {
+  const label = documentLabel(document);
+  await recordActivity(repos, deps, {
+    projectId: document.projectId,
+    kind: 'source',
+    summary: `removed ${label}`,
+    entityLabel: label,
+    entityId: document.id,
+  });
+}
+
 /** The member's display name, falling back to their id when there is no user row. */
 async function memberLabel(repos: RepositorySet, userId: Id): Promise<string> {
   const user = await repos.users.get(userId);
