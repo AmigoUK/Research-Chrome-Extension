@@ -15,6 +15,10 @@ const HOST_ID = 'context-notes-annotator';
 interface Painted {
   annotation: Annotation;
   anchor: WebAnchor;
+  // Resolved once (on load / on `annotator/changed`), not on every scroll —
+  // see the scroll handler below. `null` means the anchor didn't resolve on
+  // this load (text shifted since capture) and stays unpainted.
+  range: Range | null;
 }
 
 const painted: Painted[] = [];
@@ -73,18 +77,30 @@ function paintOne(id: string, rects: DOMRect[]): void {
   }
 }
 
-/** Repaints every overlay and returns the ids that resolved successfully — so
- *  callers can tell the side panel which annotations actually landed on this
- *  load of the page (text may have shifted since the anchor was captured). */
-function repaintAll(): string[] {
-  overlayLayer().replaceChildren();
+/** Resolves every anchor to a `Range` ONCE (a text-quote search per note) and
+ *  caches it on the `painted` entry, then paints from that cache. Returns the
+ *  ids that resolved successfully — so callers can tell the side panel which
+ *  annotations actually landed on this load of the page (text may have
+ *  shifted since the anchor was captured). This is the only place resolution
+ *  happens: scroll/resize below only repositions the cached ranges. */
+function resolveAndRepaintAll(): string[] {
   const resolvedIds: string[] = [];
   for (const p of painted) {
-    const range = resolveWebAnchor(document.body, p.anchor);
-    if (range) resolvedIds.push(p.annotation.id);
-    paintOne(p.annotation.id, range ? pageRects(range) : []);
+    p.range = resolveWebAnchor(document.body, p.anchor);
+    if (p.range) resolvedIds.push(p.annotation.id);
   }
+  repositionAll();
   return resolvedIds;
+}
+
+/** Repositions overlays from the already-resolved `Range` cache — no anchor
+ *  re-resolution (no text-quote search). Safe to call on every scroll/resize
+ *  tick (throttled to one call per animation frame, see below). */
+function repositionAll(): void {
+  overlayLayer().replaceChildren();
+  for (const p of painted) {
+    paintOne(p.annotation.id, p.range ? pageRects(p.range) : []);
+  }
 }
 
 function jumpTo(id: string): void {
@@ -159,7 +175,9 @@ function onMouseUp(): void {
   const rects = pageRects(range);
   const last = rects[rects.length - 1];
   if (!last) return;
-  showToolbar(last.left, last.top - 40, range);
+  // Clamp so a selection near the viewport top never pushes the toolbar
+  // off-screen above y=0.
+  showToolbar(last.left, Math.max(4, last.top - 40), range);
 }
 
 async function loadExisting(): Promise<void> {
@@ -173,18 +191,45 @@ async function loadExisting(): Promise<void> {
   if (!res.ok) return;
   painted.length = 0;
   for (const annotation of res.data.annotations) {
-    if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor });
+    if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor, range: null });
   }
-  const resolvedIds = repaintAll();
+  const resolvedIds = resolveAndRepaintAll();
   chrome.runtime.sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds }).catch(() => {});
 }
 
-document.addEventListener('mouseup', () => setTimeout(onMouseUp, 0));
-window.addEventListener('scroll', repaintAll, { passive: true });
-window.addEventListener('resize', repaintAll);
-chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
-  if (m?.control === 'annotator/changed') void loadExisting();
-  else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
-});
+// Coalesce scroll/resize into at most one reposition per animation frame —
+// `repositionAll` is cheap (no anchor re-resolution) but firing it once per
+// scroll event is still needless churn on a fast trackpad fling.
+let repaintScheduled = false;
+function scheduleReposition(): void {
+  if (repaintScheduled) return;
+  repaintScheduled = true;
+  requestAnimationFrame(() => {
+    repaintScheduled = false;
+    repositionAll();
+  });
+}
 
-void loadExisting();
+// A second `executeScript` injection (e.g. a double-click on the side
+// panel's "Annotate this page" button) must not register a second set of
+// `document`/`window`/`runtime.onMessage` listeners — that produces
+// duplicate toolbars and two `painted` arrays fighting over the shared
+// shadow layer. On re-activation in an already-initialized page, just
+// re-sync from storage and stop; the first instance's listeners still own
+// the page.
+const w = window as unknown as { __contextNotesAnnotator?: boolean };
+if (w.__contextNotesAnnotator) {
+  void loadExisting();
+} else {
+  w.__contextNotesAnnotator = true;
+
+  document.addEventListener('mouseup', () => setTimeout(onMouseUp, 0));
+  window.addEventListener('scroll', scheduleReposition, { passive: true });
+  window.addEventListener('resize', scheduleReposition);
+  chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
+    if (m?.control === 'annotator/changed') void loadExisting();
+    else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
+  });
+
+  void loadExisting();
+}
