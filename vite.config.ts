@@ -17,17 +17,16 @@ export default defineConfig({
     rollupOptions: {
       // The PDF reader is web-accessible (not a manifest surface), so declare it
       // as an explicit Rollup HTML input for @crxjs to bundle (script + pdf.js).
+      //
+      // The annotator content script is NOT built here. It used to be a second
+      // Rollup input folded into an 'annotator' chunk via manualChunks, but
+      // Rollup then treated dist/annotator.js as a shared chunk and had the
+      // service worker bundle import from it — evaluating content-script code
+      // (document/window listeners) in the SW context, which crashes it on
+      // startup. It is now built as a fully standalone IIFE by
+      // vite.annotator.config.ts, run as a second build step after this one.
       input: {
         pdfviewer: fileURLToPath(new URL('./src/pdfviewer/index.html', import.meta.url)),
-        annotator: fileURLToPath(new URL('./src/content/annotator.ts', import.meta.url)),
-      },
-      output: {
-        entryFileNames: (chunk) =>
-          chunk.name === 'annotator' ? 'annotator.js' : 'assets/[name]-[hash].js',
-        // The annotator must be one file — a content script cannot import a
-        // sibling chunk. Keep its dependencies inlined into it.
-        manualChunks: (id) =>
-          id.includes('/src/content/') || id.includes('dom-anchor') ? 'annotator' : undefined,
       },
     },
   },
