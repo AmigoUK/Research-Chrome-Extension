@@ -29,6 +29,11 @@ export function registerMessageRouter(
   deps: RouterDeps = {},
 ): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    // Control messages (annotator activation, per-origin registration, change
+    // broadcast) are owned by a separate listener in annotator-control.ts. If we
+    // answered them here too, our faster reply would win the shared response
+    // channel and the real handler's response would be dropped.
+    if (message && typeof (message as { control?: unknown }).control === 'string') return;
     void (async () => {
       try {
         const repos = await getRepos();

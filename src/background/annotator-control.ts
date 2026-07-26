@@ -51,12 +51,18 @@ export function registerAnnotatorControl(): void {
   chrome.runtime.onMessage.addListener((message: ControlMessage, _sender, sendResponse) => {
     if (!message || typeof message.control !== 'string') return; // not ours — let the router handle it
     void (async () => {
-      if (message.control === 'annotator/activate') sendResponse(await activate());
-      else if (message.control === 'annotator/registerOrigin' && message.origin)
+      if (message.control === 'annotator/activate') {
+        sendResponse(await activate());
+      } else if (message.control === 'annotator/registerOrigin' && message.origin) {
         sendResponse(await registerOrigin(message.origin));
-      else if (message.control === 'annotator/changed' && message.url) {
+      } else if (message.control === 'annotator/changed' && message.url) {
         await broadcast(message.url);
         sendResponse({ ok: true });
+      } else {
+        // Unrecognized verb, or a recognized one missing its required field
+        // (e.g. registerOrigin with no origin). Reply anyway so the sender's
+        // channel resolves instead of hanging until the port times out.
+        sendResponse({ ok: false });
       }
     })();
     return true;
