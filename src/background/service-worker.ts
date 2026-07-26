@@ -8,6 +8,7 @@
 import { openContextNotesDB } from '../adapters/idb/db';
 import { createRepositories } from '../adapters/idb/repositories';
 import { registerMessageRouter } from '../adapters/chrome/messaging';
+import { registerAnnotatorControl } from './annotator-control';
 import { CiteJsFormatter, type CslLoader } from '../adapters/citation/citejs';
 import { createFetchCslLoader } from '../adapters/citation/csl-assets';
 import { isCustomBaseStyleId } from '../core/citation/parse';
@@ -43,3 +44,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 // Route typed messages from the UI to the pure domain router.
 registerMessageRouter(getRepositories, { formatter: new CiteJsFormatter(createCslLoader()) });
+
+// Wire the chrome.* glue for the web annotator (activate / registerOrigin / changed).
+// A second onMessage listener, keyed on a `control` field so it never collides
+// with the router's typed messages.
+registerAnnotatorControl();
