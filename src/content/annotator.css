@@ -23,3 +23,14 @@
   border: 0; background: none; color: #f4f1ee; padding: 6px 10px; border-radius: 5px; cursor: pointer;
 }
 .toolbar button:hover { background: rgba(255, 255, 255, 0.12); }
+.hint {
+  position: fixed;
+  z-index: 2147483647;
+  padding: 4px 8px;
+  font: 12px/1.4 system-ui, sans-serif;
+  color: #fff;
+  background: #b45309;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}

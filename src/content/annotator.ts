@@ -4,7 +4,7 @@
  * never wraps or mutates page nodes (that would break page layout/reactivity):
  * highlights are overlay rects computed from Range.getClientRects().
  */
-import { createWebAnchor, resolveWebAnchor } from '../core/anchoring/web';
+import { createWebAnchor, resolveWebAnchor, webAnchorRoot, cssPath } from '../core/anchoring/web';
 import { scanDocumentRaw, buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId } from '../adapters/chrome/active-project';
 import { createUrlWatcher } from './url-watcher';
@@ -100,7 +100,7 @@ function paintOne(id: string, rects: DOMRect[]): void {
 function resolveAndRepaintAll(): string[] {
   const resolvedIds: string[] = [];
   for (const p of painted) {
-    p.range = resolveWebAnchor(document.body, p.anchor);
+    p.range = resolveWebAnchor(webAnchorRoot(document, p.anchor), p.anchor);
     if (p.range) resolvedIds.push(p.annotation.id);
   }
   repositionAll();
@@ -127,9 +127,10 @@ function jumpTo(id: string): void {
   setTimeout(() => overlays.forEach((ov) => ov.classList.remove('flash')), 1200);
 }
 
-async function commit(range: Range, withNote: boolean): Promise<void> {
+async function commit(target: SelectionTarget, withNote: boolean): Promise<void> {
+  const { range, root, shadowHost } = target;
   try {
-    const anchor = createWebAnchor(document.body, range);
+    const anchor = createWebAnchor(root, range, shadowHost);
     const scan = scanDocumentRaw();
     const projectId = (await getActiveProjectId()) ?? '';
     const input = buildCaptureInput(scan, projectId);
@@ -174,6 +175,21 @@ function hideToolbar(): void {
   toolbarRange = null;
 }
 
+/** A brief, non-interactive notice in the toolbar layer for a selection we can't
+ *  anchor (a shadow boundary we couldn't read). Auto-removes; never blocks input. */
+function showUnsupportedHint(range: Range | null): void {
+  hideToolbar();
+  const el = document.createElement('div');
+  el.className = 'hint';
+  el.textContent = "Can't annotate inside this component";
+  const rects = range ? pageRects(range) : [];
+  const last = rects[rects.length - 1];
+  el.style.left = `${last ? last.left : 8}px`;
+  el.style.top = `${last ? Math.max(4, last.top - 40) : 8}px`;
+  toolbarLayer().appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
 /** Viewport coordinates for the toolbar, anchored above the end of the
  *  selection — see paintOne's comment on the fixed layer for why no
  *  scrollX/scrollY offset is needed. `null` if the range no longer has a
@@ -201,7 +217,7 @@ function showToolbar(range: Range): void {
     b.textContent = label;
     b.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      void commit(range, withNote);
+      if (pendingTarget) void commit(pendingTarget, withNote);
     });
     el.appendChild(b);
   }
@@ -230,13 +246,44 @@ function repositionToolbar(): void {
   toolbar.style.top = `${pos.y}px`;
 }
 
-function onMouseUp(): void {
+interface SelectionTarget {
+  range: Range;
+  root: ParentNode;
+  shadowHost?: string;
+}
+// The target the open toolbar was built for — read by commit() when a button is
+// clicked, since the selection is resolved at mouseup, not at click time.
+let pendingTarget: SelectionTarget | null = null;
+
+function onMouseUp(path: EventTarget[]): void {
   const sel = window.getSelection();
-  if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-    hideToolbar();
+  if (sel && !sel.isCollapsed && sel.toString().trim()) {
+    pendingTarget = { range: sel.getRangeAt(0), root: document.body };
+    showToolbar(pendingTarget.range);
     return;
   }
-  showToolbar(sel.getRangeAt(0));
+
+  // A selection inside an OPEN shadow root doesn't surface on window.getSelection();
+  // the composed path reveals the ShadowRoot, whose own getSelection() has it.
+  const shadowRoot = path.find((n): n is ShadowRoot => n instanceof ShadowRoot);
+  if (shadowRoot) {
+    const ssel = (shadowRoot as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.();
+    if (ssel && !ssel.isCollapsed && ssel.toString().trim()) {
+      pendingTarget = {
+        range: ssel.getRangeAt(0),
+        root: shadowRoot,
+        shadowHost: cssPath(document.body, shadowRoot.host),
+      };
+      showToolbar(pendingTarget.range);
+      return;
+    }
+    // Saw a shadow boundary but got no usable selection from it (e.g. a root that
+    // switched to closed): say so instead of silently showing nothing.
+    hideToolbar();
+    showUnsupportedHint(pendingTarget?.range ?? null);
+    return;
+  }
+  hideToolbar();
 }
 
 async function loadExisting(): Promise<void> {
@@ -288,7 +335,10 @@ if (w.__contextNotesAnnotator) {
 } else {
   w.__contextNotesAnnotator = true;
 
-  document.addEventListener('mouseup', () => setTimeout(onMouseUp, 0));
+  document.addEventListener('mouseup', (e) => {
+    const path = e.composedPath();
+    setTimeout(() => onMouseUp(path), 0);
+  });
   window.addEventListener('scroll', scheduleReposition, { passive: true });
   window.addEventListener('resize', scheduleReposition);
   chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
