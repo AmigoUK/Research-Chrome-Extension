@@ -1,7 +1,7 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-25 — **all five roadmap phases delivered**; **polish list complete**;
-**v0.26.0 user-centred hardening pass shipped** (see `doc/audit-2026-07-25.md`)._
+_Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
+**v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred)._
 
 ## Where we are
 
@@ -10,12 +10,33 @@ _Last updated: 2026-07-25 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.26.0 is on `main`** (Phases 1–5 + polish + hardening).
-  No unmerged work.
-- **Releases:** v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0
-  Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Branch state:** everything through **v0.27.0 is on `main`** (Phases 1–5 + polish + hardening +
+  web-page annotation). No unmerged work.
+- **Releases:** v0.27.0 web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 →
+  v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2;
+  v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 243 unit + 24 E2E (5 PDF viewer + 16 dashboard + 3 side panel), all green.
+- **Tests:** 253 unit + 25 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 1 web annotation),
+  all green.
+
+### v0.27.0 — web-page text annotation (2026-07-26)
+
+The last capability the 2026-07-25 audit had deferred: annotating live web pages, not just PDFs.
+The pure anchoring core (`src/core/anchoring/web.ts`, the quote → position → CSS chain) was already
+built and unit-tested; v0.27.0 wires it to a surface without weakening least-privilege. Selecting
+text on any page raises a toolbar (**Highlight** / **Note**); the annotator renders overlays inside
+a **shadow root** from the range's client rects — it never mutates page nodes — and the toolbar
+lives in its own layer so it survives an overlay repaint, scroll and resize. There is **no static
+content script and no `web_accessible_resources`**: the annotator is injected on demand
+(`chrome.scripting.executeScript`) and the host permission is requested **per origin, opt-in** the
+first time you annotate there. The side panel gains an **"On this page"** view listing the current
+URL's notes and reporting which re-anchored after reflow, so an unplaceable note is flagged rather
+than painted over unrelated text. New surface files: `src/content/annotator.ts` (+ `.css`),
+`src/background/annotator-control.ts`, `src/core/usecases/web-annotation.ts`, built as a standalone
+IIFE bundle (`vite.annotator.config.ts`) so Rollup never folds it into the service worker. Covered
+by new unit tests (`web-annotation.test.ts`, `web.test.ts`) and an E2E (`e2e/webannotation.spec.ts`);
+the production activation path (side-panel → `executeScript` → host-permission consent) is verified
+manually, as Playwright cannot drive the permission prompt.
 
 ### v0.26.0 — user-centred hardening (2026-07-25)
 
@@ -24,9 +45,8 @@ dead ends. Blockers and logic errors fixed: capture card re-scans on tab change 
 wrong page); the side-panel project switcher works and is remembered; bibliography export gates on
 references not documents; PDF highlights flag themselves as "Moved?" when the quote no longer matches;
 side-panel citations honour the configured style; references can be added / edited / deleted; sources
-can be deleted with a cascade to their file bytes and annotations. **Deferred to its own spec:**
-web-page text annotation (`web.ts` anchoring is built and tested but not yet wired to a content
-script — the one remaining blocker from the audit).
+can be deleted with a cascade to their file bytes and annotations. The one item deferred here —
+web-page text annotation — **shipped in v0.27.0** (see above).
 
 ### Phase 5 — scope decision (agreed with the user, 2026-07-24)
 

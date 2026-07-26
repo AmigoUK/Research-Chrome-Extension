@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.0] — 2026-07-26
+
+Web-page text annotation — the one capability the audit left deferred, now wired end to end. The
+anchoring core (`web.ts`, the W3C quote → position → CSS chain) had been built and unit-tested for
+some time; what shipped here is everything around it that turns it into a feature you can use on a
+live page, without weakening the extension's least-privilege stance.
+
+### Added
+
+- **Annotate any web page, not only PDFs.** Select a passage on a live page and a toolbar offers
+  **Highlight** (a bare anchor) or **Note** (an anchor with a note). The selection is anchored with
+  the same W3C strategy chain used everywhere else — text-quote first, then text-position, then a
+  structural CSS path as a coarse fallback — so a note survives edits and reflow, and re-paints
+  itself when the page is reopened.
+- **The page is never mutated.** Highlights render as absolutely-positioned overlays inside a shadow
+  root, laid out from the range's client rects, so the extension paints _over_ the document instead
+  of wrapping its nodes. The toolbar lives in its own layer that survives an overlay repaint, holds
+  its place through scroll and resize, and hides when the selection collapses or leaves the viewport.
+- **Least-privilege, opt-in per site.** There is no static content script and no
+  `web_accessible_resources`. The annotator is injected on demand via `chrome.scripting.executeScript`
+  and the host permission is requested per origin the first time you annotate there — so the
+  extension holds no standing access to the pages you browse.
+- **"On this page" in the side panel.** The panel lists the notes anchored to the current URL and
+  reports which ones re-anchored after a reflow, so a note that could not be placed is flagged rather
+  than silently painted over unrelated text.
+
 ## [0.26.0] — 2026-07-25
 
 A user-centred hardening pass, from an audit of the three surfaces for logical errors and
@@ -835,7 +861,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.23.0...v0.24.0

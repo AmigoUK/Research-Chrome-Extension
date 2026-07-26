@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.26.0**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.27.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -12,7 +12,7 @@ citation-style editor, and local-first collaboration.
 | Area | What you get |
 |---|---|
 | **Capture** | File the current page into a project — title, authors, year, DOI, journal — deduplicated by DOI. |
-| **Annotations** | Anchor notes to a passage using W3C selectors (quote → position → CSS), with a review status per note. |
+| **Annotations** | Anchor notes to a passage using W3C selectors (quote → position → CSS), with a review status per note. On a live web page, select text and a toolbar offers **Highlight** or **Note** — painted as overlays that re-anchor after a reload; access is opt-in per site (no standing content script). |
 | **PDFs** | A bundled `pdf.js` reader: text highlights and drag-a-rectangle region anchors, stored as fraction coordinates so they survive zoom and DPR changes. |
 | **Dashboard** | Overview + Kanban by workflow status, Documents, References (with DOI import), Annotations, Citation styles, Team. |
 | **Citations** | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere. |
