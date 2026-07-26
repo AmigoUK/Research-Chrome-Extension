@@ -10,6 +10,7 @@
  */
 import './dashboard.css';
 import { sendRequest } from '../adapters/chrome/messaging';
+import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
 import type {
   Project,
   Document,
@@ -260,6 +261,8 @@ async function loadProjects(): Promise<void> {
     await sendRequest({ type: 'projects/put', project: seed });
     state.projects = [seed];
   }
+  const saved = await getActiveProjectId();
+  if (saved && state.projects.some((p) => p.id === saved)) state.activeProjectId = saved;
   if (!activeProject()) state.activeProjectId = state.projects[0]?.id ?? null;
 }
 function defaultRules(
@@ -426,6 +429,7 @@ function renderProjSwitch(): void {
 async function switchProject(id: Id): Promise<void> {
   if (id === state.activeProjectId) return;
   state.activeProjectId = id;
+  void setActiveProjectId(id);
   state.docFilter = { search: '', status: 'all' };
   state.annoFilter = { search: '', status: 'all' };
   state.activityFilter = 'all';

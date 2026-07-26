@@ -6,6 +6,7 @@ import './panel.css';
 import { sendRequest } from '../adapters/chrome/messaging';
 import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
+import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import type { CitationStyle, Document, Id, Project } from '../core/model/types';
 import { templateFor } from '../core/citation/styles';
@@ -93,30 +94,12 @@ async function ensureSeedProject(): Promise<void> {
   state.activeProjectId ??= state.projects[0]?.id ?? null;
 }
 
-// The active project is kept in session storage so it survives a panel reopen
-// (the panel used to reset to projects[0] every time). `session` is chosen over
-// `local` so it clears when the browser session ends — an active selection is
-// ephemeral, not a saved setting.
-const ACTIVE_PROJECT_KEY = 'sidepanel.activeProjectId';
-
-async function persistActiveProject(id: string): Promise<void> {
-  try {
-    await chrome.storage.session.set({ [ACTIVE_PROJECT_KEY]: id });
-  } catch {
-    // Best-effort: a failed persist just means the next open falls back to [0].
-  }
-}
-
+// The active project is the one canonical value shared with the dashboard (and
+// the injected annotator) via chrome.storage.local — see
+// src/adapters/chrome/active-project.ts.
 async function restoreActiveProject(): Promise<void> {
-  try {
-    const got = await chrome.storage.session.get(ACTIVE_PROJECT_KEY);
-    const id = got[ACTIVE_PROJECT_KEY];
-    if (typeof id === 'string' && state.projects.some((p) => p.id === id)) {
-      state.activeProjectId = id;
-    }
-  } catch {
-    // Ignore — keep the seeded default.
-  }
+  const id = await getActiveProjectId();
+  if (id && state.projects.some((p) => p.id === id)) state.activeProjectId = id;
 }
 
 async function loadDocuments(): Promise<void> {
@@ -510,7 +493,7 @@ async function switchProject(projectId: string): Promise<void> {
   // A new project means the previous capture context no longer applies.
   state.filedReferenceId = null;
   state.filedUrl = null;
-  await persistActiveProject(projectId);
+  await setActiveProjectId(projectId);
   await loadDocuments();
   render();
   await refreshPreview();
