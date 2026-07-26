@@ -2,7 +2,7 @@
    or a transform would otherwise become the containing block for an absolute
    layer and shift every overlay's origin. Children stay `absolute` so they
    position off this fixed layer's (0,0) viewport origin — see annotator.ts. */
-.layer { position: fixed; top: 0; left: 0; width: 0; height: 0; }
+.layer, .toolbar-layer { position: fixed; top: 0; left: 0; width: 0; height: 0; }
 .ov {
   position: absolute; pointer-events: auto; cursor: pointer;
   background: rgba(224, 122, 95, 0.22); box-shadow: inset 0 -2px 0 rgba(224, 122, 95, 0.6);

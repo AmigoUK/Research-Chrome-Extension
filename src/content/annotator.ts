@@ -45,12 +45,25 @@ function shadowRoot(): ShadowRoot {
   const layer = document.createElement('div');
   layer.className = 'layer';
   root.appendChild(layer);
+  // Separate from `.layer`: the scroll/resize reposition path below does a
+  // `replaceChildren()` on the overlay layer to redraw highlights cheaply,
+  // which would otherwise wipe out an open toolbar mid-selection (see
+  // CLAUDE.md — "a `position: fixed` popover repositions on scroll, it does
+  // not close"). Living in its own container means that redraw never touches
+  // it; `repositionToolbar` moves it explicitly instead.
+  const toolbarLayerEl = document.createElement('div');
+  toolbarLayerEl.className = 'toolbar-layer';
+  root.appendChild(toolbarLayerEl);
   document.documentElement.appendChild(host);
   return root;
 }
 
 function overlayLayer(): HTMLElement {
   return shadowRoot().querySelector('.layer') as HTMLElement;
+}
+
+function toolbarLayer(): HTMLElement {
+  return shadowRoot().querySelector('.toolbar-layer') as HTMLElement;
 }
 
 function pageRects(range: Range): DOMRect[] {
@@ -101,6 +114,7 @@ function repositionAll(): void {
   for (const p of painted) {
     paintOne(p.annotation.id, p.range ? pageRects(p.range) : []);
   }
+  repositionToolbar();
 }
 
 function jumpTo(id: string): void {
@@ -136,14 +150,34 @@ async function commit(range: Range, withNote: boolean): Promise<void> {
 }
 
 let toolbar: HTMLElement | null = null;
+// The selection the open toolbar was shown for. Kept so a scroll/resize can
+// reposition the toolbar from the range's *current* rects instead of the
+// stale ones captured at mouseup — see `repositionToolbar`.
+let toolbarRange: Range | null = null;
 
 function hideToolbar(): void {
   toolbar?.remove();
   toolbar = null;
+  toolbarRange = null;
 }
 
-function showToolbar(x: number, y: number, range: Range): void {
+/** Viewport coordinates for the toolbar, anchored above the end of the
+ *  selection — see paintOne's comment on the fixed layer for why no
+ *  scrollX/scrollY offset is needed. `null` if the range no longer has a
+ *  paintable rect (selection collapsed or the node left the document). */
+function toolbarPosition(range: Range): { x: number; y: number } | null {
+  const rects = pageRects(range);
+  const last = rects[rects.length - 1];
+  if (!last) return null;
+  // Clamp so a selection near the viewport top never pushes the toolbar
+  // off-screen above y=0.
+  return { x: last.left, y: Math.max(4, last.top - 40) };
+}
+
+function showToolbar(range: Range): void {
   hideToolbar();
+  const pos = toolbarPosition(range);
+  if (!pos) return;
   const el = document.createElement('div');
   el.className = 'toolbar';
   for (const [label, withNote] of [
@@ -158,11 +192,29 @@ function showToolbar(x: number, y: number, range: Range): void {
     });
     el.appendChild(b);
   }
-  // Viewport coordinates, unadjusted — see paintOne's comment on the fixed layer.
-  el.style.left = `${x}px`;
-  el.style.top = `${y}px`;
-  overlayLayer().appendChild(el);
+  el.style.left = `${pos.x}px`;
+  el.style.top = `${pos.y}px`;
+  toolbarLayer().appendChild(el);
   toolbar = el;
+  toolbarRange = range;
+}
+
+/** Called from the scroll/resize reposition path (see `repositionAll`). The
+ *  toolbar lives outside the overlay `.layer` now, so it survives that
+ *  path's `replaceChildren()` on its own — this only keeps it tracking the
+ *  selection instead of drifting away from it as the page scrolls. If the
+ *  selection has since collapsed or gone offscreen entirely (no rects), hide
+ *  it — matching the existing mouseup-collapse behavior — but a plain scroll
+ *  with the selection still present must keep it open. */
+function repositionToolbar(): void {
+  if (!toolbar || !toolbarRange) return;
+  const pos = toolbarPosition(toolbarRange);
+  if (!pos) {
+    hideToolbar();
+    return;
+  }
+  toolbar.style.left = `${pos.x}px`;
+  toolbar.style.top = `${pos.y}px`;
 }
 
 function onMouseUp(): void {
@@ -171,13 +223,7 @@ function onMouseUp(): void {
     hideToolbar();
     return;
   }
-  const range = sel.getRangeAt(0);
-  const rects = pageRects(range);
-  const last = rects[rects.length - 1];
-  if (!last) return;
-  // Clamp so a selection near the viewport top never pushes the toolbar
-  // off-screen above y=0.
-  showToolbar(last.left, Math.max(4, last.top - 40), range);
+  showToolbar(sel.getRangeAt(0));
 }
 
 async function loadExisting(): Promise<void> {
