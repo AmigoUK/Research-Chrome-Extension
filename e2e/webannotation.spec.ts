@@ -185,3 +185,33 @@ test('a failed annotate dismisses the toolbar and paints nothing, without hangin
   await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(0);
   await page.close();
 });
+
+test('re-anchors across a client-side (SPA) navigation', async () => {
+  const page = await context.newPage();
+  await page.goto(`${fixtureUrl()}?spa=1`);
+  await expect(page.locator('p', { hasText: targetSentence })).toBeVisible();
+  await page.addScriptTag({ url: annotatorUrl() });
+
+  // Highlight on ?spa=1 → one overlay, stored under this URL.
+  await selectTargetSentence(page);
+  await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
+  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
+
+  // SPA-navigate to ?spa=2 (no annotations). pushState is invisible to a
+  // content script, so the page dispatches popstate the way the watcher's
+  // catch-all poll would eventually see — the stale overlay must clear.
+  await page.evaluate(() => {
+    history.pushState({}, '', '?spa=2');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(0);
+
+  // Navigate back to ?spa=1 — the annotation for that URL re-anchors on its own.
+  await page.evaluate(() => {
+    history.pushState({}, '', '?spa=1');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  });
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
+  await page.close();
+});

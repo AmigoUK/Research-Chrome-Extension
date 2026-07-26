@@ -7,6 +7,7 @@
 import { createWebAnchor, resolveWebAnchor } from '../core/anchoring/web';
 import { scanDocumentRaw, buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId } from '../adapters/chrome/active-project';
+import { createUrlWatcher } from './url-watcher';
 import type { Annotation, WebAnchor } from '../core/model/types';
 import annotatorCss from './annotator.css?inline';
 
@@ -294,6 +295,26 @@ if (w.__contextNotesAnnotator) {
     if (m?.control === 'annotator/changed') void loadExisting();
     else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
   });
+
+  // Re-anchor after a client-side (SPA) navigation: the document persists but
+  // the URL and its content change, so the new URL's annotations must load and
+  // any stale overlays + a leftover toolbar must clear. A content script can't
+  // see the page's own pushState/replaceState (those run in the main world), so
+  // watch every signal available — popstate (back/forward), the Navigation API
+  // where present, and a low-frequency poll as the guaranteed catch-all. The
+  // watcher dedupes, so overlapping triggers cost only a string compare.
+  const urlWatcher = createUrlWatcher(
+    () => location.href,
+    () => {
+      hideToolbar();
+      void loadExisting();
+    },
+  );
+  window.addEventListener('popstate', () => urlWatcher.check());
+  const nav = (window as unknown as { navigation?: EventTarget }).navigation;
+  nav?.addEventListener('navigatesuccess', () => urlWatcher.check());
+  const urlPoll = setInterval(() => urlWatcher.check(), 1000);
+  window.addEventListener('pagehide', () => clearInterval(urlPoll), { once: true });
 
   void loadExisting();
 }

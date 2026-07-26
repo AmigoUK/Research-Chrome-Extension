@@ -2,7 +2,7 @@
 
 _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
-network/annotator hardening pass**._
+network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**._
 
 ## Where we are
 
@@ -11,14 +11,25 @@ network/annotator hardening pass**._
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.1 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.2 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.1 network/annotator hardening; v0.27.0 web-page text annotation; v0.26.0
-  user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 →
-  v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Releases:** v0.27.2 web annotations survive SPA navigation; v0.27.1 network/annotator hardening;
+  v0.27.0 web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5;
+  v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 277 unit + 26 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 2 web annotation),
+- **Tests:** 281 unit + 27 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 3 web annotation),
   all green.
+
+### v0.27.2 — web annotations survive SPA navigation (2026-07-26)
+
+The freshly shipped annotator only re-loaded on injection or an explicit `annotator/changed`, so a
+client-side navigation (SPA: document stays, URL + content change) left the previous page's
+highlights lingering and never re-anchored the new URL. A content script can't observe the page's own
+`pushState`/`replaceState` (main-world), so the annotator now watches `popstate`, the Navigation API
+`navigatesuccess` where present, and a one-second poll as a catch-all; on any real URL change it
+dismisses a stale toolbar and re-loads annotations for the new URL. Change detection is deduped in a
+pure, unit-tested `src/content/url-watcher.ts` (`createUrlWatcher`); the re-anchor path is covered by
+a new E2E case (pushState + popstate → overlay clears then re-paints on navigate-back). 281 unit + 27 E2E.
 
 ### v0.27.1 — network/annotator hardening (2026-07-26)
 

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.2] — 2026-07-26
+
+### Fixed
+
+- **Web annotations survive client-side (SPA) navigation.** On a single-page app the document stays
+  but the URL and its content change, and the annotator only re-loaded on injection or an explicit
+  `annotator/changed` — so after an in-app navigation the previous page's highlights lingered over
+  unrelated text and the new URL was never re-anchored. A content script can't observe the page's own
+  `history.pushState`/`replaceState` (they run in the main world), so the annotator now watches every
+  signal it *can* see — `popstate`, the Navigation API's `navigatesuccess` where present, and a
+  one-second poll as the guaranteed catch-all — and on any real URL change dismisses a stale toolbar
+  and re-loads the annotations for the new URL (clearing overlays that no longer apply). The
+  change-detection is deduped (`createUrlWatcher`) so overlapping signals cost only a string compare.
+
 ## [0.27.1] — 2026-07-26
 
 A hardening pass over two network-facing paths and the freshly shipped web annotator, with the
@@ -887,7 +901,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...HEAD
+[0.27.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...v0.26.0
