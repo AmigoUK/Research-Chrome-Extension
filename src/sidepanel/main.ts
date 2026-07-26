@@ -314,6 +314,41 @@ function makeOnPageCard(a: Annotation): HTMLElement {
   return card;
 }
 
+interface FocusedNoteEdit {
+  id: string;
+  selectionStart: number | null;
+  selectionEnd: number | null;
+}
+
+/** A re-render (e.g. from a second highlight arriving via `annotator/changed`)
+ *  rebuilds every card from scratch, which would otherwise yank focus and
+ *  caret position out from under a note the user is mid-edit in. Capture the
+ *  focused textarea's owning annotation id + selection before the rebuild so
+ *  it can be restored after. */
+function captureFocusedNoteEdit(): FocusedNoteEdit | null {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLTextAreaElement) || !active.classList.contains('onpage-note__ta')) {
+    return null;
+  }
+  const card = active.closest<HTMLElement>('.onpage-note');
+  const id = card?.dataset.id;
+  if (!id) return null;
+  return { id, selectionStart: active.selectionStart, selectionEnd: active.selectionEnd };
+}
+
+function restoreFocusedNoteEdit(focused: FocusedNoteEdit | null): void {
+  if (!focused) return;
+  const card = document.querySelector<HTMLElement>(
+    `.onpage-note[data-id="${CSS.escape(focused.id)}"]`,
+  );
+  const ta = card?.querySelector<HTMLTextAreaElement>('.onpage-note__ta');
+  if (!ta) return;
+  ta.focus();
+  if (focused.selectionStart !== null && focused.selectionEnd !== null) {
+    ta.setSelectionRange(focused.selectionStart, focused.selectionEnd);
+  }
+}
+
 function renderOnPageCard(): void {
   const section = $('onPageCard');
   const capturable = isCapturablePreview();
@@ -322,6 +357,7 @@ function renderOnPageCard(): void {
 
   const list = $('onPageList');
   const annotations = state.pageAnnotations;
+  const focused = captureFocusedNoteEdit();
 
   if (annotations.length === 0) {
     const empty = document.createElement('div');
@@ -348,6 +384,7 @@ function renderOnPageCard(): void {
     nodes.push(heading, ...lost.map(makeOnPageCard));
   }
   list.replaceChildren(...nodes);
+  restoreFocusedNoteEdit(focused);
 }
 
 const pageNoteTimers = new Map<Id, ReturnType<typeof setTimeout>>();
@@ -393,6 +430,8 @@ async function deletePageAnnotation(id: Id): Promise<void> {
   }
   state.pageAnnotations = state.pageAnnotations.filter((a) => a.id !== id);
   state.resolvedIds.delete(id);
+  clearTimeout(pageNoteTimers.get(id));
+  pageNoteTimers.delete(id);
   renderOnPageCard();
   toast('Annotation removed');
 }

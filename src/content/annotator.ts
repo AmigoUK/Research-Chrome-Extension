@@ -19,6 +19,11 @@ interface Painted {
 
 const painted: Painted[] = [];
 
+// Registered once per origin per session — the SW's registerOrigin handler is
+// idempotent, but calling it on every commit still unregisters+re-registers
+// the content script every time a note is saved, which is needless churn.
+const registeredOrigins = new Set<string>();
+
 function shadowRoot(): ShadowRoot {
   let host = document.getElementById(HOST_ID);
   if (host?.shadowRoot) return host.shadowRoot;
@@ -100,9 +105,13 @@ async function commit(range: Range, withNote: boolean): Promise<void> {
     | { ok: true; data: { documentId: string; annotationId: string } }
     | { ok: false; error: string };
   if (!res.ok) return;
-  // Opt this origin in for future page loads. Idempotent — the SW no-ops (and
-  // skips the permission prompt) if the origin is already registered.
-  chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
+  // Opt this origin in for future page loads. Idempotent on the SW side, but
+  // only send it once per origin per session to avoid re-registering the
+  // content script on every commit.
+  if (!registeredOrigins.has(location.origin)) {
+    registeredOrigins.add(location.origin);
+    chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
+  }
   paintOne(res.data.annotationId, pageRects(range));
   window.getSelection()?.removeAllRanges();
   hideToolbar();
