@@ -231,6 +231,32 @@ describe('handleRequest', () => {
     const res = await handleRequest(repos, { type: 'nope' } as unknown as never);
     expect(res.ok).toBe(false);
   });
+
+  it('annotates a web page and reads the notes back by URL', async () => {
+    const anchor = { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] };
+    const input = { projectId: 'p1', url: 'https://ex.org/a', type: 'webPage' as const, metadata: { title: 'A' } };
+
+    const res = await handleRequest(repos, { type: 'web/annotate', input, anchor, withNote: true });
+    expect(res.ok).toBe(true);
+    const ids = res.ok ? (res.data as { documentId: string; annotationId: string }) : null;
+    expect(ids?.documentId).toBeTruthy();
+
+    const forUrl = await handleRequest(repos, {
+      type: 'web/annotationsForUrl',
+      projectId: 'p1',
+      url: 'https://ex.org/a',
+    });
+    const payload = forUrl.ok ? (forUrl.data as { documentId: string | null; annotations: unknown[] }) : null;
+    expect(payload?.documentId).toBe(ids?.documentId);
+    expect(payload?.annotations).toHaveLength(1);
+
+    const none = await handleRequest(repos, {
+      type: 'web/annotationsForUrl',
+      projectId: 'p1',
+      url: 'https://ex.org/other',
+    });
+    expect(none.ok && (none.data as { documentId: string | null }).documentId).toBeNull();
+  });
 });
 
 describe('activity recording (Phase 5, M2)', () => {

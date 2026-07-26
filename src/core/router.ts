@@ -8,6 +8,7 @@ import type { RepositorySet } from './ports/repositories';
 import type { CitationFormatter } from './ports/citation';
 import type { AnyRequest, Result } from './messages';
 import { capturePage, type CaptureDeps } from './usecases/capture';
+import { annotateWebPage, findDocumentByUrl } from './usecases/web-annotation';
 import {
   formatProjectBibliography,
   formatReferenceCitation,
@@ -142,6 +143,24 @@ export async function handleRequest(
         await repos.annotations.delete(request.id);
         if (previous) await recordAnnotationDelete(repos, capture, previous);
         return ok(null) as Result;
+      }
+      case 'web/annotate': {
+        const { document, annotation, createdDocument } = await annotateWebPage(
+          repos,
+          request.input,
+          request.anchor,
+          capture,
+        );
+        if (createdDocument) await recordDocumentPut(repos, capture, undefined, document);
+        await recordAnnotationPut(repos, capture, undefined, annotation);
+        return ok({ documentId: document.id, annotationId: annotation.id }) as Result;
+      }
+      case 'web/annotationsForUrl': {
+        const document = await findDocumentByUrl(repos, request.projectId, request.url);
+        const annotations = document
+          ? (await repos.annotations.listByDocument(document.id)).filter((a) => a.anchor.kind === 'web')
+          : [];
+        return ok({ documentId: document?.id ?? null, annotations }) as Result;
       }
       case 'files/put': {
         const { id, name, mime, dataBase64 } = request.file;

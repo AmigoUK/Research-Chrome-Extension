@@ -15,6 +15,7 @@ import type {
   Id,
   ProjectRole,
   User,
+  WebAnchor,
 } from './model/types';
 import type { CaptureInput, CaptureResult } from './usecases/capture';
 import type { MemberView } from './usecases/members';
@@ -43,6 +44,14 @@ export interface MessageMap {
   'annotations/listByDocument': { req: { documentId: Id }; res: Annotation[] };
   'annotations/put': { req: { annotation: Annotation }; res: null };
   'annotations/delete': { req: { id: Id }; res: null };
+  'web/annotate': {
+    req: { input: CaptureInput; anchor: WebAnchor; withNote: boolean };
+    res: { documentId: Id; annotationId: Id };
+  };
+  'web/annotationsForUrl': {
+    req: { projectId: Id; url: string };
+    res: { documentId: Id | null; annotations: Annotation[] };
+  };
   'files/put': { req: { file: FilePayload }; res: null };
   'files/get': { req: { id: Id }; res: FilePayload | undefined };
   'references/listByProject': { req: { projectId: Id }; res: Reference[] };
