@@ -1,0 +1,16 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Shadow article</title>
+<!--
+  No inline <script> here: extension-origin pages run under MV3's default
+  `script-src 'self'` CSP, which blocks inline script execution outright
+  (verified empirically — an inline attachShadow() call here never ran, and
+  the host's shadowRoot stayed null). The shadow root is instead attached
+  from the test via `page.evaluate`, which runs through CDP and is not
+  subject to the page's CSP — the same class of harness adaptation this
+  spec's file-header comment already documents for activation.
+-->
+<main style="position: relative; padding: 20px">
+  <h1>Shadow host page</h1>
+  <div id="host"></div>
+</main>

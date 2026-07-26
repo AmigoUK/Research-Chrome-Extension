@@ -45,6 +45,10 @@ test.beforeAll(async () => {
   // Only reachable as a `chrome-extension://` page for the duration of this
   // spec — not part of the Vite build, not committed, cleaned up in afterAll.
   copyFileSync(fixtureSrc, fixtureDest);
+  copyFileSync(
+    fileURLToPath(new URL('./fixtures/shadow-article.html', import.meta.url)),
+    path.join(distPath, 'shadow-article.html'),
+  );
 
   context = await chromium.launchPersistentContext('', {
     headless: false,
@@ -63,6 +67,7 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await context.close();
   rmSync(fixtureDest, { force: true });
+  rmSync(path.join(distPath, 'shadow-article.html'), { force: true });
 });
 
 function fixtureUrl(): string {
@@ -213,5 +218,74 @@ test('re-anchors across a client-side (SPA) navigation', async () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
   });
   await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
+  await page.close();
+});
+
+/**
+ * Attaches the open shadow root the fixture describes. Not inlined as a
+ * <script> in shadow-article.html: extension-origin pages run under MV3's
+ * default `script-src 'self'` CSP, which silently blocks inline script
+ * execution (verified empirically — an inline attachShadow() call there
+ * never ran, leaving the host's `shadowRoot` null). `page.evaluate` runs
+ * through CDP and is not subject to the page's CSP, so it stands in for the
+ * fixture's own setup — the same class of harness adaptation this file's
+ * header comment already documents for activation.
+ */
+async function attachShadowSentence(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const host = document.getElementById('host') as HTMLElement;
+    const root = host.shadowRoot ?? host.attachShadow({ mode: 'open' });
+    root.innerHTML =
+      '<p style="font: 16px/1.5 system-ui">Photosynthesis converts sunlight into chemical energy.</p>';
+  });
+}
+
+test('anchors a selection made inside an open shadow root, and repaints after reload', async () => {
+  const page = await context.newPage();
+  await page.goto(`chrome-extension://${extensionId}/shadow-article.html`);
+  await attachShadowSentence(page);
+  await page.addScriptTag({ url: annotatorUrl() });
+  await expect(page.locator('#context-notes-annotator')).toHaveCount(1);
+
+  // Select the shadow-tree sentence and fire the mouseup FROM the shadow node,
+  // composed:true, so the annotator's document listener sees the ShadowRoot in
+  // composedPath() — exactly what a real user mouseup carries.
+  await page.evaluate(() => {
+    const root = (document.getElementById('host') as HTMLElement).shadowRoot!;
+    const p = root.querySelector('p')!;
+    // ShadowRoot.getSelection is a non-standard Chrome extension of the DOM
+    // (not in TS's lib.dom.d.ts) — cast rather than weaken the fallback.
+    const shadowRootWithSelection = root as ShadowRoot & { getSelection?: () => Selection | null };
+    const sel = shadowRootWithSelection.getSelection ? shadowRootWithSelection.getSelection()! : window.getSelection()!;
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    p.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, composed: true }));
+  });
+
+  await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
+  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
+
+  // Reload: the fixture is static (no shadow root of its own — see
+  // attachShadowSentence's header comment), so the shadow tree is rebuilt the
+  // same way before the annotator re-injects. The anchor must still resolve
+  // from its stored shadowHost and repaint against that rebuilt tree.
+  await page.reload();
+  await attachShadowSentence(page);
+  await page.addScriptTag({ url: annotatorUrl() });
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
+
+  // Persistence carries the shadowHost.
+  const stored = await page.evaluate(async () => {
+    return (await chrome.runtime.sendMessage({
+      type: 'web/annotationsForUrl',
+      projectId: '',
+      url: location.href,
+    })) as { ok: true; data: { annotations: Array<{ anchor: { shadowHost?: string } }> } };
+  });
+  expect(stored.data.annotations).toHaveLength(1);
+  expect(stored.data.annotations[0]?.anchor.shadowHost).toBeTruthy();
   await page.close();
 });
