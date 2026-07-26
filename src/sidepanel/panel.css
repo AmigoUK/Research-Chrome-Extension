@@ -259,6 +259,121 @@ body {
   color: var(--muted);
 }
 
+/* On this page — web annotations for the previewed URL */
+.onpage {
+  padding: 15px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.onpage__actions {
+  margin-top: 11px;
+}
+.onpage__actions .btn {
+  width: 100%;
+}
+.onpage-empty {
+  margin-top: 11px;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.onpage-note {
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 11px 12px;
+  margin-top: 11px;
+  animation: rowIn 0.34s var(--ease-out) both;
+  transition: border-color 0.4s, background 0.4s;
+}
+.onpage-note.flash {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.onpage-note__quote {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-style: italic;
+  border-left: 2px solid var(--border);
+  padding-left: 9px;
+  margin-bottom: 9px;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.onpage-note__ta {
+  width: 100%;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  padding: 8px 9px;
+  resize: vertical;
+  min-height: 52px;
+  transition: border-color 0.12s;
+}
+.onpage-note__ta:focus {
+  outline: none;
+  border-color: var(--fg);
+  background: var(--surface);
+}
+.onpage-note__ta::placeholder {
+  color: var(--muted);
+}
+.onpage-note__foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  flex-wrap: wrap;
+}
+.onpage-note__status {
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+.onpage-note__jump {
+  font-size: 11.5px;
+  padding: 6px 10px;
+}
+.onpage-note__del {
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.onpage-note__del:hover {
+  color: var(--danger);
+  border-color: oklch(85% 0.08 27);
+}
+.onpage-lost__heading {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 16px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+}
+
 /* Controls */
 .controls {
   padding: 14px 16px 6px;

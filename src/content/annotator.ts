@@ -68,12 +68,27 @@ function paintOne(id: string, rects: DOMRect[]): void {
   }
 }
 
-function repaintAll(): void {
+/** Repaints every overlay and returns the ids that resolved successfully — so
+ *  callers can tell the side panel which annotations actually landed on this
+ *  load of the page (text may have shifted since the anchor was captured). */
+function repaintAll(): string[] {
   overlayLayer().replaceChildren();
+  const resolvedIds: string[] = [];
   for (const p of painted) {
     const range = resolveWebAnchor(document.body, p.anchor);
+    if (range) resolvedIds.push(p.annotation.id);
     paintOne(p.annotation.id, range ? pageRects(range) : []);
   }
+  return resolvedIds;
+}
+
+function jumpTo(id: string): void {
+  const overlays = shadowRoot().querySelectorAll<HTMLElement>(`.ov[data-id="${CSS.escape(id)}"]`);
+  const first = overlays[0];
+  if (!first) return;
+  first.scrollIntoView({ block: 'center' });
+  overlays.forEach((ov) => ov.classList.add('flash'));
+  setTimeout(() => overlays.forEach((ov) => ov.classList.remove('flash')), 1200);
 }
 
 async function commit(range: Range, withNote: boolean): Promise<void> {
@@ -85,6 +100,9 @@ async function commit(range: Range, withNote: boolean): Promise<void> {
     | { ok: true; data: { documentId: string; annotationId: string } }
     | { ok: false; error: string };
   if (!res.ok) return;
+  // Opt this origin in for future page loads. Idempotent — the SW no-ops (and
+  // skips the permission prompt) if the origin is already registered.
+  chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
   paintOne(res.data.annotationId, pageRects(range));
   window.getSelection()?.removeAllRanges();
   hideToolbar();
@@ -148,14 +166,16 @@ async function loadExisting(): Promise<void> {
   for (const annotation of res.data.annotations) {
     if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor });
   }
-  repaintAll();
+  const resolvedIds = repaintAll();
+  chrome.runtime.sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds }).catch(() => {});
 }
 
 document.addEventListener('mouseup', () => setTimeout(onMouseUp, 0));
 window.addEventListener('scroll', repaintAll, { passive: true });
 window.addEventListener('resize', repaintAll);
-chrome.runtime.onMessage.addListener((m: { control?: string }) => {
+chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
   if (m?.control === 'annotator/changed') void loadExisting();
+  else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
 });
 
 void loadExisting();

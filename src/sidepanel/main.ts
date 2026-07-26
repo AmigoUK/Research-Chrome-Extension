@@ -8,7 +8,15 @@ import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
-import type { CitationStyle, Document, Id, Project } from '../core/model/types';
+import type {
+  Annotation,
+  AnnotationStatus,
+  CitationStyle,
+  Document,
+  Id,
+  Project,
+  TextQuoteSelector,
+} from '../core/model/types';
 import { templateFor } from '../core/citation/styles';
 import type { CaptureInput } from '../core/usecases/capture';
 import {
@@ -34,6 +42,14 @@ interface State {
    *  the session. Without this the button stuck on "Filed ✓" forever and only
    *  one page could be filed per panel open. */
   filedUrl: string | null;
+  /** Web annotations anchored to `preview.url`, plus the document they belong
+   *  to (created lazily by the first annotation on a page). */
+  pageAnnotations: Annotation[];
+  pageDocumentId: string | null;
+  /** Ids the content script reported it could actually place on the current
+   *  load of the page. Empty means "no report yet" — render everything
+   *  normally rather than presuming every note is lost. */
+  resolvedIds: Set<string>;
 }
 
 const state: State = {
@@ -45,7 +61,18 @@ const state: State = {
   preview: null,
   filedReferenceId: null,
   filedUrl: null,
+  pageAnnotations: [],
+  pageDocumentId: null,
+  resolvedIds: new Set(),
 };
+
+const ANNO_STATUS: Record<AnnotationStatus, string> = {
+  draft: 'Draft',
+  accepted: 'Accepted',
+  rejected: 'Rejected',
+  includedInReport: 'In report',
+};
+const ANNO_STATUSES = Object.keys(ANNO_STATUS) as AnnotationStatus[];
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -128,6 +155,31 @@ async function loadPreview(): Promise<void> {
 }
 
 /**
+ * Load the web annotations anchored to the currently previewed page. Keyed on
+ * `preview.url`, so it must run after `loadPreview()`. `resolvedIds` always
+ * resets here: it describes what the content script placed on *this* load of
+ * *this* page, and a stale set from the previous page would wrongly mark
+ * fresh annotations as unplaced until a new `annotator/resolved` report
+ * arrives.
+ */
+async function loadPageAnnotations(): Promise<void> {
+  const url = state.preview?.url;
+  state.resolvedIds = new Set();
+  if (!state.activeProjectId || !url) {
+    state.pageAnnotations = [];
+    state.pageDocumentId = null;
+    return;
+  }
+  const { documentId, annotations } = await sendRequest({
+    type: 'web/annotationsForUrl',
+    projectId: state.activeProjectId,
+    url,
+  });
+  state.pageDocumentId = documentId;
+  state.pageAnnotations = annotations;
+}
+
+/**
  * Re-scan the active tab and repaint the capture card. Wired to tab-activation,
  * tab-load and window-focus events so the card reflects the page the user is
  * actually looking at — the panel used to scan once at open and then file the
@@ -135,7 +187,9 @@ async function loadPreview(): Promise<void> {
  */
 async function refreshPreview(): Promise<void> {
   await loadPreview();
+  await loadPageAnnotations();
   renderCaptureCard();
+  renderOnPageCard();
 }
 
 // --------------------------------------------------------------------------
@@ -180,6 +234,179 @@ function renderCaptureCard(): void {
 
   $<HTMLButtonElement>('copyInText').disabled = state.filedReferenceId === null;
   $<HTMLButtonElement>('copyBiblio').disabled = state.filedReferenceId === null;
+}
+
+// --------------------------------------------------------------------------
+// On this page — web annotations for the previewed URL
+// --------------------------------------------------------------------------
+
+function isCapturablePreview(): boolean {
+  return state.preview !== null && /^https?:/i.test(state.preview.url);
+}
+
+function annotationQuote(a: Annotation): string {
+  if (a.anchor.kind !== 'web') return '';
+  const selector = a.anchor.selectors.find(
+    (s): s is TextQuoteSelector => s.type === 'textQuote',
+  );
+  return selector?.exact ?? '';
+}
+
+function makeOnPageCard(a: Annotation): HTMLElement {
+  const card = document.createElement('article');
+  card.className = 'onpage-note';
+  card.dataset.id = a.id;
+  card.dataset.odId = `onpage-note-${a.id}`;
+
+  const quote = annotationQuote(a);
+  if (quote) {
+    const q = document.createElement('div');
+    q.className = 'onpage-note__quote';
+    q.textContent = quote; // never innerHTML — the quote is page content, not ours.
+    card.append(q);
+  }
+
+  const ta = document.createElement('textarea');
+  ta.className = 'onpage-note__ta';
+  ta.placeholder = 'Add a note…';
+  ta.value = a.content; // .value, not innerHTML — same reason.
+  ta.addEventListener('input', () => scheduleNoteSave(a.id, ta.value));
+  card.append(ta);
+
+  const foot = document.createElement('div');
+  foot.className = 'onpage-note__foot';
+
+  const select = document.createElement('select');
+  select.className = 'onpage-note__status';
+  select.setAttribute('aria-label', 'Review status');
+  for (const status of ANNO_STATUSES) {
+    const opt = document.createElement('option');
+    opt.value = status;
+    opt.textContent = ANNO_STATUS[status];
+    opt.selected = status === a.status;
+    select.append(opt);
+  }
+  select.addEventListener('change', () => {
+    void updatePageAnnotationStatus(a.id, select.value as AnnotationStatus);
+  });
+  foot.append(select);
+
+  const jumpBtn = document.createElement('button');
+  jumpBtn.type = 'button';
+  jumpBtn.className = 'btn onpage-note__jump';
+  jumpBtn.textContent = 'Jump to';
+  jumpBtn.addEventListener('click', () => {
+    // Panel → SW → active tab's content script; the panel has no direct
+    // tabs.sendMessage access to an injected page context.
+    chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
+  });
+  foot.append(jumpBtn);
+
+  const delBtn = document.createElement('button');
+  delBtn.type = 'button';
+  delBtn.className = 'onpage-note__del';
+  delBtn.setAttribute('aria-label', 'Delete annotation');
+  delBtn.textContent = '✕';
+  delBtn.addEventListener('click', () => void deletePageAnnotation(a.id));
+  foot.append(delBtn);
+
+  card.append(foot);
+  return card;
+}
+
+function renderOnPageCard(): void {
+  const section = $('onPageCard');
+  const capturable = isCapturablePreview();
+  section.hidden = !capturable;
+  if (!capturable) return;
+
+  const list = $('onPageList');
+  const annotations = state.pageAnnotations;
+
+  if (annotations.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'onpage-empty';
+    empty.textContent = 'No notes on this page yet — select text to highlight or annotate it.';
+    list.replaceChildren(empty);
+    return;
+  }
+
+  // Only split placed/lost once the content script has actually reported back
+  // for this page — an empty set just means no report has arrived yet, not
+  // that every annotation failed to place.
+  const splitByResolution = state.resolvedIds.size > 0;
+  const placed = splitByResolution
+    ? annotations.filter((a) => state.resolvedIds.has(a.id))
+    : annotations;
+  const lost = splitByResolution ? annotations.filter((a) => !state.resolvedIds.has(a.id)) : [];
+
+  const nodes: HTMLElement[] = placed.map(makeOnPageCard);
+  if (lost.length > 0) {
+    const heading = document.createElement('div');
+    heading.className = 'onpage-lost__heading';
+    heading.textContent = "Couldn't place on this page";
+    nodes.push(heading, ...lost.map(makeOnPageCard));
+  }
+  list.replaceChildren(...nodes);
+}
+
+const pageNoteTimers = new Map<Id, ReturnType<typeof setTimeout>>();
+function scheduleNoteSave(id: Id, content: string): void {
+  clearTimeout(pageNoteTimers.get(id));
+  pageNoteTimers.set(
+    id,
+    setTimeout(() => void savePageAnnotationContent(id, content), 500),
+  );
+}
+
+async function savePageAnnotationContent(id: Id, content: string): Promise<void> {
+  const idx = state.pageAnnotations.findIndex((a) => a.id === id);
+  if (idx < 0) return;
+  const updated: Annotation = { ...state.pageAnnotations[idx]!, content, updatedAt: nowIso() };
+  state.pageAnnotations[idx] = updated;
+  try {
+    await sendRequest({ type: 'annotations/put', annotation: updated });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Save failed', true);
+  }
+}
+
+async function updatePageAnnotationStatus(id: Id, status: AnnotationStatus): Promise<void> {
+  const idx = state.pageAnnotations.findIndex((a) => a.id === id);
+  if (idx < 0) return;
+  const updated: Annotation = { ...state.pageAnnotations[idx]!, status, updatedAt: nowIso() };
+  state.pageAnnotations[idx] = updated;
+  try {
+    await sendRequest({ type: 'annotations/put', annotation: updated });
+    toast(`Status · ${ANNO_STATUS[status]}`);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t change status', true);
+  }
+}
+
+async function deletePageAnnotation(id: Id): Promise<void> {
+  try {
+    await sendRequest({ type: 'annotations/delete', id });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Delete failed', true);
+    return;
+  }
+  state.pageAnnotations = state.pageAnnotations.filter((a) => a.id !== id);
+  state.resolvedIds.delete(id);
+  renderOnPageCard();
+  toast('Annotation removed');
+}
+
+/** Scroll a note card into view and flash it — mirrors the content script's
+ *  own overlay flash, so a click anywhere in the loop lands somewhere visible. */
+function focusOnPageCard(id: string): void {
+  const card = document.querySelector<HTMLElement>(
+    `.onpage-note[data-id="${CSS.escape(id)}"]`,
+  );
+  if (!card) return;
+  card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1200);
 }
 
 function statusColor(status: DocumentStatus): string {
@@ -312,6 +539,7 @@ function renderProgress(): void {
 function render(): void {
   renderHeader();
   renderCaptureCard();
+  renderOnPageCard();
   renderSegmented();
   renderList();
   renderProgress();
@@ -632,6 +860,9 @@ async function init(): Promise<void> {
   $('copyInText').addEventListener('click', () => void copyCaptureInText());
   $('copyBiblio').addEventListener('click', () => void copyCaptureBiblio());
   $('bibBtn').addEventListener('click', () => void copyProjectBibliography());
+  $('annotateBtn').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ control: 'annotator/activate' }).catch(() => {});
+  });
   $('switchBtn').addEventListener('click', (e) => {
     e.stopPropagation();
     openProjectMenu($('switchBtn'));
@@ -660,13 +891,37 @@ async function init(): Promise<void> {
     if (document.visibilityState === 'visible') void refreshPreview();
   });
 
+  // The annotator (content script / SW) is a separate extension surface —
+  // these are `control` messages, not the typed request/response pairs
+  // `sendRequest` uses, so they're handled directly here rather than through
+  // the router.
+  chrome.runtime.onMessage.addListener(
+    (message: { control?: string; id?: string; url?: string; resolvedIds?: string[] }) => {
+      if (message?.control === 'annotator/changed') {
+        void (async () => {
+          await loadPageAnnotations();
+          renderOnPageCard();
+        })();
+      } else if (message?.control === 'annotator/resolved') {
+        if (message.url && message.url === state.preview?.url) {
+          state.resolvedIds = new Set(message.resolvedIds ?? []);
+          renderOnPageCard();
+        }
+      } else if (message?.control === 'annotator/focus' && message.id) {
+        focusOnPageCard(message.id);
+      }
+    },
+  );
+
   await ensureSeedProject();
   await restoreActiveProject();
   await loadStyles();
   await loadDocuments();
   render();
   await loadPreview();
+  await loadPageAnnotations();
   renderCaptureCard();
+  renderOnPageCard();
 }
 
 document.addEventListener('DOMContentLoaded', () => void init());

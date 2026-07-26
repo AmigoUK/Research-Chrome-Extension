@@ -6,9 +6,17 @@
 const ANNOTATOR_FILE = 'annotator.js';
 
 export interface ControlMessage {
-  control: 'annotator/activate' | 'annotator/registerOrigin' | 'annotator/changed';
+  control:
+    | 'annotator/activate'
+    | 'annotator/registerOrigin'
+    | 'annotator/changed'
+    | 'annotator/focus'
+    | 'annotator/jump'
+    | 'annotator/resolved';
   origin?: string;
   url?: string;
+  id?: string;
+  resolvedIds?: string[];
 }
 
 async function activeTabId(): Promise<number | undefined> {
@@ -56,7 +64,30 @@ export function registerAnnotatorControl(): void {
       } else if (message.control === 'annotator/registerOrigin' && message.origin) {
         sendResponse(await registerOrigin(message.origin));
       } else if (message.control === 'annotator/changed' && message.url) {
+        // Open the side panel on the user gesture that produced the annotation —
+        // opening it later (e.g. after an await with no gesture) would be
+        // rejected by Chrome's user-gesture requirement for sidePanel.open.
+        const tabId = await activeTabId();
+        if (tabId != null) await chrome.sidePanel.open({ tabId }).catch(() => {});
         await broadcast(message.url);
+        sendResponse({ ok: true });
+      } else if (message.control === 'annotator/focus' && message.id) {
+        // Content-script overlay click → forward to the side panel (an extension
+        // page, reached via runtime.sendMessage, not tabs.sendMessage).
+        chrome.runtime.sendMessage({ control: 'annotator/focus', id: message.id }).catch(() => {});
+        sendResponse({ ok: true });
+      } else if (message.control === 'annotator/jump' && message.id) {
+        // Side panel "Jump to" → forward to the active tab's content script (an
+        // injected page context, reached via tabs.sendMessage, not runtime.sendMessage).
+        const tabId = await activeTabId();
+        if (tabId != null) chrome.tabs.sendMessage(tabId, { control: 'annotator/jump', id: message.id }).catch(() => {});
+        sendResponse({ ok: true });
+      } else if (message.control === 'annotator/resolved' && message.url) {
+        // Content script reports which annotations it could place on the page →
+        // forward to the side panel so it can flag the rest as unplaced.
+        chrome.runtime
+          .sendMessage({ control: 'annotator/resolved', url: message.url, resolvedIds: message.resolvedIds })
+          .catch(() => {});
         sendResponse({ ok: true });
       } else {
         // Unrecognized verb, or a recognized one missing its required field
