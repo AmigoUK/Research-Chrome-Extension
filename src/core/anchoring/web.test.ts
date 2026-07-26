@@ -1,6 +1,15 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createWebAnchor, resolveWebAnchor, cssPath } from './web';
+import { createWebAnchor, resolveWebAnchor, cssPath, webAnchorRoot } from './web';
+import type { TextQuoteSelector } from '../model/types';
+
+// Polyfill CSS.escape for jsdom
+if (!globalThis.CSS?.escape) {
+  const originalCSS = globalThis.CSS as any || {};
+  originalCSS.escape = (value: string) =>
+    value.replace(/([!"#$%&'()*+,./:;?@[\\\]^`{|}~])/g, '\\$1');
+  globalThis.CSS = originalCSS;
+}
 
 function selectText(root: Element, needle: string): Range {
   const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -77,5 +86,53 @@ describe('the fallback chain survives a failing strategy', () => {
     const range = resolveWebAnchor(root, anchor);
     expect(range?.toString()).toBe('energetic');
     root.remove();
+  });
+});
+
+describe('open Shadow DOM anchoring', () => {
+  function shadowFixture(): { host: HTMLElement; root: ShadowRoot; text: Text } {
+    document.body.innerHTML = '<section><div id="host"></div></section>';
+    const host = document.getElementById('host') as HTMLElement;
+    const root = host.attachShadow({ mode: 'open' });
+    root.innerHTML = '<p>Alpha beta gamma delta epsilon.</p>';
+    const text = root.querySelector('p')!.firstChild as Text;
+    return { host, root, text };
+  }
+
+  it('anchors a selection inside an open shadow root, recording the host path', () => {
+    const { host, root, text } = shadowFixture();
+    const range = document.createRange();
+    range.setStart(text, 6); // "beta gamma"
+    range.setEnd(text, 16);
+    const hostPath = cssPath(document.body, host);
+
+    const anchor = createWebAnchor(root, range, hostPath);
+
+    expect(anchor.shadowHost).toBe(hostPath);
+    const quote = anchor.selectors.find((s): s is TextQuoteSelector => s.type === 'textQuote');
+    expect(quote?.exact).toBe('beta gamma');
+  });
+
+  it('round-trips: webAnchorRoot finds the root and resolveWebAnchor re-derives the range', () => {
+    const { host, root, text } = shadowFixture();
+    const range = document.createRange();
+    range.setStart(text, 6);
+    range.setEnd(text, 16);
+    const anchor = createWebAnchor(root, range, cssPath(document.body, host));
+
+    const resolvedRoot = webAnchorRoot(document, anchor);
+    expect(resolvedRoot).toBe(root);
+    expect(resolveWebAnchor(resolvedRoot, anchor)?.toString()).toBe('beta gamma');
+  });
+
+  it('webAnchorRoot: no shadowHost → document.body', () => {
+    expect(webAnchorRoot(document, { kind: 'web', selectors: [] })).toBe(document.body);
+  });
+
+  it('webAnchorRoot: an unresolvable shadowHost falls back to document.body', () => {
+    document.body.innerHTML = '<p>plain</p>';
+    expect(webAnchorRoot(document, { kind: 'web', selectors: [], shadowHost: '#gone' })).toBe(
+      document.body,
+    );
   });
 });

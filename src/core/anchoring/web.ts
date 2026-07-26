@@ -16,7 +16,7 @@ import type {
 } from '../model/types';
 
 /** Build a structural CSS selector from `root` down to `element`. */
-export function cssPath(root: Element, element: Element): string {
+export function cssPath(root: ParentNode, element: Element): string {
   const parts: string[] = [];
   let node: Element | null = element;
   while (node && node !== root) {
@@ -39,7 +39,7 @@ function nearestElement(node: Node): Element | null {
 }
 
 /** Create a multi-strategy web anchor from a selection Range. */
-export function createWebAnchor(root: Element, range: Range): WebAnchor {
+export function createWebAnchor(root: ParentNode, range: Range, shadowHost?: string): WebAnchor {
   const selectors: Array<TextQuoteSelector | TextPositionSelector | CssSelector> = [];
 
   const quote = textQuote.fromRange(root, range);
@@ -59,11 +59,12 @@ export function createWebAnchor(root: Element, range: Range): WebAnchor {
     if (value) selectors.push({ type: 'css', value });
   }
 
-  return { kind: 'web', selectors };
+  // Only attach shadowHost when present, to satisfy exactOptionalPropertyTypes.
+  return shadowHost ? { kind: 'web', selectors, shadowHost } : { kind: 'web', selectors };
 }
 
 /** Resolve a web anchor back to a Range, trying each strategy in order. */
-export function resolveWebAnchor(root: Element, anchor: WebAnchor): Range | null {
+export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | null {
   const quote = anchor.selectors.find((s): s is TextQuoteSelector => s.type === 'textQuote');
   if (quote) {
     try {
@@ -102,4 +103,12 @@ export function resolveWebAnchor(root: Element, anchor: WebAnchor): Range | null
   }
 
   return null;
+}
+
+/** Turn a stored anchor's `shadowHost` back into the live root to anchor within.
+ *  No host → document.body; a host that no longer resolves → document.body too,
+ *  so a note is reported unplaced rather than mis-anchored against the wrong root. */
+export function webAnchorRoot(doc: Document, anchor: WebAnchor): ParentNode {
+  if (!anchor.shadowHost) return doc.body;
+  return doc.querySelector(anchor.shadowHost)?.shadowRoot ?? doc.body;
 }

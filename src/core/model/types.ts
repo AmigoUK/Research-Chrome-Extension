@@ -59,6 +59,9 @@ export interface PdfRegionSelector {
 export interface WebAnchor {
   kind: 'web';
   selectors: Array<TextQuoteSelector | TextPositionSelector | CssSelector>;
+  /** CSS path (in the light DOM) to the open shadow HOST whose shadowRoot is the
+   *  anchoring root. Absent → the anchor is relative to document.body. */
+  shadowHost?: string;
 }
 
 /** Anchor for a fixed-layout PDF: page + percent-coordinate rects. */
