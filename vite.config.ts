@@ -19,6 +19,15 @@ export default defineConfig({
       // as an explicit Rollup HTML input for @crxjs to bundle (script + pdf.js).
       input: {
         pdfviewer: fileURLToPath(new URL('./src/pdfviewer/index.html', import.meta.url)),
+        annotator: fileURLToPath(new URL('./src/content/annotator.ts', import.meta.url)),
+      },
+      output: {
+        entryFileNames: (chunk) =>
+          chunk.name === 'annotator' ? 'annotator.js' : 'assets/[name]-[hash].js',
+        // The annotator must be one file — a content script cannot import a
+        // sibling chunk. Keep its dependencies inlined into it.
+        manualChunks: (id) =>
+          id.includes('/src/content/') || id.includes('dom-anchor') ? 'annotator' : undefined,
       },
     },
   },
