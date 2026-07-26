@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.1] — 2026-07-26
+
+A hardening pass over two network-facing paths and the freshly shipped web annotator, with the
+fetch/negotiation logic extracted behind injected `fetch` seams so it is unit-tested for the first
+time (previously only the happy path was, and `doc/STATUS.md` overclaimed the coverage).
+
+### Fixed
+
+- **Open-PDF-by-URL no longer poisons the file cache.** A bare `fetch(url)` for a "PDF" could hang
+  forever, store a 200-OK HTML login page as if it were a PDF, or pull an unbounded body into memory
+  and across the runtime message channel. Fetching now runs through `fetchPdfBytes`: an
+  `AbortController` timeout, rejection of non-PDF responses by both content-type **and** the `%PDF-`
+  magic bytes, and a size cap checked against `Content-Length` before download and the body after.
+- **DOI import reports a friendly error when a DOI resolves to a landing page.** A DOI that returned
+  HTML instead of CSL-JSON surfaced as a raw `SyntaxError: Unexpected token <` from `res.json()`,
+  bypassing the import's error messaging. The content type is checked first now.
+- **Annotator activation can no longer hang the caller's channel.** `chrome.scripting.executeScript`
+  (activation) and `permissions.request` / `registerContentScripts` (per-origin opt-in) were
+  unguarded — on a `chrome://` page, the Web Store, the built-in PDF viewer, a denied prompt, or a
+  tab closed mid-injection they rejected, the listener's `sendResponse` never fired, and the sender
+  waited until the port timed out. They report `{ ok: false }` / `{ registered: false }` instead.
+- **A failed web-annotation commit no longer sticks.** If the `web/annotate` round trip rejected
+  (service worker asleep, context invalidated) the toolbar was left open over the selection and the
+  rejection went unhandled. `commit()` and `loadExisting()` now catch, dismiss the toolbar, and paint
+  nothing — covered by a new E2E case.
+
 ## [0.27.0] — 2026-07-26
 
 Web-page text annotation — the one capability the audit left deferred, now wired end to end. The
@@ -861,7 +887,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...HEAD
+[0.27.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...v0.27.0
 [0.26.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.25.0...v0.26.0
 [0.25.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.24.0...v0.25.0

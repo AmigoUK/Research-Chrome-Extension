@@ -28,29 +28,46 @@ export interface ImportDeps {
 /** doi.org is usually quick; a hung request must not leave the UI waiting. */
 const DOI_TIMEOUT_MS = 15_000;
 
-const defaultDeps: ImportDeps = {
-  fetchCsl: async (doi: string): Promise<unknown> => {
-    // Without this the promise never settles: the import button spins forever,
-    // and the service worker cannot go to sleep while the fetch is pending.
-    const abort = new AbortController();
-    const timer = setTimeout(() => abort.abort(), DOI_TIMEOUT_MS);
-    try {
-      const res = await fetch(`https://doi.org/${encodeURIComponent(doi)}`, {
-        headers: { Accept: 'application/vnd.citationstyles.csl+json' },
-        redirect: 'follow',
-        signal: abort.signal,
-      });
-      if (!res.ok) throw new Error(`DOI lookup failed (${res.status})`);
-      return (await res.json()) as unknown;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new Error('DOI lookup timed out — check the connection and try again');
-      }
-      throw error;
-    } finally {
-      clearTimeout(timer);
+/**
+ * Resolve a normalised DOI to CSL-JSON via doi.org content negotiation. The
+ * `fetch` is injected so the logic is unit-testable without a network. Guards a
+ * hung request (timeout) and, crucially, a DOI that resolves to an HTML landing
+ * page instead of metadata: without the content-type check `res.json()` throws a
+ * raw `SyntaxError: Unexpected token <` that bypasses the friendly error path.
+ */
+export async function negotiateCsl(
+  doi: string,
+  fetchFn: typeof fetch = fetch,
+  timeoutMs: number = DOI_TIMEOUT_MS,
+): Promise<unknown> {
+  // Without the timeout the promise never settles: the import button spins
+  // forever, and the service worker cannot go to sleep while the fetch pends.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), timeoutMs);
+  try {
+    const res = await fetchFn(`https://doi.org/${encodeURIComponent(doi)}`, {
+      headers: { Accept: 'application/vnd.citationstyles.csl+json' },
+      redirect: 'follow',
+      signal: abort.signal,
+    });
+    if (!res.ok) throw new Error(`DOI lookup failed (${res.status})`);
+    const contentType = (res.headers.get('content-type') ?? '').toLowerCase();
+    if (contentType.includes('text/html')) {
+      throw new Error('That DOI did not resolve to citation metadata');
     }
-  },
+    return (await res.json()) as unknown;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('DOI lookup timed out — check the connection and try again');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+const defaultDeps: ImportDeps = {
+  fetchCsl: (doi: string): Promise<unknown> => negotiateCsl(doi),
   newId: () => crypto.randomUUID(),
   now: () => new Date().toISOString(),
 };

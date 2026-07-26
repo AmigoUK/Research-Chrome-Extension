@@ -52,6 +52,7 @@ import {
 } from '../core/model/roles';
 import { initialsOf, type MemberView } from '../core/usecases/members';
 import { bytesToBase64 } from '../core/files/base64';
+import { fetchPdfBytes } from '../core/files/fetch-pdf';
 import {
   computeProgress,
   filterDocuments,
@@ -852,9 +853,7 @@ async function openInReader(d: Document): Promise<void> {
     return;
   }
   try {
-    const res = await fetch(d.url);
-    if (!res.ok) throw new Error(`Fetch failed (${res.status})`);
-    const buf = await res.arrayBuffer();
+    const buf = await fetchPdfBytes(d.url);
     const fileId = crypto.randomUUID();
     await sendRequest({
       type: 'files/put',

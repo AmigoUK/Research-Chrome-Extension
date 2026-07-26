@@ -127,26 +127,38 @@ function jumpTo(id: string): void {
 }
 
 async function commit(range: Range, withNote: boolean): Promise<void> {
-  const anchor = createWebAnchor(document.body, range);
-  const scan = scanDocumentRaw();
-  const projectId = (await getActiveProjectId()) ?? '';
-  const input = buildCaptureInput(scan, projectId);
-  const res = (await chrome.runtime.sendMessage({ type: 'web/annotate', input, anchor, withNote })) as
-    | { ok: true; data: { documentId: string; annotationId: string } }
-    | { ok: false; error: string };
-  if (!res.ok) return;
-  // Opt this origin in for future page loads. Idempotent on the SW side, but
-  // only send it once per origin per session to avoid re-registering the
-  // content script on every commit.
-  if (!registeredOrigins.has(location.origin)) {
-    registeredOrigins.add(location.origin);
-    chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
+  try {
+    const anchor = createWebAnchor(document.body, range);
+    const scan = scanDocumentRaw();
+    const projectId = (await getActiveProjectId()) ?? '';
+    const input = buildCaptureInput(scan, projectId);
+    const res = (await chrome.runtime.sendMessage({ type: 'web/annotate', input, anchor, withNote })) as
+      | { ok: true; data: { documentId: string; annotationId: string } }
+      | { ok: false; error: string };
+    if (!res.ok) {
+      hideToolbar();
+      return;
+    }
+    // Opt this origin in for future page loads. Idempotent on the SW side, but
+    // only send it once per origin per session to avoid re-registering the
+    // content script on every commit.
+    if (!registeredOrigins.has(location.origin)) {
+      registeredOrigins.add(location.origin);
+      chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
+    }
+    paintOne(res.data.annotationId, pageRects(range));
+    window.getSelection()?.removeAllRanges();
+    hideToolbar();
+    // Let the service worker open the side panel + broadcast the change.
+    chrome.runtime.sendMessage({ control: 'annotator/changed', url: scan.url }).catch(() => {});
+  } catch {
+    // The annotate round trip (or getActiveProjectId) can reject when the
+    // service worker is asleep or the extension context was invalidated. Called
+    // via `void commit(...)`, an escaping rejection would go unhandled AND leave
+    // the toolbar stuck open over a selection the click appeared to do nothing
+    // with. Dismiss it instead; the user can re-select to retry.
+    hideToolbar();
   }
-  paintOne(res.data.annotationId, pageRects(range));
-  window.getSelection()?.removeAllRanges();
-  hideToolbar();
-  // Let the service worker open the side panel + broadcast the change.
-  chrome.runtime.sendMessage({ control: 'annotator/changed', url: scan.url }).catch(() => {});
 }
 
 let toolbar: HTMLElement | null = null;
@@ -227,20 +239,26 @@ function onMouseUp(): void {
 }
 
 async function loadExisting(): Promise<void> {
-  const projectId = (await getActiveProjectId()) ?? '';
-  const scan = scanDocumentRaw();
-  const res = (await chrome.runtime.sendMessage({
-    type: 'web/annotationsForUrl',
-    projectId,
-    url: scan.url,
-  })) as { ok: true; data: { annotations: Annotation[] } } | { ok: false };
-  if (!res.ok) return;
-  painted.length = 0;
-  for (const annotation of res.data.annotations) {
-    if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor, range: null });
+  try {
+    const projectId = (await getActiveProjectId()) ?? '';
+    const scan = scanDocumentRaw();
+    const res = (await chrome.runtime.sendMessage({
+      type: 'web/annotationsForUrl',
+      projectId,
+      url: scan.url,
+    })) as { ok: true; data: { annotations: Annotation[] } } | { ok: false };
+    if (!res.ok) return;
+    painted.length = 0;
+    for (const annotation of res.data.annotations) {
+      if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor, range: null });
+    }
+    const resolvedIds = resolveAndRepaintAll();
+    chrome.runtime.sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds }).catch(() => {});
+  } catch {
+    // Called via `void loadExisting()` on injection and on annotator/changed;
+    // a rejected sync (SW asleep, context invalidated) must not surface as an
+    // unhandled rejection. The next annotator/changed retries.
   }
-  const resolvedIds = resolveAndRepaintAll();
-  chrome.runtime.sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds }).catch(() => {});
 }
 
 // Coalesce scroll/resize into at most one reposition per animation frame —

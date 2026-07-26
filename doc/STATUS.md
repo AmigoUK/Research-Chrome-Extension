@@ -1,7 +1,8 @@
 # Project Status & Resume Plan
 
 _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
-**v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred)._
+**v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
+network/annotator hardening pass**._
 
 ## Where we are
 
@@ -10,14 +11,28 @@ _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish li
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.0 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.1 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.0 web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 →
-  v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2;
-  v0.0.1 → v0.1.1 Phase 1.
+- **Releases:** v0.27.1 network/annotator hardening; v0.27.0 web-page text annotation; v0.26.0
+  user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 →
+  v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 253 unit + 25 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 1 web annotation),
+- **Tests:** 277 unit + 26 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 2 web annotation),
   all green.
+
+### v0.27.1 — network/annotator hardening (2026-07-26)
+
+A hardening pass over the two network-facing paths and the just-shipped annotator, each fix behind a
+unit test (the fetch/negotiation logic was extracted behind injected `fetch` seams). **Open-PDF-by-URL**
+now runs through `src/core/files/fetch-pdf.ts` `fetchPdfBytes` — timeout, content-type + `%PDF-`
+magic-byte validation, and a size cap — so a hung host, a 200-OK login page, or an oversized body can
+no longer poison the file cache. **DOI import** validates the content type before `res.json()`, so a
+DOI resolving to an HTML landing page gives a friendly error instead of a raw `SyntaxError`
+(`negotiateCsl` extracted and tested). **Annotator activation** (`activate` / `registerOrigin` in
+`annotator-control.ts`) wraps `executeScript` / `permissions.request` / `registerContentScripts` so a
+`chrome://` page, denied prompt, or closed tab reports `{ ok:false }` instead of hanging the sender's
+channel. **`commit()` / `loadExisting()`** in the content script catch a rejected round trip, dismiss
+the toolbar, and paint nothing (new E2E case). Tests: 253→277 unit, 25→26 E2E.
 
 ### v0.27.0 — web-page text annotation (2026-07-26)
 
@@ -135,7 +150,9 @@ styles (v0.2.0–v0.7.0). Dashboard-local CSS; side panel untouched.
 - Per-annotation "section" + link-to-section (mock nicety) omitted — the domain `Annotation` has no
   section field.
 - **DOI import** and **open-PDF-by-URL** real-network round trips need a runtime host-permission grant
-  and were not exercised in headless CI (both unit-tested / covered by seeded-path E2E).
+  and are not exercised in headless CI. Their fetch/negotiation logic **is** unit-tested with an
+  injected `fetch` (`src/core/usecases/references.test.ts`, `src/core/files/fetch-pdf.test.ts` — the
+  latter added in v0.27.1 with content-type/size/timeout hardening); the live network hop is not.
 - Prior Phase 1 follow-ups still stand (dev-dep dependabot alerts, OFL web fonts).
 
 ### Delivered (verified end-to-end in real Chrome)
@@ -177,7 +194,8 @@ snapshot cryptography, the last-owner invariant, and `recordActivity` never thro
    the licensed names in each stack, with `latin` and `latin-ext` subsets so Polish renders. 236 kB
    packaged, 146 kB loaded, read from disk. Licences travel with them in `THIRD-PARTY-NOTICES.md`.
 2. **DOI import and open-PDF-by-URL** still need a runtime host-permission grant and are not
-   exercised in headless CI (both unit-tested and covered by seeded-path E2E).
+   exercised in headless CI. The fetch/negotiation logic is unit-tested with an injected `fetch`
+   (`references.test.ts`, `fetch-pdf.test.ts`); only the live network hop is uncovered.
 
 ## Resume plan — next steps
 

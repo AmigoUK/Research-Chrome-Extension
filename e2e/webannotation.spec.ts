@@ -152,3 +152,36 @@ test('highlighting a selection paints an overlay that repaints after reload, and
 
   await page.close();
 });
+
+test('a failed annotate dismisses the toolbar and paints nothing, without hanging', async () => {
+  // A distinct query string → a fresh URL with no annotations stored by the
+  // test above, so the overlay assertions start from a clean slate.
+  const page = await context.newPage();
+  await page.goto(`${fixtureUrl()}?case=fail`);
+  await expect(page.locator('p', { hasText: targetSentence })).toBeVisible();
+  await page.addScriptTag({ url: annotatorUrl() });
+  await expect(page.locator('#context-notes-annotator')).toHaveCount(1);
+
+  // Simulate the service worker asleep / the extension context invalidated: the
+  // annotate round trip rejects. Every other control message still passes
+  // through, so activation and repaint are unaffected.
+  await page.evaluate(() => {
+    const runtime = chrome.runtime as unknown as { sendMessage: (m: unknown, ...r: unknown[]) => Promise<unknown> };
+    const orig = runtime.sendMessage.bind(chrome.runtime);
+    runtime.sendMessage = (m: unknown, ...r: unknown[]) =>
+      (m as { type?: string })?.type === 'web/annotate'
+        ? Promise.reject(new Error('simulated: service worker asleep'))
+        : orig(m, ...r);
+  });
+
+  await selectTargetSentence(page);
+  await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
+  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+
+  // The commit's send rejected — but `commit()` must catch it: the toolbar is
+  // dismissed (not left stuck over the selection) and nothing is painted. Before
+  // the fix this rejected unhandled and left the toolbar open.
+  await expect(page.locator('#context-notes-annotator .toolbar')).toHaveCount(0);
+  await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(0);
+  await page.close();
+});

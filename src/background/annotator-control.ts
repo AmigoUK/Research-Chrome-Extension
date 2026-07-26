@@ -24,27 +24,41 @@ async function activeTabId(): Promise<number | undefined> {
   return tab?.id;
 }
 
-async function activate(): Promise<{ ok: boolean }> {
+export async function activate(): Promise<{ ok: boolean }> {
   const tabId = await activeTabId();
   if (tabId == null) return { ok: false };
-  await chrome.scripting.executeScript({ target: { tabId }, files: [ANNOTATOR_FILE] });
-  return { ok: true };
+  try {
+    await chrome.scripting.executeScript({ target: { tabId }, files: [ANNOTATOR_FILE] });
+    return { ok: true };
+  } catch {
+    // A chrome:// page, the Web Store, the built-in PDF viewer, or a tab closed
+    // mid-injection all reject executeScript. Report it rather than letting the
+    // throw escape the listener's async IIFE — an unanswered sendResponse leaves
+    // the sender's channel hanging until the port times out.
+    return { ok: false };
+  }
 }
 
-async function registerOrigin(origin: string): Promise<{ registered: boolean }> {
+export async function registerOrigin(origin: string): Promise<{ registered: boolean }> {
   const pattern = `${origin}/*`;
-  const granted = await chrome.permissions.request({ origins: [pattern] });
-  if (!granted) return { registered: false };
-  const id = `annotator-${origin.replace(/[^a-z0-9]/gi, '-')}`;
   try {
-    await chrome.scripting.unregisterContentScripts({ ids: [id] });
+    const granted = await chrome.permissions.request({ origins: [pattern] });
+    if (!granted) return { registered: false };
+    const id = `annotator-${origin.replace(/[^a-z0-9]/gi, '-')}`;
+    try {
+      await chrome.scripting.unregisterContentScripts({ ids: [id] });
+    } catch {
+      // not registered yet — fine
+    }
+    await chrome.scripting.registerContentScripts([
+      { id, matches: [pattern], js: [ANNOTATOR_FILE], world: 'ISOLATED', runAt: 'document_idle' },
+    ]);
+    return { registered: true };
   } catch {
-    // not registered yet — fine
+    // A denied prompt is already handled above; this catches request/register
+    // *rejecting* (offline, quota, an invalid pattern) — same hung-channel risk.
+    return { registered: false };
   }
-  await chrome.scripting.registerContentScripts([
-    { id, matches: [pattern], js: [ANNOTATOR_FILE], world: 'ISOLATED', runAt: 'document_idle' },
-  ]);
-  return { registered: true };
 }
 
 /** Tell every context (side panel + the tab's content script) that a URL changed. */
