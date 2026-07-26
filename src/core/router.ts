@@ -156,7 +156,14 @@ export async function handleRequest(
         return ok({ documentId: document.id, annotationId: annotation.id }) as Result;
       }
       case 'web/annotationsForUrl': {
-        const document = await findDocumentByUrl(repos, request.projectId, request.url);
+        // No active project (empty/falsy id) falls back to the first existing
+        // project — reading must never seed one, unlike `web/annotate`.
+        let projectId: Id | undefined = request.projectId;
+        if (!projectId) {
+          const [first] = await repos.projects.list();
+          projectId = first?.id;
+        }
+        const document = projectId ? await findDocumentByUrl(repos, projectId, request.url) : undefined;
         const annotations = document
           ? (await repos.annotations.listByDocument(document.id)).filter((a) => a.anchor.kind === 'web')
           : [];

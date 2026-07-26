@@ -24,7 +24,11 @@ function shadowRoot(): ShadowRoot {
   if (host?.shadowRoot) return host.shadowRoot;
   host = document.createElement('div');
   host.id = HOST_ID;
-  host.style.cssText = 'all: initial; position: absolute; top: 0; left: 0; z-index: 2147483647;';
+  // Fixed to the viewport (not `absolute` on `body`) so a `position: relative`
+  // or transformed ancestor can't become the containing block and shift the
+  // overlay origin. Hung off `documentElement` rather than `body` for the same
+  // reason: minimizes the chance an ancestor transform captures it.
+  host.style.cssText = 'all: initial; position: fixed; top: 0; left: 0; z-index: 2147483647;';
   const root = host.attachShadow({ mode: 'open' });
   const style = document.createElement('style');
   style.textContent = annotatorCss;
@@ -32,7 +36,7 @@ function shadowRoot(): ShadowRoot {
   const layer = document.createElement('div');
   layer.className = 'layer';
   root.appendChild(layer);
-  document.body.appendChild(host);
+  document.documentElement.appendChild(host);
   return root;
 }
 
@@ -44,16 +48,17 @@ function pageRects(range: Range): DOMRect[] {
   return [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1);
 }
 
-function paintOne(id: string, rects: DOMRect[], moved: boolean): void {
+function paintOne(id: string, rects: DOMRect[]): void {
   const layer = overlayLayer();
-  const sx = window.scrollX;
-  const sy = window.scrollY;
+  // The layer is `position: fixed`, so client rects are already
+  // viewport-relative — no window.scrollX/scrollY offset needed (and adding
+  // one would double-count the scroll on a fixed-position ancestor).
   for (const r of rects) {
     const ov = document.createElement('div');
-    ov.className = `ov${moved ? ' moved' : ''}`;
+    ov.className = 'ov';
     ov.dataset.id = id;
-    ov.style.left = `${r.left + sx}px`;
-    ov.style.top = `${r.top + sy}px`;
+    ov.style.left = `${r.left}px`;
+    ov.style.top = `${r.top}px`;
     ov.style.width = `${r.width}px`;
     ov.style.height = `${r.height}px`;
     ov.addEventListener('click', () => {
@@ -67,7 +72,7 @@ function repaintAll(): void {
   overlayLayer().replaceChildren();
   for (const p of painted) {
     const range = resolveWebAnchor(document.body, p.anchor);
-    paintOne(p.annotation.id, range ? pageRects(range) : [], false);
+    paintOne(p.annotation.id, range ? pageRects(range) : []);
   }
 }
 
@@ -80,7 +85,7 @@ async function commit(range: Range, withNote: boolean): Promise<void> {
     | { ok: true; data: { documentId: string; annotationId: string } }
     | { ok: false; error: string };
   if (!res.ok) return;
-  paintOne(res.data.annotationId, pageRects(range), false);
+  paintOne(res.data.annotationId, pageRects(range));
   window.getSelection()?.removeAllRanges();
   hideToolbar();
   // Let the service worker open the side panel + broadcast the change.
@@ -110,8 +115,9 @@ function showToolbar(x: number, y: number, range: Range): void {
     });
     el.appendChild(b);
   }
-  el.style.left = `${x + window.scrollX}px`;
-  el.style.top = `${y + window.scrollY}px`;
+  // Viewport coordinates, unadjusted — see paintOne's comment on the fixed layer.
+  el.style.left = `${x}px`;
+  el.style.top = `${y}px`;
   overlayLayer().appendChild(el);
   toolbar = el;
 }

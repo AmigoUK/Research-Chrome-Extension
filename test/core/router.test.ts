@@ -5,7 +5,7 @@ import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import { handleRequest } from '../../src/core/router';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type { ActivityEvent, CommentThread, Document } from '../../src/core/model/types';
+import type { ActivityEvent, CommentThread, Document, Project } from '../../src/core/model/types';
 
 const NOW = '2026-07-23T00:00:00.000Z';
 
@@ -233,6 +233,19 @@ describe('handleRequest', () => {
   });
 
   it('annotates a web page and reads the notes back by URL', async () => {
+    // resolveProjectId only reuses 'p1' as-is when a project with that id
+    // actually exists — put one first so this doesn't fall through to the
+    // seed-a-default-project fallback (that path is covered separately).
+    const project: Project = {
+      id: 'p1',
+      name: 'P1',
+      sections: [],
+      members: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await handleRequest(repos, { type: 'projects/put', project });
+
     const anchor = { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] };
     const input = { projectId: 'p1', url: 'https://ex.org/a', type: 'webPage' as const, metadata: { title: 'A' } };
 
@@ -256,6 +269,47 @@ describe('handleRequest', () => {
       url: 'https://ex.org/other',
     });
     expect(none.ok && (none.data as { documentId: string | null }).documentId).toBeNull();
+  });
+
+  it('web/annotationsForUrl falls back to the first existing project on an empty id, without seeding', async () => {
+    const project: Project = {
+      id: 'existing',
+      name: 'Existing',
+      sections: [],
+      members: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    await handleRequest(repos, { type: 'projects/put', project });
+
+    const anchor = { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] };
+    const input = { projectId: 'existing', url: 'https://ex.org/b', type: 'webPage' as const, metadata: { title: 'B' } };
+    const annotated = await handleRequest(repos, { type: 'web/annotate', input, anchor, withNote: true });
+    const ids = annotated.ok ? (annotated.data as { documentId: string }) : null;
+
+    const forUrl = await handleRequest(repos, {
+      type: 'web/annotationsForUrl',
+      projectId: '',
+      url: 'https://ex.org/b',
+    });
+    const payload = forUrl.ok ? (forUrl.data as { documentId: string | null }) : null;
+    expect(payload?.documentId).toBe(ids?.documentId);
+
+    // Reading must never seed a project — unlike web/annotate.
+    const projects = await handleRequest(repos, { type: 'projects/list' });
+    expect(projects.ok && (projects.data as Project[])).toHaveLength(1);
+  });
+
+  it('web/annotationsForUrl returns an empty result when there is no project at all', async () => {
+    const forUrl = await handleRequest(repos, {
+      type: 'web/annotationsForUrl',
+      projectId: '',
+      url: 'https://ex.org/nothing',
+    });
+    expect(forUrl.ok && (forUrl.data as { documentId: string | null; annotations: unknown[] })).toEqual({
+      documentId: null,
+      annotations: [],
+    });
   });
 });
 
