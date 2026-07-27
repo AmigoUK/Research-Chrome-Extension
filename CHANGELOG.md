@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.3] — 2026-07-27
+
+### Added
+
+- **Annotate text inside open Shadow DOM.** A selection made inside a web component's open shadow
+  tree can now be highlighted. `window.getSelection()` does not descend into a shadow tree, so the
+  annotator reads the selection from the `ShadowRoot` found in the mouseup's composed path and
+  anchors it against that root; the anchor stores a light-DOM CSS path to the shadow host
+  (`WebAnchor.shadowHost`, optional and backward-compatible — existing anchors are unaffected) so it
+  re-anchors on reload. Selections inside iframes or closed shadow roots are unreachable from a
+  content script and continue to show no toolbar, as before.
+
+### Fixed
+
+- **A malformed `shadowHost` in an imported snapshot can no longer blank the page's highlights.**
+  `webAnchorRoot` now falls back to `document.body` instead of letting a `querySelector` `SyntaxError`
+  abort the repaint of every note on the page.
+
 ## [0.27.2] — 2026-07-26
 
 ### Fixed
@@ -901,7 +919,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...HEAD
+[0.27.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...v0.27.1
 [0.27.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.26.0...v0.27.0

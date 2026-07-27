@@ -2,7 +2,8 @@
 
 _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
-network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**._
+network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
+annotate inside open Shadow DOM**._
 
 ## Where we are
 
@@ -11,14 +12,31 @@ network/annotator hardening pass**; **v0.27.2 web annotations survive SPA naviga
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.2 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.3 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.2 web annotations survive SPA navigation; v0.27.1 network/annotator hardening;
-  v0.27.0 web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5;
-  v0.13.0 → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Releases:** v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA
+  navigation; v0.27.1 network/annotator hardening; v0.27.0 web-page text annotation; v0.26.0
+  user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 →
+  v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 281 unit + 27 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 3 web annotation),
+- **Tests:** 286 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v0.27.3 — annotate inside open Shadow DOM (2026-07-27)
+
+Selections made inside a web component's **open** shadow tree can now be annotated. `window.getSelection()`
+doesn't descend into a shadow tree, so the annotator reads the selection from the `ShadowRoot` found in
+the mouseup's composed path (captured synchronously) and anchors against that root; `WebAnchor` gained an
+optional `shadowHost` (a light-DOM CSS path to the host) so the note re-anchors on reload. Backward
+compatible and append-only — no IDB schema bump; existing anchors resolve against `document.body`
+unchanged. `webAnchorRoot` guards a malformed `shadowHost` from an untrusted snapshot (falls back to
+`document.body` rather than aborting every repaint). Built pure-and-tested in `web.ts`
+(`createWebAnchor`/`resolveWebAnchor` root widened to `ParentNode`, new `webAnchorRoot`), with the
+content-script glue in `annotator.ts`. **Explicitly not covered** (unreachable from a content script,
+so no toolbar — as before, not a regression): cross-origin iframes, same-origin iframes (top-frame-only
+injection), and closed shadow roots. A designed "can't annotate here" hint was dropped before release —
+`composedPath()` omits closed roots entirely, so it could only misfire on benign open-shadow clicks.
+Delivered TDD via subagent-driven development (spec + plan in `doc/superpowers/`). 286 unit + 28 E2E.
 
 ### v0.27.2 — web annotations survive SPA navigation (2026-07-26)
 
