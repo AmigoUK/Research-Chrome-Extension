@@ -15,6 +15,13 @@ import type {
   CssSelector,
 } from '../model/types';
 
+// A text-quote's `exact` is the full selected text. A pathological selection
+// (a whole article) would bloat every stored/exported anchor, so above this
+// length we drop the quote and rely on the compact, precise textPosition
+// offsets. Truncating `exact` instead would resolve to a shorter, wrong range
+// (and text-quote is tried first), so omit rather than trim.
+const MAX_QUOTE_EXACT = 10_000;
+
 /** Build a structural CSS selector from `root` down to `element`. */
 export function cssPath(root: ParentNode, element: Element): string {
   const parts: string[] = [];
@@ -43,12 +50,14 @@ export function createWebAnchor(root: ParentNode, range: Range, shadowHost?: str
   const selectors: Array<TextQuoteSelector | TextPositionSelector | CssSelector> = [];
 
   const quote = textQuote.fromRange(root, range);
-  selectors.push({
-    type: 'textQuote',
-    exact: quote.exact,
-    ...(quote.prefix ? { prefix: quote.prefix } : {}),
-    ...(quote.suffix ? { suffix: quote.suffix } : {}),
-  });
+  if (quote.exact.length <= MAX_QUOTE_EXACT) {
+    selectors.push({
+      type: 'textQuote',
+      exact: quote.exact,
+      ...(quote.prefix ? { prefix: quote.prefix } : {}),
+      ...(quote.suffix ? { suffix: quote.suffix } : {}),
+    });
+  }
 
   const position = textPosition.fromRange(root, range);
   selectors.push({ type: 'textPosition', start: position.start, end: position.end });

@@ -143,3 +143,24 @@ describe('open Shadow DOM anchoring', () => {
     expect(webAnchorRoot(document, anchor)).toBe(document.body);
   });
 });
+
+describe('quote length cap', () => {
+  function longFixture(chars: number): Range {
+    document.body.innerHTML = `<p>${'x'.repeat(chars)}</p>`;
+    const p = document.querySelector('p')!;
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    return range;
+  }
+
+  it('omits the textQuote selector when the selection exceeds the cap, keeping textPosition', () => {
+    const anchor = createWebAnchor(document.body, longFixture(10_001));
+    expect(anchor.selectors.find((s) => s.type === 'textQuote')).toBeUndefined();
+    expect(anchor.selectors.find((s) => s.type === 'textPosition')).toBeDefined();
+  });
+
+  it('keeps the textQuote selector for a normal-length selection', () => {
+    const anchor = createWebAnchor(document.body, longFixture(50));
+    expect(anchor.selectors.find((s) => s.type === 'textQuote')).toBeDefined();
+  });
+});
