@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.6] — 2026-07-27
+
+### Fixed
+
+- **Denying the "show highlights on this site" permission no longer fails silently.** After your first
+  highlight on a site, the annotator asks to auto-show your highlights when the page reloads. If you
+  declined, the request was ignored: the highlight was saved but wouldn't reappear on reload, with no
+  explanation, and the prompt never returned. Now the highlight paints immediately, then a brief
+  in-page notice explains that the site needs permission to re-show highlights, and the ask is retried
+  on your next highlight there instead of being permanently suppressed.
+
 ## [0.27.5] — 2026-07-27
 
 ### Fixed
@@ -949,7 +960,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.5...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.6...HEAD
+[0.27.6]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.5...v0.27.6
 [0.27.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.4...v0.27.5
 [0.27.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...v0.27.3

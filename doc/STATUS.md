@@ -4,7 +4,8 @@ _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish li
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
 annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**; **v0.27.5 no
-dead "Jump to" on an unplaced note**._
+dead "Jump to" on an unplaced note**; **v0.27.6 honest denied-opt-in feedback (web-annotation edge
+cases A2–A8 all closed)**._
 
 ## Where we are
 
@@ -13,9 +14,10 @@ dead "Jump to" on an unplaced note**._
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.5 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.6 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.5 no dead "Jump to" on an unplaced note; v0.27.4 quote cap + honest coarse CSS
+- **Releases:** v0.27.6 honest denied-opt-in feedback; v0.27.5 no dead "Jump to" on an unplaced note;
+  v0.27.4 quote cap + honest coarse CSS
   fallback; v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA navigation;
   v0.27.1 network/annotator hardening; v0.27.0
   web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0
@@ -23,6 +25,21 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
 - **Tests:** 292 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v0.27.6 — honest denied-opt-in feedback (2026-07-27)
+
+A8 — the last of the web-annotation edge cases (A2–A8) from the post-v0.27.0 hardening exploration.
+After a first highlight on a site, the annotator asks (via the SW's `annotator/registerOrigin` →
+`chrome.permissions.request`) to auto-inject on future loads. The content script sent that
+fire-and-forget: it marked the origin registered *before* sending and ignored the `{registered:false}`
+returned on denial, so a user who declined got no signal their highlights won't reappear on reload,
+and it was never retried. Now `commit()` paints the highlight first, then `optInOrigin()` awaits the
+result — recording only success, retrying on the next commit after a denial, and showing a brief
+in-page notice (`showNotice`, shadow-layer, non-interactive, auto-removing) on an explicit denial.
+Content-script glue (E2E can't drive the native prompt; the SW denial path is unit-tested in
+`annotator-control.test.ts` from v0.27.1). Reviewed on the diff. 292 unit + 28 E2E. **The web-annotation
+edge-case list (A2 SPA, A3 shadow DOM, A4 quote/css, A5 jump-to, A7 hung-channel, A8 opt-in) is now
+fully closed.**
 
 ### v0.27.5 — no dead "Jump to" on an unplaced note (2026-07-27)
 
