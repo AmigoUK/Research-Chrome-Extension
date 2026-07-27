@@ -3,12 +3,12 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { createWebAnchor, resolveWebAnchor, cssPath, webAnchorRoot } from './web';
 import type { TextQuoteSelector } from '../model/types';
 
-// Polyfill CSS.escape for jsdom
+// Polyfill CSS.escape for jsdom (which does not implement it), so cssPath can
+// escape ids. Typed structurally rather than via `any` to satisfy the lint rule.
 if (!globalThis.CSS?.escape) {
-  const originalCSS = globalThis.CSS as any || {};
-  originalCSS.escape = (value: string) =>
-    value.replace(/([!"#$%&'()*+,./:;?@[\\\]^`{|}~])/g, '\\$1');
-  globalThis.CSS = originalCSS;
+  const css = (globalThis.CSS ?? {}) as { escape?: (value: string) => string };
+  css.escape = (value: string) => value.replace(/([!"#$%&'()*+,./:;?@[\\\]^`{|}~])/g, '\\$1');
+  globalThis.CSS = css as typeof globalThis.CSS;
 }
 
 function selectText(root: Element, needle: string): Range {
