@@ -135,4 +135,11 @@ describe('open Shadow DOM anchoring', () => {
       document.body,
     );
   });
+
+  it('webAnchorRoot: a malformed shadowHost selector falls back to document.body instead of throwing', () => {
+    document.body.innerHTML = '<p>x</p>';
+    const anchor = { kind: 'web' as const, selectors: [], shadowHost: ')(bad-selector' };
+    expect(() => webAnchorRoot(document, anchor)).not.toThrow();
+    expect(webAnchorRoot(document, anchor)).toBe(document.body);
+  });
 });

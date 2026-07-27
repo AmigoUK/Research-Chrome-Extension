@@ -110,5 +110,11 @@ export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | n
  *  so a note is reported unplaced rather than mis-anchored against the wrong root. */
 export function webAnchorRoot(doc: Document, anchor: WebAnchor): ParentNode {
   if (!anchor.shadowHost) return doc.body;
-  return doc.querySelector(anchor.shadowHost)?.shadowRoot ?? doc.body;
+  try {
+    return doc.querySelector(anchor.shadowHost)?.shadowRoot ?? doc.body;
+  } catch {
+    // A shadowHost from an imported (untrusted) snapshot may be a malformed
+    // selector; a throw here would abort repaint for every note on the page.
+    return doc.body;
+  }
 }

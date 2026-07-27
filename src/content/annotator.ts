@@ -175,21 +175,6 @@ function hideToolbar(): void {
   toolbarRange = null;
 }
 
-/** A brief, non-interactive notice in the toolbar layer for a selection we can't
- *  anchor (a shadow boundary we couldn't read). Auto-removes; never blocks input. */
-function showUnsupportedHint(range: Range | null): void {
-  hideToolbar();
-  const el = document.createElement('div');
-  el.className = 'hint';
-  el.textContent = "Can't annotate inside this component";
-  const rects = range ? pageRects(range) : [];
-  const last = rects[rects.length - 1];
-  el.style.left = `${last ? last.left : 8}px`;
-  el.style.top = `${last ? Math.max(4, last.top - 40) : 8}px`;
-  toolbarLayer().appendChild(el);
-  setTimeout(() => el.remove(), 3000);
-}
-
 /** Viewport coordinates for the toolbar, anchored above the end of the
  *  selection — see paintOne's comment on the fixed layer for why no
  *  scrollX/scrollY offset is needed. `null` if the range no longer has a
@@ -278,9 +263,9 @@ function onMouseUp(path: EventTarget[]): void {
       return;
     }
     // Saw a shadow boundary but got no usable selection from it (e.g. a root that
-    // switched to closed): say so instead of silently showing nothing.
+    // switched to closed, or a benign click with nothing selected): treat it
+    // like any other empty selection.
     hideToolbar();
-    showUnsupportedHint(pendingTarget?.range ?? null);
     return;
   }
   hideToolbar();
