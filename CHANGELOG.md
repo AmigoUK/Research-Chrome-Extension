@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.4] — 2026-07-27
+
+### Changed
+
+- **A web annotation no longer stores an unbounded quote.** `createWebAnchor` caps the text-quote's
+  `exact` at 10 000 characters; a pathological selection (a whole article) drops the quote selector
+  and relies on the compact, precise text-position offsets instead of bloating every stored and
+  exported anchor. Realistic highlights are unaffected — they keep their quote and its move-tolerant
+  re-anchoring.
+
+### Fixed
+
+- **A web highlight that can't be precisely re-found is no longer painted over a whole block.** When
+  text-quote and text-position both fail (the passage moved or changed), the CSS fallback used to
+  select the entire containing element and paint it as confidently as a real highlight. Such a coarse
+  match is now reported as "couldn't place on this page" (in the side panel) rather than shown as a
+  misleading block overlay.
+- **A malformed CSS selector in an imported snapshot can no longer blank a page's highlights.**
+  `resolveWebAnchor`'s CSS fallback guards its `querySelector`, so a bad selector falls through to
+  "not found" instead of throwing and aborting the repaint of every note on the page.
+
 ## [0.27.3] — 2026-07-27
 
 ### Added
@@ -919,7 +940,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.4...HEAD
+[0.27.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...v0.27.2
 [0.27.1]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.0...v0.27.1

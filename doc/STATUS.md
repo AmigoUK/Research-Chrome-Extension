@@ -3,7 +3,7 @@
 _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
-annotate inside open Shadow DOM**._
+annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**._
 
 ## Where we are
 
@@ -12,15 +12,33 @@ annotate inside open Shadow DOM**._
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.3 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.4 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA
-  navigation; v0.27.1 network/annotator hardening; v0.27.0 web-page text annotation; v0.26.0
-  user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0 → v0.14.0 Phase 4; v0.8.0 →
-  v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
+- **Releases:** v0.27.4 quote cap + honest coarse CSS fallback; v0.27.3 annotate inside open Shadow
+  DOM; v0.27.2 web annotations survive SPA navigation; v0.27.1 network/annotator hardening; v0.27.0
+  web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0
+  → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 286 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
+- **Tests:** 292 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v0.27.4 — quote cap + honest coarse CSS fallback (2026-07-27)
+
+Two rough edges in `src/core/anchoring/web.ts` (A4 from the post-v0.27.0 hardening exploration).
+**Quote cap:** `createWebAnchor` caps the stored text-quote `exact` at `MAX_QUOTE_EXACT = 10_000`
+chars — a pathological whole-article selection omits the quote (keeping the compact, precise
+text-position offsets) instead of bloating every stored/exported anchor; realistic highlights keep
+their quote and its move-tolerant re-anchoring. **Honest coarse fallback:** `resolveWebAnchor` now
+returns `{ range, approximate }` — the CSS fallback (which selects a whole element) is
+`approximate: true`, and the annotator paints/counts a note as resolved only when
+`range && !approximate`, so a coarse match is reported as "couldn't place on this page" via the
+existing side-panel split rather than shown as a misleading block overlay. The CSS fallback's
+`querySelector` is also guarded against a malformed selector from an untrusted snapshot (falls back
+to no-match instead of aborting every note's repaint — mirrors the `webAnchorRoot` guard from
+v0.27.3). Pure-and-tested in `web.ts`; one-line paint gate in the glue. Delivered TDD via
+subagent-driven development (spec + plan in `doc/superpowers/`). 292 unit + 28 E2E. **Still open from
+that exploration: A5** (`jumpTo` no-op for an unplaced note) and **A8** (host-permission denial
+ignored by the content script).
 
 ### v0.27.3 — annotate inside open Shadow DOM (2026-07-27)
 
