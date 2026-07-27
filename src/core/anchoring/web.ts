@@ -109,13 +109,19 @@ export function resolveWebAnchor(
 
   const css = anchor.selectors.find((s): s is CssSelector => s.type === 'css');
   if (css) {
-    const el = root.querySelector(css.value);
-    if (el) {
-      const range = el.ownerDocument.createRange();
-      range.selectNodeContents(el);
-      // Coarse: this is the whole element, not the original fragment. Flagged so
-      // the caller reports it as unplaced rather than painting a misleading block.
-      return { range, approximate: true };
+    try {
+      const el = root.querySelector(css.value);
+      if (el) {
+        const range = el.ownerDocument.createRange();
+        range.selectNodeContents(el);
+        // Coarse: whole element, not the original fragment. Flagged so the caller
+        // reports it as unplaced rather than painting a misleading block.
+        return { range, approximate: true };
+      }
+    } catch {
+      // A malformed css selector from an imported (untrusted) snapshot must not
+      // throw — it would abort resolveAndRepaintAll for every note on the page.
+      // Mirrors the guard in webAnchorRoot.
     }
   }
 
