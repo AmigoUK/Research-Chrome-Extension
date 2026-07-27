@@ -1,6 +1,6 @@
 {
   "name": "scientific-context-notes",
-  "version": "0.27.6",
+  "version": "0.28.0",
   "description": "A Chrome MV3 research companion: contextual annotations, project organisation, and CSL citations.",
   "type": "module",
   "private": true,
@@ -13,6 +13,7 @@
     "dev": "vite",
     "dev:annotator": "vite build --config vite.annotator.config.ts --watch",
     "build": "tsc --noEmit && vite build && vite build --config vite.annotator.config.ts",
+    "package": "npm run build && node scripts/package.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",

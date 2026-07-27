@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.28.0] — 2026-07-27
+
+### Added
+
+- **Chrome Web Store distribution packaging.** `npm run package` builds and zips `dist/` into an
+  upload-ready `release/context-notes-v<version>.zip` (manifest at the archive root, source maps
+  excluded, version taken from `package.json`), using the system `zip` — no new dependency.
+- **`doc/DISTRIBUTION.md`** — build/package/upload steps, a store-listing checklist, and a
+  per-permission justification for review.
+- **`doc/PRIVACY.md`** — a privacy policy for the listing, stating the local-first, no-backend,
+  no-telemetry data handling (required because the extension requests broad optional host
+  permissions).
+- The release flow now attaches the packaged zip to the GitHub release, so a tag and its Web Store
+  upload are the same bytes.
+
 ## [0.27.6] — 2026-07-27
 
 ### Fixed
@@ -960,7 +975,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.6...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.6...v0.28.0
 [0.27.6]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.5...v0.27.6
 [0.27.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.4...v0.27.5
 [0.27.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...v0.27.4

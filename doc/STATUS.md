@@ -5,7 +5,7 @@ _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish li
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
 annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**; **v0.27.5 no
 dead "Jump to" on an unplaced note**; **v0.27.6 honest denied-opt-in feedback (web-annotation edge
-cases A2–A8 all closed)**._
+cases A2–A8 all closed)**; **v0.28.0 Chrome Web Store distribution packaging**._
 
 ## Where we are
 
@@ -14,9 +14,10 @@ cases A2–A8 all closed)**._
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.6 is on `main`** (Phases 1–5 + polish + hardening +
-  web-page annotation). No unmerged work.
-- **Releases:** v0.27.6 honest denied-opt-in feedback; v0.27.5 no dead "Jump to" on an unplaced note;
+- **Branch state:** everything through **v0.28.0 is on `main`** (Phases 1–5 + polish + hardening +
+  web-page annotation + Web Store packaging). No unmerged work.
+- **Releases:** v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
+  feedback; v0.27.5 no dead "Jump to" on an unplaced note;
   v0.27.4 quote cap + honest coarse CSS
   fallback; v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA navigation;
   v0.27.1 network/annotator hardening; v0.27.0
@@ -25,6 +26,19 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
 - **Tests:** 292 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v0.28.0 — Chrome Web Store distribution packaging (2026-07-27)
+
+The "distribution" strand from the project overview. `npm run package` (`scripts/package.mjs`) runs a
+production build and zips `dist/` into `release/context-notes-v<version>.zip` — manifest at the
+archive root, source maps excluded, version from `package.json` — using the system `zip`, no new
+dependency (`release/` is git-ignored). `doc/DISTRIBUTION.md` documents build → package → upload, a
+store-listing checklist, and a per-permission justification; `doc/PRIVACY.md` is the listing's privacy
+policy (local-first, no backend/telemetry — required given the broad optional host permissions). The
+release checklist in `CLAUDE.md` now includes packaging the zip and attaching it to the GitHub
+release, so a tag and its store upload are identical bytes. No runtime code changed (build-time script
++ docs); suite unchanged at 292 unit + 28 E2E. Verified by running `npm run package` and inspecting
+the zip (manifest at root, no `.map`, no test leftovers, ~1.2 MB).
 
 ### v0.27.6 — honest denied-opt-in feedback (2026-07-27)
 

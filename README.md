@@ -4,7 +4,7 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.27.6**.
+> **Status:** **all five roadmap phases delivered.** Current release: **v0.28.0**.
 > See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
@@ -116,9 +116,12 @@ npm test           # unit tests (Vitest)
 npm run test:e2e   # end-to-end tests (Playwright, extension loaded in headed Chromium)
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
+npm run package    # build + zip dist/ → release/context-notes-v<version>.zip (Web Store upload)
 ```
 
-Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mode).
+Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mode). To publish, run
+`npm run package` and upload the zip — see [`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md)
+(and [`doc/PRIVACY.md`](doc/PRIVACY.md) for the listing's privacy policy).
 
 ## Architecture
 

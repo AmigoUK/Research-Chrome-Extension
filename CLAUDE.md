@@ -93,6 +93,11 @@ a new `CHANGELOG.md` section, update `README.md` and `doc/STATUS.md`, commit as
 tag, push with `--follow-tags`, then `gh release create`. **Documentation ships with the release** —
 README, the affected `doc/` files and the GitHub repo description, not afterwards.
 
+For a store-facing release, also `npm run package` and attach the zip
+(`release/context-notes-vX.Y.Z.zip`) to the GitHub release (`gh release create … <zip>` or
+`gh release upload vX.Y.Z <zip>`), so the tag and the Chrome Web Store upload are the same bytes.
+See `doc/DISTRIBUTION.md`.
+
 # Protected Files
 
 Do not modify these without an explicit instruction:
