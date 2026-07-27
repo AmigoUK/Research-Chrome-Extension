@@ -23,3 +23,12 @@
   border: 0; background: none; color: #f4f1ee; padding: 6px 10px; border-radius: 5px; cursor: pointer;
 }
 .toolbar button:hover { background: rgba(255, 255, 255, 0.12); }
+/* Transient notice (e.g. a denied opt-in). Fixed to the viewport top, centred,
+   non-interactive — it informs, never blocks. */
+.notice {
+  position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+  max-width: 90vw; padding: 8px 12px;
+  background: #1c1a18; color: #f4f1ee; border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); pointer-events: none;
+  font: 500 13px/1.4 -apple-system, system-ui, sans-serif;
+}

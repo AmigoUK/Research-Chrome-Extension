@@ -145,18 +145,16 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
       hideToolbar();
       return;
     }
-    // Opt this origin in for future page loads. Idempotent on the SW side, but
-    // only send it once per origin per session to avoid re-registering the
-    // content script on every commit.
-    if (!registeredOrigins.has(location.origin)) {
-      registeredOrigins.add(location.origin);
-      chrome.runtime.sendMessage({ control: 'annotator/registerOrigin', origin: location.origin }).catch(() => {});
-    }
+    // Paint and dismiss immediately — the highlight must not wait on the opt-in
+    // permission round trip below.
     paintOne(res.data.annotationId, pageRects(range));
     window.getSelection()?.removeAllRanges();
     hideToolbar();
     // Let the service worker open the side panel + broadcast the change.
     chrome.runtime.sendMessage({ control: 'annotator/changed', url: scan.url }).catch(() => {});
+    // Opt this origin in for future page loads (needs a host-permission grant).
+    // Once per origin per session, and only after a real result — see optInOrigin.
+    if (!registeredOrigins.has(location.origin)) void optInOrigin();
   } catch {
     // The annotate round trip (or getActiveProjectId) can reject when the
     // service worker is asleep or the extension context was invalidated. Called
@@ -165,6 +163,39 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
     // with. Dismiss it instead; the user can re-select to retry.
     hideToolbar();
   }
+}
+
+/** Ask the SW to register this origin so the annotator auto-injects on future
+ *  page loads. Only *success* is remembered — a denied or failed request is not
+ *  recorded, so the next commit tries again. On an explicit denial, tell the
+ *  user: the highlight is saved, but without the permission it will not reappear
+ *  automatically when the page reloads (the earlier fire-and-forget swallowed
+ *  this, leaving the user to think the tool had lost their work). */
+async function optInOrigin(): Promise<void> {
+  try {
+    const res = (await chrome.runtime.sendMessage({
+      control: 'annotator/registerOrigin',
+      origin: location.origin,
+    })) as { registered: boolean } | undefined;
+    if (res?.registered) {
+      registeredOrigins.add(location.origin);
+    } else {
+      showNotice('Highlight saved. Allow this site to show your highlights when the page reloads.');
+    }
+  } catch {
+    // SW asleep / context invalidated — don't record, so a later commit retries.
+  }
+}
+
+/** A brief, non-interactive notice in the annotator's shadow layer. Unlike the
+ *  removed selection hint, this fires only on a real, discrete event (a denied
+ *  opt-in), so it never misfires on ordinary interaction. Auto-removes. */
+function showNotice(text: string): void {
+  const el = document.createElement('div');
+  el.className = 'notice';
+  el.textContent = text;
+  toolbarLayer().appendChild(el);
+  setTimeout(() => el.remove(), 5000);
 }
 
 let toolbar: HTMLElement | null = null;
