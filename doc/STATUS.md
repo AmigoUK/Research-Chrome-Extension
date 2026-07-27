@@ -3,7 +3,8 @@
 _Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
-annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**._
+annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**; **v0.27.5 no
+dead "Jump to" on an unplaced note**._
 
 ## Where we are
 
@@ -12,15 +13,25 @@ annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallb
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.27.4 is on `main`** (Phases 1–5 + polish + hardening +
+- **Branch state:** everything through **v0.27.5 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation). No unmerged work.
-- **Releases:** v0.27.4 quote cap + honest coarse CSS fallback; v0.27.3 annotate inside open Shadow
-  DOM; v0.27.2 web annotations survive SPA navigation; v0.27.1 network/annotator hardening; v0.27.0
+- **Releases:** v0.27.5 no dead "Jump to" on an unplaced note; v0.27.4 quote cap + honest coarse CSS
+  fallback; v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA navigation;
+  v0.27.1 network/annotator hardening; v0.27.0
   web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0
   → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
 - **Tests:** 292 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v0.27.5 — no dead "Jump to" on an unplaced note (2026-07-27)
+
+A5 from the post-v0.27.0 hardening exploration. In the side panel's "On this page" view, a note under
+"Couldn't place on this page" had no overlay to scroll to, so its "Jump to" button was a silent no-op.
+`makeOnPageCard(a, jumpable)` now renders the button only for notes that resolved on the page (the
+`placed` list); the "couldn't place" heading already explains why the rest can't be jumped to. Small
+side-panel render change (`src/sidepanel/main.ts`); status/delete controls unchanged. 292 unit + 28
+E2E. **Remaining from that exploration: A8** (host-permission denial ignored by the content script).
 
 ### v0.27.4 — quote cap + honest coarse CSS fallback (2026-07-27)
 

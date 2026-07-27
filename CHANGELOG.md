@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [0.27.5] — 2026-07-27
+
+### Fixed
+
+- **A note that couldn't be placed on the page no longer offers a dead "Jump to".** In the side
+  panel's "On this page" view, a note under "Couldn't place on this page" has no overlay to scroll
+  to, so its "Jump to" button did nothing when clicked. The button is now shown only for notes that
+  actually resolved on the page; the section heading already explains why the rest can't be jumped to.
+
 ## [0.27.4] — 2026-07-27
 
 ### Changed
@@ -940,7 +949,8 @@ is something an assertion would have caught:
 - Tooling: ESLint (flat config), Prettier, EditorConfig, Vitest + v8 coverage.
 - GitHub Actions CI: typecheck → lint → unit → build.
 
-[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.4...HEAD
+[Unreleased]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.5...HEAD
+[0.27.5]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.4...v0.27.5
 [0.27.4]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.3...v0.27.4
 [0.27.3]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.2...v0.27.3
 [0.27.2]: https://github.com/AmigoUK/Research-Chrome-Extension/compare/v0.27.1...v0.27.2

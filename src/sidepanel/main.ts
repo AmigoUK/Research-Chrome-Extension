@@ -252,7 +252,10 @@ function annotationQuote(a: Annotation): string {
   return selector?.exact ?? '';
 }
 
-function makeOnPageCard(a: Annotation): HTMLElement {
+/** `jumpable` is false for a note in the "couldn't place" list: its anchor did
+ *  not resolve on this page, so there is no overlay to scroll to — offering
+ *  "Jump to" would be a silent no-op. */
+function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   const card = document.createElement('article');
   card.className = 'onpage-note';
   card.dataset.id = a.id;
@@ -291,16 +294,18 @@ function makeOnPageCard(a: Annotation): HTMLElement {
   });
   foot.append(select);
 
-  const jumpBtn = document.createElement('button');
-  jumpBtn.type = 'button';
-  jumpBtn.className = 'btn onpage-note__jump';
-  jumpBtn.textContent = 'Jump to';
-  jumpBtn.addEventListener('click', () => {
-    // Panel → SW → active tab's content script; the panel has no direct
-    // tabs.sendMessage access to an injected page context.
-    chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
-  });
-  foot.append(jumpBtn);
+  if (jumpable) {
+    const jumpBtn = document.createElement('button');
+    jumpBtn.type = 'button';
+    jumpBtn.className = 'btn onpage-note__jump';
+    jumpBtn.textContent = 'Jump to';
+    jumpBtn.addEventListener('click', () => {
+      // Panel → SW → active tab's content script; the panel has no direct
+      // tabs.sendMessage access to an injected page context.
+      chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
+    });
+    foot.append(jumpBtn);
+  }
 
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
@@ -376,12 +381,12 @@ function renderOnPageCard(): void {
     : annotations;
   const lost = splitByResolution ? annotations.filter((a) => !state.resolvedIds.has(a.id)) : [];
 
-  const nodes: HTMLElement[] = placed.map(makeOnPageCard);
+  const nodes: HTMLElement[] = placed.map((a) => makeOnPageCard(a, true));
   if (lost.length > 0) {
     const heading = document.createElement('div');
     heading.className = 'onpage-lost__heading';
     heading.textContent = "Couldn't place on this page";
-    nodes.push(heading, ...lost.map(makeOnPageCard));
+    nodes.push(heading, ...lost.map((a) => makeOnPageCard(a, false)));
   }
   list.replaceChildren(...nodes);
   restoreFocusedNoteEdit(focused);
