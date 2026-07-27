@@ -100,7 +100,11 @@ function paintOne(id: string, rects: DOMRect[]): void {
 function resolveAndRepaintAll(): string[] {
   const resolvedIds: string[] = [];
   for (const p of painted) {
-    p.range = resolveWebAnchor(webAnchorRoot(document, p.anchor), p.anchor);
+    const { range, approximate } = resolveWebAnchor(webAnchorRoot(document, p.anchor), p.anchor);
+    // A coarse CSS-fallback match (approximate) is not a precise location — leave
+    // it unpainted and unresolved so the side panel lists it as "couldn't place"
+    // rather than confidently highlighting a whole block.
+    p.range = range && !approximate ? range : null;
     if (p.range) resolvedIds.push(p.annotation.id);
   }
   repositionAll();

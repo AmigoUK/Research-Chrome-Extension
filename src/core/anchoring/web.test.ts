@@ -45,7 +45,7 @@ describe('web anchoring', () => {
     expect(anchor.selectors.some((s) => s.type === 'textPosition')).toBe(true);
 
     const resolved = resolveWebAnchor(root, anchor);
-    expect(resolved?.toString()).toBe('stored daytime heat');
+    expect(resolved.range?.toString()).toBe('stored daytime heat');
   });
 
   it('re-anchors via text-quote after unrelated content shifts positions', () => {
@@ -57,7 +57,7 @@ describe('web anchoring', () => {
     root.insertBefore(intro, root.firstChild);
 
     const resolved = resolveWebAnchor(root, anchor);
-    expect(resolved?.toString()).toBe('cardiovascular strain');
+    expect(resolved.range?.toString()).toBe('cardiovascular strain');
   });
 
   it('builds a css path down to an element', () => {
@@ -84,7 +84,7 @@ describe('the fallback chain survives a failing strategy', () => {
     };
 
     const range = resolveWebAnchor(root, anchor);
-    expect(range?.toString()).toBe('energetic');
+    expect(range.range?.toString()).toBe('energetic');
     root.remove();
   });
 });
@@ -122,7 +122,7 @@ describe('open Shadow DOM anchoring', () => {
 
     const resolvedRoot = webAnchorRoot(document, anchor);
     expect(resolvedRoot).toBe(root);
-    expect(resolveWebAnchor(resolvedRoot, anchor)?.toString()).toBe('beta gamma');
+    expect(resolveWebAnchor(resolvedRoot, anchor).range?.toString()).toBe('beta gamma');
   });
 
   it('webAnchorRoot: no shadowHost → document.body', () => {
@@ -162,5 +162,33 @@ describe('quote length cap', () => {
   it('keeps the textQuote selector for a normal-length selection', () => {
     const anchor = createWebAnchor(document.body, longFixture(50));
     expect(anchor.selectors.find((s) => s.type === 'textQuote')).toBeDefined();
+  });
+});
+
+describe('resolveWebAnchor approximate flag', () => {
+  it('reports approximate:false for a precise text-quote match', () => {
+    document.body.innerHTML = '<p>Alpha beta gamma.</p>';
+    const p = document.querySelector('p')!.firstChild as Text;
+    const range = document.createRange();
+    range.setStart(p, 6);
+    range.setEnd(p, 10); // "beta"
+    const anchor = createWebAnchor(document.body, range);
+    const res = resolveWebAnchor(document.body, anchor);
+    expect(res.approximate).toBe(false);
+    expect(res.range?.toString()).toBe('beta');
+  });
+
+  it('reports approximate:true when only the css fallback matches', () => {
+    document.body.innerHTML = '<div id="box">some block text</div>';
+    const anchor = { kind: 'web' as const, selectors: [{ type: 'css' as const, value: '#box' }] };
+    const res = resolveWebAnchor(document.body, anchor);
+    expect(res.approximate).toBe(true);
+    expect(res.range?.toString()).toBe('some block text');
+  });
+
+  it('reports {null,false} when nothing matches', () => {
+    document.body.innerHTML = '<p>x</p>';
+    const anchor = { kind: 'web' as const, selectors: [{ type: 'css' as const, value: '#missing' }] };
+    expect(resolveWebAnchor(document.body, anchor)).toEqual({ range: null, approximate: false });
   });
 });

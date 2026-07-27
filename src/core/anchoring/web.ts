@@ -72,8 +72,13 @@ export function createWebAnchor(root: ParentNode, range: Range, shadowHost?: str
   return shadowHost ? { kind: 'web', selectors, shadowHost } : { kind: 'web', selectors };
 }
 
-/** Resolve a web anchor back to a Range, trying each strategy in order. */
-export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | null {
+/** Resolve a web anchor back to a Range, trying each strategy in order. The
+ *  `approximate` flag is true only for the coarse CSS fallback — a whole-element
+ *  match the caller must not treat as a precise highlight. */
+export function resolveWebAnchor(
+  root: ParentNode,
+  anchor: WebAnchor,
+): { range: Range | null; approximate: boolean } {
   const quote = anchor.selectors.find((s): s is TextQuoteSelector => s.type === 'textQuote');
   if (quote) {
     try {
@@ -82,7 +87,7 @@ export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | n
         ...(quote.prefix ? { prefix: quote.prefix } : {}),
         ...(quote.suffix ? { suffix: quote.suffix } : {}),
       });
-      if (range) return range;
+      if (range) return { range, approximate: false };
     } catch {
       // The point of a strategy list is that a failing strategy hands over to
       // the next one. An exception here used to abandon the whole chain, so a
@@ -95,7 +100,8 @@ export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | n
   );
   if (position) {
     try {
-      return textPosition.toRange(root, { start: position.start, end: position.end });
+      const range = textPosition.toRange(root, { start: position.start, end: position.end });
+      if (range) return { range, approximate: false };
     } catch {
       // fall through to css
     }
@@ -107,11 +113,13 @@ export function resolveWebAnchor(root: ParentNode, anchor: WebAnchor): Range | n
     if (el) {
       const range = el.ownerDocument.createRange();
       range.selectNodeContents(el);
-      return range;
+      // Coarse: this is the whole element, not the original fragment. Flagged so
+      // the caller reports it as unplaced rather than painting a misleading block.
+      return { range, approximate: true };
     }
   }
 
-  return null;
+  return { range: null, approximate: false };
 }
 
 /** Turn a stored anchor's `shadowHost` back into the live root to anchor within.
