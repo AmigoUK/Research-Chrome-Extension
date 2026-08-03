@@ -13,6 +13,11 @@
     "exactOptionalPropertyTypes": true,
     "forceConsistentCasingInFileNames": true,
 
+    // The store-package rules are plain .mjs (they run under bare node during
+    // packaging) but are unit-tested from TypeScript; allowJs lets tsc check
+    // that import against the module's JSDoc types.
+    "allowJs": true,
+
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,

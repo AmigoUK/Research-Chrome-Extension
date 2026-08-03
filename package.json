@@ -13,7 +13,7 @@
     "dev": "vite",
     "dev:annotator": "vite build --config vite.annotator.config.ts --watch",
     "build": "tsc --noEmit && vite build && vite build --config vite.annotator.config.ts",
-    "package": "npm run build && node scripts/package.mjs",
+    "package": "npm run build && node scripts/package.mjs && node scripts/validate-package.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
