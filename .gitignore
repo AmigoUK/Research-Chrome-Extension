@@ -27,3 +27,8 @@ test-results/
 # Env
 .env
 .env.local
+
+# Runtime lock held by the local tooling, committed by accident in v0.18.0. It
+# is machine state, not source: tracked, it leaves every checkout permanently
+# dirty as the tooling takes and releases it.
+.claude/*.lock
