@@ -8,10 +8,17 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    // Build-time scripts run in Node, not in the extension.
+    // Build-time scripts run in Node, not in the extension — except for the
+    // callbacks they hand to Playwright's `evaluate`, which run in the page and
+    // legitimately reach for `document` (and `chrome`, declared globally below).
     files: ['scripts/**/*.mjs'],
     languageOptions: {
-      globals: { console: 'readonly', process: 'readonly', URL: 'readonly' },
+      globals: {
+        console: 'readonly',
+        process: 'readonly',
+        URL: 'readonly',
+        document: 'readonly',
+      },
     },
   },
   {

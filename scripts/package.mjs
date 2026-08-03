@@ -17,7 +17,9 @@ const dist = path.join(root, 'dist');
 const outDir = path.join(root, 'release');
 
 if (!existsSync(path.join(dist, 'manifest.json'))) {
-  console.error('dist/manifest.json not found — run `npm run build` first (or use `npm run package`).');
+  console.error(
+    'dist/manifest.json not found — run `npm run build` first (or use `npm run package`).',
+  );
   process.exit(1);
 }
 
@@ -33,7 +35,9 @@ try {
   execFileSync('zip', ['-r', '-q', zipPath, '.', '-x', '*.map'], { cwd: dist });
 } catch (err) {
   if (err && err.code === 'ENOENT') {
-    console.error('`zip` is not installed or not on PATH. Install it (Linux: `apt-get install zip`, macOS: preinstalled) or package dist/ with your own tool.');
+    console.error(
+      '`zip` is not installed or not on PATH. Install it (Linux: `apt-get install zip`, macOS: preinstalled) or package dist/ with your own tool.',
+    );
   } else {
     console.error('Packaging failed:', err instanceof Error ? err.message : err);
   }
@@ -41,4 +45,6 @@ try {
 }
 
 const sizeKb = (statSync(zipPath).size / 1024).toFixed(0);
-console.log(`Packaged v${version} → release/${zipName} (${sizeKb} kB). Upload this at the Chrome Web Store Developer Dashboard.`);
+console.log(
+  `Packaged v${version} → release/${zipName} (${sizeKb} kB). Upload this at the Chrome Web Store Developer Dashboard.`,
+);

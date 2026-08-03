@@ -115,7 +115,8 @@ export function validateStorePackage({ manifest, files, expectedVersion }) {
     ...Object.values(m.action?.default_icon ?? {}),
   ].filter((p) => typeof p === 'string' && p);
   for (const path of new Set(referenced)) {
-    if (!present.has(path)) errors.push(`manifest references ${path}, which is not in the archive.`);
+    if (!present.has(path))
+      errors.push(`manifest references ${path}, which is not in the archive.`);
   }
 
   if (!present.has('manifest.json')) {
