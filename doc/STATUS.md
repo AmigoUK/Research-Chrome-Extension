@@ -1,6 +1,7 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-07-26 — **all five roadmap phases delivered**; **polish list complete**;
+_Last updated: 2026-08-03 — **v1.0.0, ready to submit to the Chrome Web Store**;
+**all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
 annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**; **v0.27.5 no
@@ -24,8 +25,35 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
   web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0
   → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
-- **Tests:** 292 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
+- **Tests:** 309 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v1.0.0 — ready for the Chrome Web Store (2026-08-03)
+
+Everything the store requires and the repo did not have. No behaviour changed; 1.0.0 marks that the
+five phases are delivered and the extension is ready for people who did not build it.
+
+- **The archive is checked before it is uploaded.** `npm run package` now also runs
+  `scripts/validate-package.mjs`, which asserts what the dashboard would otherwise reject after a
+  login and an upload: MV3, the 132-character summary limit, manifest version matching
+  `package.json`, all four icons and every manifest-referenced surface present in the zip,
+  `manifest.json` at the root, and no source maps or build junk. Rules are a pure module
+  (`scripts/lib/store-package-rules.mjs`, 17 unit tests); the wrapper uses the system `unzip`.
+- **Listing images exist at a legal size.** The store takes 1280×800 or 640×400 only —
+  `doc/screenshots/` (1360×940, and a 400×820 side panel) would have been refused for every single
+  shot. `npm run store:assets` writes `doc/store/`: five captioned 1280×800 screenshots, a 440×280
+  tile and a 1400×560 marquee, captured at 2× and asserted against the PNG header.
+- **The privacy policy is published**, at
+  <https://amigouk.github.io/Research-Chrome-Extension/privacy.html> — required for the broad
+  optional host permissions. `npm run pages` generates `docs/` from `doc/PRIVACY.md`, so the source
+  and the published copy cannot diverge.
+- **`doc/STORE-LISTING.md`** holds every dashboard field ready to paste, including a justification
+  per permission and the data-usage answers.
+- **The manifest description is store-facing now** — it is literally the summary under the name in
+  search results, and it read like internal documentation.
+
+Remaining before it is live: the upload itself, which needs a Chrome Web Store developer account,
+and the manual checks E2E cannot drive (see `doc/RESUME.md`).
 
 ### v0.28.0 — Chrome Web Store distribution packaging (2026-07-27)
 

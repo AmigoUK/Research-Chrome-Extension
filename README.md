@@ -4,8 +4,9 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v0.28.0**.
-> See [`CHANGELOG.md`](CHANGELOG.md) and [`doc/STATUS.md`](doc/STATUS.md).
+> **Status:** **all five roadmap phases delivered.** Current release: **v1.0.0** — the first build
+> prepared for the Chrome Web Store. See [`CHANGELOG.md`](CHANGELOG.md) and
+> [`doc/STATUS.md`](doc/STATUS.md).
 
 ## What it does
 
@@ -116,12 +117,19 @@ npm test           # unit tests (Vitest)
 npm run test:e2e   # end-to-end tests (Playwright, extension loaded in headed Chromium)
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
-npm run package    # build + zip dist/ → release/context-notes-v<version>.zip (Web Store upload)
+npm run package    # build + zip dist/ → release/context-notes-v<version>.zip, then validate it
+npm run store:assets  # regenerate the Web Store images in doc/store/ (run under xvfb)
+npm run pages      # regenerate docs/ — the published site and privacy policy
 ```
 
-Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mode). To publish, run
-`npm run package` and upload the zip — see [`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md)
-(and [`doc/PRIVACY.md`](doc/PRIVACY.md) for the listing's privacy policy).
+Load the unpacked extension from `dist/` at `chrome://extensions` (Developer mode).
+
+To publish: `npm run package` builds the zip **and checks it against what the Web Store enforces at
+upload**, then upload it with the copy in [`doc/STORE-LISTING.md`](doc/STORE-LISTING.md) and the
+images in [`doc/store/`](doc/store/). The steps are in
+[`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md); the listing's privacy policy is published at
+<https://amigouk.github.io/Research-Chrome-Extension/privacy.html> and generated from
+[`doc/PRIVACY.md`](doc/PRIVACY.md).
 
 ## Architecture
 
@@ -154,12 +162,15 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 | [`doc/data-model.md`](doc/data-model.md) | Entities and anchoring |
 | [`doc/citations.md`](doc/citations.md) | CSL, styles and user rules |
 | [`doc/ui-ux.md`](doc/ui-ux.md) | Surfaces and interaction design |
+| [`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md) | Packaging and publishing to the Chrome Web Store |
+| [`doc/STORE-LISTING.md`](doc/STORE-LISTING.md) | The listing copy, ready to paste into the dashboard |
+| [`doc/PRIVACY.md`](doc/PRIVACY.md) | The privacy policy (source of the published page) |
 | [`CHANGELOG.md`](CHANGELOG.md) | Every release, Keep a Changelog format |
 | [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Bundled fonts, CSL styles and their licences |
 
 ## Testing
 
-243 unit tests (Vitest, `fake-indexeddb`) and 24 end-to-end tests that load the built extension into
+309 unit tests (Vitest, `fake-indexeddb`) and 28 end-to-end tests that load the built extension into
 a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
 build, plus an E2E job under xvfb.
 
