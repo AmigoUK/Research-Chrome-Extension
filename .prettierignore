@@ -17,3 +17,8 @@ doc/
 # Local process artifacts from the subagent-driven-development skill. Not in
 # git, so not in a CI checkout either.
 .superpowers/
+
+# Released history, append-only (CLAUDE.md "Protected Files"). A formatter has
+# no business rewriting entries for versions that already shipped, and CI should
+# not be able to fail on the shape of a note written months ago.
+CHANGELOG.md

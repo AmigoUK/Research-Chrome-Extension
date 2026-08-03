@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   afterwards), and CI gained a `format:check` step between lint and the unit tests. It only verifies:
   a job that rewrote the tree would push a commit nobody reviewed. `.prettierignore` now also covers
   `docs/`, which `npm run pages` generates — Prettier and the generator would otherwise overwrite
-  each other and turn CI red on an unrelated docs edit.
+  each other and turn CI red on an unrelated docs edit — and this file, whose released sections are
+  append-only history that a formatter has no business rewriting.
 
 ### Fixed
 
