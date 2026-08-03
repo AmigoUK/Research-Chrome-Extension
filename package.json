@@ -1,7 +1,7 @@
 {
   "name": "scientific-context-notes",
   "version": "0.28.0",
-  "description": "A Chrome MV3 research companion: contextual annotations, project organisation, and CSL citations.",
+  "description": "File web pages and PDFs into research projects, anchor notes to the exact passage, and generate real CSL citations — all locally.",
   "type": "module",
   "private": true,
   "license": "MIT",

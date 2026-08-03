@@ -15,8 +15,13 @@ export default defineManifest({
   manifest_version: 3,
   name: 'Scientific Context Notes',
   version: pkg.version,
+  // This string IS the summary the Chrome Web Store shows under the name in
+  // search results — not internal documentation. It must read for a researcher
+  // deciding whether to install, and it must stay within the store's 132-char
+  // limit (`scripts/lib/store-package-rules.mjs` fails the build past it).
   description: pkg.description,
   minimum_chrome_version: '116',
+  homepage_url: 'https://github.com/AmigoUK/Research-Chrome-Extension',
   // Generated from `src/assets/icons/icon.svg` (and `icon-small.svg` for the two
   // toolbar sizes, whose motif is drawn for the size it is actually seen at).
   icons: {
