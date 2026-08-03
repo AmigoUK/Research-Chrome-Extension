@@ -129,7 +129,9 @@ async function paintedRect(
 test('highlighting a selection paints an overlay that repaints after reload, and persists', async () => {
   const page = await context.newPage();
   await page.goto(fixtureUrl());
-  await expect(page.locator('main[style*="position: relative"] p', { hasText: targetSentence })).toBeVisible();
+  await expect(
+    page.locator('main[style*="position: relative"] p', { hasText: targetSentence }),
+  ).toBeVisible();
 
   // Activate: inject the real built annotator script (see file-header comment
   // for why this replaces the side-panel/executeScript path in this harness).
@@ -187,12 +189,19 @@ test('highlighting a selection paints an overlay that repaints after reload, and
       type: 'web/annotationsForUrl',
       projectId: '',
       url: location.href,
-    })) as { ok: true; data: { annotations: Array<{ anchor: { selectors: Array<{ type: string; exact?: string }> } }> } };
+    })) as {
+      ok: true;
+      data: {
+        annotations: Array<{ anchor: { selectors: Array<{ type: string; exact?: string }> } }>;
+      };
+    };
     return res;
   });
   expect(stored.ok).toBe(true);
   expect(stored.data.annotations).toHaveLength(1);
-  const quoteSelector = stored.data.annotations[0]?.anchor.selectors.find((s) => s.type === 'textQuote');
+  const quoteSelector = stored.data.annotations[0]?.anchor.selectors.find(
+    (s) => s.type === 'textQuote',
+  );
   expect(quoteSelector?.exact).toBe(targetSentence);
 
   await page.close();
@@ -211,7 +220,9 @@ test('a failed annotate dismisses the toolbar and paints nothing, without hangin
   // annotate round trip rejects. Every other control message still passes
   // through, so activation and repaint are unaffected.
   await page.evaluate(() => {
-    const runtime = chrome.runtime as unknown as { sendMessage: (m: unknown, ...r: unknown[]) => Promise<unknown> };
+    const runtime = chrome.runtime as unknown as {
+      sendMessage: (m: unknown, ...r: unknown[]) => Promise<unknown>;
+    };
     const orig = runtime.sendMessage.bind(chrome.runtime);
     runtime.sendMessage = (m: unknown, ...r: unknown[]) =>
       (m as { type?: string })?.type === 'web/annotate'
@@ -296,7 +307,9 @@ test('anchors a selection made inside an open shadow root, and repaints after re
     // ShadowRoot.getSelection is a non-standard Chrome extension of the DOM
     // (not in TS's lib.dom.d.ts) — cast rather than weaken the fallback.
     const shadowRootWithSelection = root as ShadowRoot & { getSelection?: () => Selection | null };
-    const sel = shadowRootWithSelection.getSelection ? shadowRootWithSelection.getSelection()! : window.getSelection()!;
+    const sel = shadowRootWithSelection.getSelection
+      ? shadowRootWithSelection.getSelection()!
+      : window.getSelection()!;
     const range = document.createRange();
     range.selectNodeContents(p);
     sel.removeAllRanges();
