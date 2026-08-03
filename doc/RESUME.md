@@ -1,6 +1,6 @@
 # Resume — session handoff
 
-_Snapshot: 2026-08-03 · release **v1.0.0** · branch `main` (synced with origin) · working tree clean._
+_Snapshot: 2026-08-03 · release **v1.0.1** · branch `main` (synced with origin) · working tree clean._
 
 A fast-start pointer for the next session. Canonical detail lives in `doc/STATUS.md`, `CHANGELOG.md`,
 and the git history — this file is just the "where we are and what's next" so you don't re-derive it.
@@ -8,10 +8,13 @@ and the git history — this file is just the "where we are and what's next" so 
 ## Where things stand
 
 - **All five roadmap phases + the polish list are delivered.** No unmerged work.
-- **Green:** 309 unit + 28 E2E, typecheck + lint clean. CI: typecheck → lint → unit → build (+ E2E job).
+- **Green:** 309 unit + 28 E2E, typecheck + lint + format clean. CI: typecheck → lint →
+  format:check → unit → build (+ E2E job).
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
 - **Published site:** https://amigouk.github.io/Research-Chrome-Extension/ (GitHub Pages, from `docs/`)
-- **Latest work:** **v1.0.0 — everything the Chrome Web Store needs except the upload.**
+- **Latest work:** **v1.0.1 — the build to submit.** It fixes a real defect v1.0.0 shipped with: a
+  fast-failing annotate left the highlight toolbar stuck open over the selection (see `CHANGELOG.md`).
+  v1.0.0 added everything the Chrome Web Store needs except the upload:
   - `npm run package` builds the zip **and validates it** against the store's upload rules
     (`scripts/lib/store-package-rules.mjs`, 17 unit tests).
   - `npm run store:assets` → `doc/store/`: five 1280×800 screenshots, a 440×280 tile, a 1400×560
@@ -25,8 +28,9 @@ and the git history — this file is just the "where we are and what's next" so 
 1. **Submit to the Chrome Web Store.** Everything is prepared; what remains is the account and the
    clicking.
    - Needs a CWS **developer account** (one-off 5 USD registration) with a verified contact email.
-   - Upload `release/context-notes-v1.0.0.zip` — regenerate with `npm run package`, or take the
-     asset attached to the v1.0.0 GitHub release (same bytes).
+   - Upload `release/context-notes-v1.0.1.zip` — regenerate with `npm run package`, or take the
+     asset attached to the v1.0.1 GitHub release (same bytes). **Use v1.0.1, not v1.0.0: v1.0.0 can
+     leave the highlight toolbar stuck open when an annotate fails fast.**
    - Fill the listing from **`doc/STORE-LISTING.md`**, upload the images from **`doc/store/`**, and
      give the privacy-policy URL <https://amigouk.github.io/Research-Chrome-Extension/privacy.html>.
    - `doc/DISTRIBUTION.md` has the end-to-end steps.

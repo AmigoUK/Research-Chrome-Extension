@@ -238,6 +238,15 @@ test('a failed annotate dismisses the toolbar and paints nothing, without hangin
   // dismissed (not left stuck over the selection) and nothing is painted. Before
   // the fix this rejected unhandled and left the toolbar open.
   await expect(page.locator('#context-notes-annotator .toolbar')).toHaveCount(0);
+
+  // …and it must STAY dismissed. The document's mouseup handler is deferred by
+  // `setTimeout(…, 0)`, while a fast rejection resolves in microtasks, so the
+  // click's own mouseup used to land *after* the dismissal and re-open the
+  // toolbar over the still-present selection — permanently. Draining two
+  // macrotask turns guarantees that handler has run, whichever order the two
+  // raced in, which is what makes this deterministic instead of a coin flip.
+  await page.evaluate(() => new Promise((r) => setTimeout(() => setTimeout(r, 0), 0)));
+  await expect(page.locator('#context-notes-annotator .toolbar')).toHaveCount(0);
   await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(0);
   await page.close();
 });

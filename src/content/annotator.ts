@@ -367,6 +367,15 @@ if (w.__contextNotesAnnotator) {
 
   document.addEventListener('mouseup', (e) => {
     const path = e.composedPath();
+    // A mouseup that came out of our own UI is not a page selection. Clicking a
+    // toolbar button commits on `mousedown` (with preventDefault, so the
+    // selection survives), and the matching mouseup lands here a moment later
+    // with that selection still present — which used to re-open the toolbar the
+    // commit had just dismissed. On the failure path that is permanent: nothing
+    // clears the selection, so the toolbar sits stuck over it. It only looked
+    // intermittent because this handler is deferred to a macrotask while a fast
+    // rejection resolves in microtasks, so which one won was a race.
+    if (path.some((n) => n instanceof HTMLElement && n.id === HOST_ID)) return;
     setTimeout(() => onMouseUp(path), 0);
   });
   window.addEventListener('scroll', scheduleReposition, { passive: true });

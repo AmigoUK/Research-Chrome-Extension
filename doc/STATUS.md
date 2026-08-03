@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-08-03 — **v1.0.0, ready to submit to the Chrome Web Store**;
+_Last updated: 2026-08-03 — **v1.0.1, the build to submit to the Chrome Web Store**;
 **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
@@ -15,18 +15,38 @@ cases A2–A8 all closed)**; **v0.28.0 Chrome Web Store distribution packaging**
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v0.28.0 is on `main`** (Phases 1–5 + polish + hardening +
-  web-page annotation + Web Store packaging). No unmerged work.
-- **Releases:** v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
+- **Branch state:** everything through **v1.0.1 is on `main`** (Phases 1–5 + polish + hardening +
+  web-page annotation + Web Store packaging + submission prep). No unmerged work.
+- **Releases:** v1.0.1 failed-highlight toolbar fix; v1.0.0 ready for the Chrome Web Store;
+  v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
   feedback; v0.27.5 no dead "Jump to" on an unplaced note;
   v0.27.4 quote cap + honest coarse CSS
   fallback; v0.27.3 annotate inside open Shadow DOM; v0.27.2 web annotations survive SPA navigation;
   v0.27.1 network/annotator hardening; v0.27.0
   web-page text annotation; v0.26.0 user-centred hardening pass; v0.15.0 → v0.18.0 Phase 5; v0.13.0
   → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
-- **CI:** GitHub Actions — typecheck → lint → unit → build, plus an E2E job (Playwright under xvfb).
+- **CI:** GitHub Actions — typecheck → lint → format:check → unit → build, plus an E2E job
+  (Playwright under xvfb).
 - **Tests:** 309 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v1.0.1 — a failed highlight no longer sticks the toolbar open (2026-08-03)
+
+Surfaced by a CI red that looked like an E2E flake and was not. Committing a highlight runs from the
+toolbar button's **`mousedown`** (with `preventDefault`, so the selection survives the click); the
+matching **`mouseup`** then reaches the annotator's own document listener, which read it as a fresh
+page selection and re-opened the toolbar. On the success path that is invisible — the commit clears
+the selection first, so the re-check finds nothing. On the failure path nothing clears it, so the
+toolbar came back and stayed. It only showed when the failure was fast enough to beat that handler
+(deferred to a macrotask, while a rejection settles in microtasks), which is exactly the coin flip a
+sleeping service worker produces in the field. The listener now ignores events out of the
+annotator's own UI. Reproduced with a MutationObserver (`ADD → REMOVE → ADD`, 3/3), the E2E
+assertion was strengthened to fail deterministically first (3/3 red), then green 3/3 alone and
+3× across the full suite. **Submit this build to the store, not v1.0.0.**
+
+Also in this release, no product effect: the repository is Prettier-formatted with a `format:check`
+step in CI, and the web-annotation spec no longer reads an overlay's geometry one frame before it
+has one.
 
 ### v1.0.0 — ready for the Chrome Web Store (2026-08-03)
 
