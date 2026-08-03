@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- **`e2e/webannotation.spec.ts` no longer depends on the renderer being warm.** Its first test failed
+  every time the file ran on its own and passed inside a full suite. The cause was not shared state:
+  `commit()` paints asynchronously, so the click returns with no overlay at all and the first `.ov`
+  appears about 18 ms later — and reading its geometry the instant `toHaveCount(1)` resolved caught
+  the node one frame before it had a box, which `boundingBox()` reports as `null` and
+  `getBoundingClientRect()` as zeros. The geometry assertion now polls until the box is real, so it
+  still fails if the overlay never gets one. No product code changed.
 
 ## [1.0.0] — 2026-08-03
 

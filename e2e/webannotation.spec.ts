@@ -1,4 +1,12 @@
-import { test, expect, chromium, type BrowserContext, type Worker, type Page } from '@playwright/test';
+import {
+  test,
+  expect,
+  chromium,
+  type BrowserContext,
+  type Locator,
+  type Worker,
+  type Page,
+} from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { copyFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
@@ -84,6 +92,40 @@ async function selectTargetSentence(page: Page): Promise<void> {
   await page.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
 }
 
+/**
+ * The overlay's laid-out rect, waited for rather than sampled once.
+ *
+ * `commit()` is asynchronous — it awaits the active project and the
+ * `web/annotate` round trip before painting — so the click returns with no
+ * overlay in the shadow root at all; measured per animation frame, the first
+ * `.ov` appears about 18 ms later. `toHaveCount(1)` bridges that, but it
+ * resolves the instant the node is appended, which is one frame before the
+ * element has a box: read straight after it, the geometry comes back as `null`
+ * from `boundingBox()` (CDP's box model) or as zeros from
+ * `getBoundingClientRect()`. That is why this test failed every time it ran on
+ * its own and passed inside a full suite, where the preceding specs left the
+ * renderer warm enough for layout to win the race.
+ *
+ * So poll the assertion itself until the box is real. Not a sleep: if the
+ * overlay genuinely never gets a box — the regression these assertions exist
+ * for — the poll exhausts its timeout and the test fails.
+ */
+async function paintedRect(
+  locator: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let rect = { x: 0, y: 0, width: 0, height: 0 };
+  await expect
+    .poll(async () => {
+      rect = await locator.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      });
+      return rect.width;
+    })
+    .toBeGreaterThan(1);
+  return rect;
+}
+
 test('highlighting a selection paints an overlay that repaints after reload, and persists', async () => {
   const page = await context.newPage();
   await page.goto(fixtureUrl());
@@ -116,9 +158,8 @@ test('highlighting a selection paints an overlay that repaints after reload, and
   // `position: relative` <main> ancestor above) guards against.
   const overlay = page.locator('#context-notes-annotator .ov');
   await expect(overlay).toHaveCount(1);
-  const ovBox = await overlay.boundingBox();
-  expect(ovBox).not.toBeNull();
-  if (ovBox && expectedRect) {
+  const ovBox = await paintedRect(overlay);
+  if (expectedRect) {
     expect(Math.abs(ovBox.x - expectedRect.left)).toBeLessThan(2);
     expect(Math.abs(ovBox.y - expectedRect.top)).toBeLessThan(2);
     expect(Math.abs(ovBox.width - expectedRect.width)).toBeLessThan(2);
@@ -132,9 +173,8 @@ test('highlighting a selection paints an overlay that repaints after reload, and
 
   const overlayAfterReload = page.locator('#context-notes-annotator .ov');
   await expect(overlayAfterReload).toHaveCount(1);
-  const ovBoxAfterReload = await overlayAfterReload.boundingBox();
-  expect(ovBoxAfterReload).not.toBeNull();
-  if (ovBoxAfterReload && expectedRect) {
+  const ovBoxAfterReload = await paintedRect(overlayAfterReload);
+  if (expectedRect) {
     expect(Math.abs(ovBoxAfterReload.x - expectedRect.left)).toBeLessThan(2);
     expect(Math.abs(ovBoxAfterReload.y - expectedRect.top)).toBeLessThan(2);
   }

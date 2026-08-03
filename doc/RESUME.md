@@ -41,11 +41,6 @@ and the git history — this file is just the "where we are and what's next" so 
 
 ## Candidate next work (pick per user intent)
 
-- **Test isolation in `e2e/webannotation.spec.ts`.** The file is green in a full-suite run but its
-  first test fails **every time** when the file is run on its own
-  (`npx playwright test e2e/webannotation.spec.ts` → the overlay has no bounding box). It depends on
-  state an earlier spec leaves behind. Pre-existing, not a product bug, but it makes the file
-  undebuggable in isolation and it is the same file that flakes occasionally in full runs.
 - **Deferred by design (see `doc/STATUS.md` "Deferred by design"):** `CitationStyle.cslOverride`
   persistence (won't-do — duplicates `userRules`); per-annotation **"section"** field + link-to-section
   (needs an IDB schema migration — append-only, bump `DB_VERSION`); **Presence** (needs a live backend —
@@ -80,5 +75,8 @@ and the git history — this file is just the "where we are and what's next" so 
 - A8: two rapid denials could briefly stack two notices; a denied opt-in re-prompts on each later
   highlight (intended — silent failure is worse); a near-zero-window concurrent double
   `permissions.request` (SW `registerOrigin` is idempotent).
-- E2E under headed Chromium/xvfb flakes occasionally (`webannotation.spec.ts` did so once on
-  2026-08-03, then passed clean); re-run before treating a single red as a regression.
+- `e2e/webannotation.spec.ts` used to fail whenever the file ran on its own and pass inside a full
+  suite. That was **not** leftover state between specs: `commit()` paints asynchronously (the click
+  returns with no overlay; the first `.ov` appears ~18 ms later), and reading its geometry the
+  instant `toHaveCount(1)` resolved caught the node one frame before it had a box. `paintedRect()`
+  now polls the assertion instead. Don't reintroduce `locator.boundingBox()` there.
