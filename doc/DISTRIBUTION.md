@@ -9,10 +9,15 @@ How to package and publish Scientific Context Notes. The extension currently als
 npm run package
 ```
 
-This runs a production build and writes an uploadable zip to
-`release/context-notes-v<version>.zip`. The zip's root is the extension (manifest at the top level),
-source maps are excluded, and the version comes from `package.json` — so it always matches the
-release you tagged. `release/` is git-ignored.
+This runs a production build, writes an uploadable zip to `release/context-notes-v<version>.zip`,
+and then **checks it against what the store enforces at upload** (`scripts/validate-package.mjs`) —
+manifest shape, the 132-character summary limit, all four icons and every referenced surface being
+present, and no source maps or build junk in the archive. A failure here is one the dashboard would
+otherwise report after a login and an upload.
+
+The zip's root is the extension (manifest at the top level), source maps are excluded, and the
+version comes from `package.json` — so it always matches the release you tagged. `release/` is
+git-ignored.
 
 The zip is the artifact you upload; do **not** upload the source repo.
 
@@ -25,42 +30,24 @@ The zip is the artifact you upload; do **not** upload the source repo.
    bumps `package.json` (see the "Releases" section in `CLAUDE.md`), and the manifest version is
    derived from it, so a normal release produces an upload-ready bump automatically.
 
-## 3. Store listing checklist
+## 3. The listing itself
 
-- **Name:** Scientific Context Notes
-- **Summary (≤132 chars):** A local-first research companion — file pages and PDFs into projects,
-  anchor notes to the exact passage, and produce real CSL citations.
-- **Category:** Productivity (or Education).
-- **Detailed description:** adapt the README's "What it does" table into prose; lead with the
-  local-first, no-backend promise.
-- **Screenshots:** use `doc/screenshots/` (1280×800). Good hero shots: `01-overview.png`,
-  `14-pdf-reader.png`, `12-side-panel.png`.
-- **Icon:** shipped in the build (declared in the manifest).
-- **Single-purpose description:** "Organise research sources and anchor notes/citations to the exact
-  passage they came from, entirely within the browser."
+Every field the dashboard asks for — name, summary, detailed description, category, single purpose,
+a justification per permission, the data-usage answers and the note for the reviewer — is written
+out ready to paste in **[`STORE-LISTING.md`](STORE-LISTING.md)**. Submitting should be transcription,
+not composition, and one copy of that text means the listing and the repo cannot drift apart.
+
+Two things it is worth knowing here:
+
+- **Images come from [`store/`](store/), not `screenshots/`.** The store accepts screenshots at
+  exactly 1280×800 or 640×400; `doc/screenshots/` is 1360×940 and 400×820 and would be refused.
+  Regenerate with `npm run build && xvfb-run -a npm run store:assets`.
 - **Privacy policy URL:** <https://amigouk.github.io/Research-Chrome-Extension/privacy.html> —
   **required**, because the extension requests broad optional host permissions. It is generated from
   `doc/PRIVACY.md` by `npm run pages` and served from `docs/` by GitHub Pages; regenerate and commit
   `docs/` whenever the policy changes.
 
-## 4. Permissions justification (the review asks for each)
-
-| Permission | Why it's needed |
-|---|---|
-| `storage` | Store projects, documents, annotations and citations locally in IndexedDB. |
-| `activeTab` + `scripting` | Inject the annotator into the page you're viewing, on demand, when you choose to annotate it. |
-| `sidePanel` | The extension's primary workspace surface. |
-| `optional_host_permissions: *://*/*` | Requested **per site, opt-in**, only to read the page text you annotate so highlights can be anchored. Never granted up front; page content is read locally and never transmitted. |
-
-## 5. Review notes worth stating
-
-- **Manifest V3, no remote code** — every asset (CSL styles, the pdf.js reader and worker, the
-  citeproc engine, fonts) is bundled; nothing is loaded from a CDN.
-- **Local-first, no backend** — no servers, telemetry, or accounts. See `doc/PRIVACY.md`.
-- **Host access is optional and per-origin** — the extension holds no standing access to your
-  browsing; it asks the first time you annotate a given site.
-
-## 6. Attach the zip to the GitHub release
+## 4. Attach the zip to the GitHub release
 
 Our release step uploads the same zip as a release asset, so a tag and its store upload are the same
 bytes:
