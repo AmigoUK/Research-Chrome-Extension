@@ -126,7 +126,12 @@ test('a stored PDF text anchor renders as an overlay and rail card, and edits pe
         anchor: {
           kind: 'pdf',
           selectors: [
-            { type: 'pdfRegion', page: 1, rects: [{ page: 1, left: 0.1, top: 0.1, width: 0.5, height: 0.06 }], quote: 'Hello Context Notes' },
+            {
+              type: 'pdfRegion',
+              page: 1,
+              rects: [{ page: 1, left: 0.1, top: 0.1, width: 0.5, height: 0.06 }],
+              quote: 'Hello Context Notes',
+            },
           ],
         },
         content: '',
@@ -191,10 +196,7 @@ test('dashboard "Add PDF" uploads a file, creates a pdf document, and opens the 
     page.waitForEvent('filechooser'),
     page.locator('#addPdf').click(),
   ]);
-  const [reader] = await Promise.all([
-    context.waitForEvent('page'),
-    chooser.setFiles(fixturePath),
-  ]);
+  const [reader] = await Promise.all([context.waitForEvent('page'), chooser.setFiles(fixturePath)]);
 
   // A reader tab opened on the new document and rendered the PDF.
   expect(reader.url()).toContain('src/pdfviewer/index.html?documentId=');

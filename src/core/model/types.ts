@@ -155,10 +155,7 @@ export interface Annotation {
 }
 
 export type ReferenceSource =
-  | 'extractedFromPage'
-  | 'importedByDoi'
-  | 'importedFromZotero'
-  | 'manual';
+  'extractedFromPage' | 'importedByDoi' | 'importedFromZotero' | 'manual';
 
 export interface Reference {
   id: Id;

@@ -16,7 +16,11 @@ function installChrome(
     registerThrows?: boolean;
   } = {},
 ): { executeScript: number; registerContentScripts: number; lastFiles: string[] | undefined } {
-  const calls: { executeScript: number; registerContentScripts: number; lastFiles: string[] | undefined } = {
+  const calls: {
+    executeScript: number;
+    registerContentScripts: number;
+    lastFiles: string[] | undefined;
+  } = {
     executeScript: 0,
     registerContentScripts: 0,
     lastFiles: undefined,

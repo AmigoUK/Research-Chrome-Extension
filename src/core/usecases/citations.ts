@@ -32,7 +32,10 @@ async function pairWith(
         formatter.formatWithStyle(items, style, 'inText'),
         formatter.formatWithStyle(items, style, 'bibliography'),
       ])
-    : await Promise.all([formatter.inText(items, template), formatter.bibliography(items, template)]);
+    : await Promise.all([
+        formatter.inText(items, template),
+        formatter.bibliography(items, template),
+      ]);
   return { inText, bibliography };
 }
 

@@ -24,6 +24,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Formatting is checked, never applied, in CI: a job that rewrites the
+      # tree would push a commit nobody reviewed. Run `npm run format` locally.
+      - name: Format
+        run: npm run format:check
+
       - name: Unit tests
         run: npm test
 

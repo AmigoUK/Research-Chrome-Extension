@@ -115,7 +115,9 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         ...(doc as unknown as SnapshotData['documents'][number]),
         id: id(doc['id'], `source ${i + 1}'s id`),
         projectId: id(doc['projectId'], `source ${i + 1}'s project id`),
-        ...(doc['fileId'] === undefined ? {} : { fileId: id(doc['fileId'], `source ${i + 1}'s file id`) }),
+        ...(doc['fileId'] === undefined
+          ? {}
+          : { fileId: id(doc['fileId'], `source ${i + 1}'s file id`) }),
         status: oneOf(doc['status'], DOCUMENT_STATUSES, `source ${i + 1}'s status`),
         metadata: record(doc['metadata'], `source ${i + 1}'s metadata`) as never,
         createdAt: timestamp(doc['createdAt'], `source ${i + 1}'s creation date`),
@@ -209,7 +211,10 @@ export function validateSnapshotData(value: unknown): SnapshotData {
             id: id(comment['id'], `comment ${j + 1}'s id in thread ${i + 1}`),
             authorId: id(comment['authorId'], `comment ${j + 1}'s author in thread ${i + 1}`),
             body: text(comment['body'], `comment ${j + 1} in thread ${i + 1}`),
-            createdAt: timestamp(comment['createdAt'], `comment ${j + 1}'s date in thread ${i + 1}`),
+            createdAt: timestamp(
+              comment['createdAt'],
+              `comment ${j + 1}'s date in thread ${i + 1}`,
+            ),
           };
         }),
         createdAt: timestamp(thread['createdAt'], `thread ${i + 1}'s creation date`),

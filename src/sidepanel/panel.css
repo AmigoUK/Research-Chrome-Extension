@@ -283,7 +283,9 @@ body {
   padding: 11px 12px;
   margin-top: 11px;
   animation: rowIn 0.34s var(--ease-out) both;
-  transition: border-color 0.4s, background 0.4s;
+  transition:
+    border-color 0.4s,
+    background 0.4s;
 }
 .onpage-note.flash {
   border-color: var(--accent);
@@ -520,7 +522,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
-  box-shadow: 0 14px 34px -16px rgba(20, 18, 16, .45);
+  box-shadow: 0 14px 34px -16px rgba(20, 18, 16, 0.45);
 }
 .smenu__item {
   display: flex;
@@ -537,9 +539,16 @@ body {
   color: var(--fg);
   text-align: left;
 }
-.smenu__item:hover { background: var(--bg); }
-.smenu__item.is-current { font-weight: 600; }
-.smenu__item.is-current .smenu__label::after { content: " ·"; color: var(--muted); }
+.smenu__item:hover {
+  background: var(--bg);
+}
+.smenu__item.is-current {
+  font-weight: 600;
+}
+.smenu__item.is-current .smenu__label::after {
+  content: ' ·';
+  color: var(--muted);
+}
 .smenu__item--create {
   margin-top: 4px;
   padding-top: 9px;

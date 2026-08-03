@@ -51,7 +51,11 @@ const style = (over: Partial<CitationUserRules>): CitationStyle => ({
 describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output', () => {
   it('truncates the author list to "et al." when maxAuthors is small', async () => {
     const full = await formatter.formatWithStyle([ITEM], style({ maxAuthors: 20 }), 'bibliography');
-    const truncated = await formatter.formatWithStyle([ITEM], style({ maxAuthors: 1 }), 'bibliography');
+    const truncated = await formatter.formatWithStyle(
+      [ITEM],
+      style({ maxAuthors: 1 }),
+      'bibliography',
+    );
     expect(full).toContain('Hashizume');
     expect(full).not.toContain('et al.');
     expect(truncated).toContain('et al.');
@@ -59,7 +63,11 @@ describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
   });
 
   it('drops the DOI from the bibliography when includeDoi is false', async () => {
-    const withDoi = await formatter.formatWithStyle([ITEM], style({ includeDoi: true }), 'bibliography');
+    const withDoi = await formatter.formatWithStyle(
+      [ITEM],
+      style({ includeDoi: true }),
+      'bibliography',
+    );
     const withoutDoi = await formatter.formatWithStyle(
       [ITEM],
       style({ includeDoi: false }),
@@ -91,16 +99,32 @@ describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
   });
 
   it('prints the DOI as a bare doi: identifier when doiAsUri is off', async () => {
-    const asUri = await formatter.formatWithStyle([ITEM], style({ doiAsUri: true }), 'bibliography');
-    const bare = await formatter.formatWithStyle([ITEM], style({ doiAsUri: false }), 'bibliography');
+    const asUri = await formatter.formatWithStyle(
+      [ITEM],
+      style({ doiAsUri: true }),
+      'bibliography',
+    );
+    const bare = await formatter.formatWithStyle(
+      [ITEM],
+      style({ doiAsUri: false }),
+      'bibliography',
+    );
     expect(asUri).toContain('https://doi.org/10.1016');
     expect(bare).toContain('doi:10.1016');
     expect(bare).not.toContain('https://doi.org/');
   });
 
   it('labels the page range when pagePrefix is on', async () => {
-    const plain = await formatter.formatWithStyle([ITEM], style({ pagePrefix: false }), 'bibliography');
-    const labelled = await formatter.formatWithStyle([ITEM], style({ pagePrefix: true }), 'bibliography');
+    const plain = await formatter.formatWithStyle(
+      [ITEM],
+      style({ pagePrefix: false }),
+      'bibliography',
+    );
+    const labelled = await formatter.formatWithStyle(
+      [ITEM],
+      style({ pagePrefix: true }),
+      'bibliography',
+    );
     expect(plain).not.toContain('pp. 369');
     expect(labelled).toContain('pp. 369');
   });
@@ -114,7 +138,11 @@ describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
       number: 'EA/2023/0456',
       issued: { 'date-parts': [[2023, 5, 12]] },
     };
-    const off = await formatter.formatWithStyle([foi], style({ foiTemplate: false }), 'bibliography');
+    const off = await formatter.formatWithStyle(
+      [foi],
+      style({ foiTemplate: false }),
+      'bibliography',
+    );
     const on = await formatter.formatWithStyle([foi], style({ foiTemplate: true }), 'bibliography');
     expect(off).not.toContain('Freedom of Information');
     // APA title-cases the genre it renders alongside the report number.
@@ -130,8 +158,16 @@ describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
       number: '[2021] EWHC 1234 (Admin)',
       issued: { 'date-parts': [[2021]] },
     };
-    const off = await formatter.formatWithStyle([legal], style({ legalTemplate: false }), 'bibliography');
-    const on = await formatter.formatWithStyle([legal], style({ legalTemplate: true }), 'bibliography');
+    const off = await formatter.formatWithStyle(
+      [legal],
+      style({ legalTemplate: false }),
+      'bibliography',
+    );
+    const on = await formatter.formatWithStyle(
+      [legal],
+      style({ legalTemplate: true }),
+      'bibliography',
+    );
     expect(off).not.toContain('High Court');
     expect(on).toContain('High Court');
   });

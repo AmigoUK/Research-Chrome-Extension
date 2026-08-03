@@ -9,7 +9,9 @@ function res(opts: { status?: number; contentType?: string; json?: unknown }): R
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (k: string) => (k.toLowerCase() === 'content-type' ? (opts.contentType ?? null) : null) },
+    headers: {
+      get: (k: string) => (k.toLowerCase() === 'content-type' ? (opts.contentType ?? null) : null),
+    },
     json: async () => opts.json,
   } as unknown as Response;
 }
@@ -17,7 +19,9 @@ function res(opts: { status?: number; contentType?: string; json?: unknown }): R
 describe('negotiateCsl', () => {
   it('returns the parsed CSL JSON on a valid response', async () => {
     const csl = { DOI: '10.1/x', title: 'A paper' };
-    const got = await negotiateCsl('10.1/x', async () => res({ contentType: 'application/json', json: csl }));
+    const got = await negotiateCsl('10.1/x', async () =>
+      res({ contentType: 'application/json', json: csl }),
+    );
     expect(got).toEqual(csl);
   });
 
@@ -73,12 +77,18 @@ const deps = (fetched: unknown) => ({
 describe('importReferenceByDoi', () => {
   it('rejects an empty DOI', async () => {
     const { repos } = fakeRepos();
-    await expect(importReferenceByDoi(repos, { projectId: 'p1', doi: '   ' }, deps({}))).rejects.toThrow(/enter a doi/i);
+    await expect(
+      importReferenceByDoi(repos, { projectId: 'p1', doi: '   ' }, deps({})),
+    ).rejects.toThrow(/enter a doi/i);
   });
 
   it('creates a reference from fetched CSL, stamping the DOI and source', async () => {
     const { repos, store } = fakeRepos();
-    const ref = await importReferenceByDoi(repos, { projectId: 'p1', doi: '10.1/x' }, deps({ title: 'A paper' }));
+    const ref = await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: '10.1/x' },
+      deps({ title: 'A paper' }),
+    );
     expect(ref.source).toBe('importedByDoi');
     expect((ref.cslData as { DOI?: string }).DOI).toBe('10.1/x');
     expect(store).toHaveLength(1);
@@ -102,7 +112,11 @@ describe('importReferenceByDoi', () => {
       updatedAt: '2026-01-01T00:00:00.000Z',
     };
     const { repos, store } = fakeRepos([existing]);
-    const ref = await importReferenceByDoi(repos, { projectId: 'p1', doi: 'https://doi.org/10.1/x' }, deps({ title: 'New' }));
+    const ref = await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: 'https://doi.org/10.1/x' },
+      deps({ title: 'New' }),
+    );
     expect(ref.id).toBe('existing');
     expect(store).toHaveLength(1);
   });

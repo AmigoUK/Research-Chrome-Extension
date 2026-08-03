@@ -193,7 +193,11 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
   for (const user of data.users ?? []) {
     const local = await repos.users.get(user.id);
     const merged = local
-      ? { ...local, ...user, rolesPerProject: { ...local.rolesPerProject, ...user.rolesPerProject } }
+      ? {
+          ...local,
+          ...user,
+          rolesPerProject: { ...local.rolesPerProject, ...user.rolesPerProject },
+        }
       : user;
     writes.push(() => repos.users.put(merged));
     report.users++;
@@ -290,10 +294,10 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
   for (const event of data.activity ?? []) {
     if (knownEvents.has(event.id)) continue;
     const entityId =
-      event.entityId && documentKinds.has(event.kind) ? mapDocumentId(event.entityId) : event.entityId;
-    writes.push(() =>
-      repos.activity.put({ ...event, ...(entityId ? { entityId } : {}) }),
-    );
+      event.entityId && documentKinds.has(event.kind)
+        ? mapDocumentId(event.entityId)
+        : event.entityId;
+    writes.push(() => repos.activity.put({ ...event, ...(entityId ? { entityId } : {}) }));
     report.activity++;
   }
 
@@ -323,10 +327,7 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
  * What an import would do, without doing it. The counts come from the same plan
  * the import applies, so the preview cannot promise something else.
  */
-export async function previewMerge(
-  repos: RepositorySet,
-  data: SnapshotData,
-): Promise<MergeReport> {
+export async function previewMerge(repos: RepositorySet, data: SnapshotData): Promise<MergeReport> {
   return (await planMerge(repos, data)).report;
 }
 

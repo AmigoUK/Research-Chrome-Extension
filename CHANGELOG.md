@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The repository is Prettier-formatted, and CI enforces it.** 37 files had drifted because
+  `format:check` existed as a script but was never run by anything. They are formatted now (wrapping
+  only — no logic, selector or assertion changed; the dashboard screenshot regenerates byte-identical
+  afterwards), and CI gained a `format:check` step between lint and the unit tests. It only verifies:
+  a job that rewrote the tree would push a commit nobody reviewed. `.prettierignore` now also covers
+  `docs/`, which `npm run pages` generates — Prettier and the generator would otherwise overwrite
+  each other and turn CI red on an unrelated docs edit.
+
 ### Fixed
 
 - **`e2e/webannotation.spec.ts` no longer depends on the renderer being warm.** Its first test failed
@@ -142,7 +152,7 @@ roadmap phases have been delivered and the extension is ready for people who did
   `annotator/changed` — so after an in-app navigation the previous page's highlights lingered over
   unrelated text and the new URL was never re-anchored. A content script can't observe the page's own
   `history.pushState`/`replaceState` (they run in the main world), so the annotator now watches every
-  signal it *can* see — `popstate`, the Navigation API's `navigatesuccess` where present, and a
+  signal it _can_ see — `popstate`, the Navigation API's `navigatesuccess` where present, and a
   one-second poll as the guaranteed catch-all — and on any real URL change dismisses a stale toolbar
   and re-loads the annotations for the new URL (clearing overlays that no longer apply). The
   change-detection is deduped (`createUrlWatcher`) so overlapping signals cost only a string compare.
@@ -287,11 +297,11 @@ v0.23.0. Each item was reproduced or verified before it was changed.
   doi.org left the import button spinning forever and kept the service worker awake. It now aborts
   after 15s and says so.
 - **A failing anchor strategy no longer abandons the chain.** `resolveWebAnchor` guarded
-  `textPosition` with try/catch but not `textQuote`, so an exception in the *first* strategy skipped
+  `textPosition` with try/catch but not `textQuote`, so an exception in the _first_ strategy skipped
   the two fallbacks that exist precisely for that case — a note that text-position could still have
   found was reported as lost.
 - **The merge no longer rewrites unrelated ids.** Every imported event's `entityId` was remapped
-  through the *document* dedup map, but `entityId` means a user for a `member` event and a thread for
+  through the _document_ dedup map, but `entityId` means a user for a `member` event and a thread for
   a `comment` one. Only the kinds that point at a document are remapped now.
 - **A DOI import says where it came from.** It recorded `source: 'manual'`, so the References view's
   ORIGIN column called a fetched record hand-entered. `ReferenceSource` gained `importedByDoi`.
@@ -355,7 +365,7 @@ v0.23.0. Each item was reproduced or verified before it was changed.
 ### Fixed
 
 - **An imported timestamp with an offset could make an older record win the merge.** `isNewer`
-  compares ISO strings lexicographically, so `12:00+02:00` (10:00Z) sorted *after* `11:00Z`. Imported
+  compares ISO strings lexicographically, so `12:00+02:00` (10:00Z) sorted _after_ `11:00Z`. Imported
   dates are now normalised to UTC at the boundary.
 - **A status outside the pipeline silently hid a source.** The Kanban renders known statuses only, so
   an imported `status: "archived"` removed the source from every column. Such a file is now refused.
@@ -388,7 +398,7 @@ is something an assertion would have caught:
 ### Added
 
 - **Pick a status in the side panel instead of cycling it.** The reading list's status button opened
-  nothing and only ever moved a source *forward*, so a mis-click could not be undone from the panel
+  nothing and only ever moved a source _forward_, so a mis-click could not be undone from the panel
   at all — the pipeline runs one way. It now opens a menu of the whole pipeline with the current
   position marked, and a source can move back.
 
@@ -433,7 +443,7 @@ is something an assertion would have caught:
     it produces. Preview and import share the one code path deliberately: a preview that could
     disagree with the import would be worse than no preview at all — a test asserts they are equal.
   - New message `snapshot/preview`; `MergeReport` gained `newProject`, so the panel can say
-    *Create* rather than *Merge into* when the project is new to this browser.
+    _Create_ rather than _Merge into_ when the project is new to this browser.
 
 ### Fixed
 
@@ -463,7 +473,7 @@ is something an assertion would have caught:
     where a style came from, and re-importing the same style replaces it — what someone updating a
     journal's style file expects.
   - `src/core/usecases/base-styles.ts` and messages `baseStyles/list|import|delete`.
-  - **Style editor**: an *Import .csl* button beside the base-style picker, imported styles grouped
+  - **Style editor**: an _Import .csl_ button beside the base-style picker, imported styles grouped
     under an **Imported** heading, and a button to forget one. The live citeproc preview formats
     through the imported file immediately.
 
@@ -478,7 +488,7 @@ is something an assertion would have caught:
 ### Changed
 
 - Deleting an imported base style leaves the citation profiles built on it alone. They keep pointing
-  at it, the picker marks the base style *missing*, and formatting degrades to an empty compile —
+  at it, the picker marks the base style _missing_, and formatting degrades to an empty compile —
   deleting someone's profiles because a base style went away would be the worse surprise.
 
 ### Notes
@@ -535,7 +545,7 @@ is something an assertion would have caught:
   - New messages `snapshot/export` and `snapshot/import`; both halves record a `sync` activity
     event — the last of the seven kinds to come into use.
 - **Team → Sync** tab: the sync-mode selector (**Local only** / **File-based**, with **Self-hosted
-  backend** shown as *Unavailable* rather than pretended), export with an optional password and an
+  backend** shown as _Unavailable_ rather than pretended), export with an optional password and an
   "Include PDF files" checkbox, and import with a file picker. `Project.syncMode` persists the choice.
 
 ### Changed
@@ -629,7 +639,7 @@ is something an assertion would have caught:
 - **Team view — members & roles (Phase 5, M1)**, the sixth dashboard nav item and the end of the
   Phase-2 "Team is deferred" note:
   - `src/core/model/roles.ts` — the capability matrix from the design mock as data (`can(role,
-    capability)`), plus `keepsAnOwner()`, the guard that stops a project losing its last owner.
+capability)`), plus `keepsAnOwner()`, the guard that stops a project losing its last owner.
   - `src/core/usecases/members.ts` — `listMembers` / `inviteMember` / `setMemberRole` /
     `removeMember`. `Project.members` is authoritative for roles and `User.rolesPerProject` is
     written in the same use-case, so the two cannot drift.

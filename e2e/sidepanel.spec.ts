@@ -121,7 +121,9 @@ test('the status menu moves a source backwards, which cycling never could', asyn
   await page.keyboard.press('End');
   await expect(page.locator('#statusMenu [data-status="usedInOutput"]')).toBeFocused();
   await page.keyboard.press('Enter');
-  await expect(page.locator('[data-od-id="status-e2e-status-menu"]')).toContainText('Used in output');
+  await expect(page.locator('[data-od-id="status-e2e-status-menu"]')).toContainText(
+    'Used in output',
+  );
 
   // Put it back, so the assertions below still describe the same source.
   await page.locator('[data-od-id="status-e2e-status-menu"]').click();

@@ -48,7 +48,10 @@ export function createPdfAnchor(
 }
 
 /** Resolve an anchor to pixel rects for a page rendered at `box` px. */
-export function resolvePdfAnchor(anchor: PdfAnchor, box: PageBox): Array<PxRect & { page: number }> {
+export function resolvePdfAnchor(
+  anchor: PdfAnchor,
+  box: PageBox,
+): Array<PxRect & { page: number }> {
   const out: Array<PxRect & { page: number }> = [];
   for (const sel of anchor.selectors) {
     for (const r of sel.rects) {

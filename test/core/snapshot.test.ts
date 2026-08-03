@@ -153,7 +153,12 @@ describe('mergeSnapshot onto another machine', () => {
     const target = await otherMachine();
     const report = await mergeSnapshot(target, deps, data);
 
-    expect(report).toMatchObject({ projectName: 'Urban Heat', documents: 1, annotations: 1, files: 1 });
+    expect(report).toMatchObject({
+      projectName: 'Urban Heat',
+      documents: 1,
+      annotations: 1,
+      files: 1,
+    });
     expect((await target.projects.get('p1'))?.name).toBe('Urban Heat');
     expect(await target.documents.listByProject('p1')).toHaveLength(1);
     expect(await target.files.get('f1')).toBeDefined();
@@ -235,7 +240,12 @@ describe('merge rules', () => {
     const target = await otherMachine();
 
     const preview = await previewMerge(target, data);
-    expect(preview).toMatchObject({ newProject: true, documents: 1, annotations: 1, references: 1 });
+    expect(preview).toMatchObject({
+      newProject: true,
+      documents: 1,
+      annotations: 1,
+      references: 1,
+    });
 
     // Nothing landed — a preview that wrote would be a lie.
     expect(await target.projects.list()).toHaveLength(0);
@@ -271,7 +281,12 @@ describe('merge rules', () => {
     await mergeSnapshot(target, deps, data);
 
     const preview = await previewMerge(target, data);
-    expect(preview).toMatchObject({ documents: 0, annotations: 0, references: 0, newProject: false });
+    expect(preview).toMatchObject({
+      documents: 0,
+      annotations: 0,
+      references: 0,
+      newProject: false,
+    });
     expect(preview.skippedOlder).toBeGreaterThan(0);
   });
 

@@ -116,7 +116,10 @@ export interface ActivityDay {
  * Group events into the feed's day sections. Input is expected newest first
  * (that is how the repository reads them) and that order is preserved.
  */
-export function groupActivityByDay(events: readonly ActivityEvent[], nowIso: string): ActivityDay[] {
+export function groupActivityByDay(
+  events: readonly ActivityEvent[],
+  nowIso: string,
+): ActivityDay[] {
   const days: ActivityDay[] = [];
   let currentKey: string | undefined;
   for (const event of events) {

@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
-import { annotateWebPage, findDocumentByUrl, resolveProjectId } from '../../src/core/usecases/web-annotation';
+import {
+  annotateWebPage,
+  findDocumentByUrl,
+  resolveProjectId,
+} from '../../src/core/usecases/web-annotation';
 import type { RepositorySet } from '../../src/core/ports/repositories';
 import type { CaptureInput } from '../../src/core/usecases/capture';
 import type { Project, WebAnchor } from '../../src/core/model/types';
@@ -11,7 +15,10 @@ import type { Project, WebAnchor } from '../../src/core/model/types';
 let repos: RepositorySet;
 let counter = 0;
 let tick = 0;
-const deps = { newId: () => `id-${++tick}`, now: () => new Date(Date.UTC(2026, 6, 26, 0, 0, ++tick)).toISOString() };
+const deps = {
+  newId: () => `id-${++tick}`,
+  now: () => new Date(Date.UTC(2026, 6, 26, 0, 0, ++tick)).toISOString(),
+};
 
 const input = (url: string): CaptureInput => ({
   projectId: 'p1',

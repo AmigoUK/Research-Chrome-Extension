@@ -188,13 +188,19 @@ describe('resolveWebAnchor approximate flag', () => {
 
   it('reports {null,false} when nothing matches', () => {
     document.body.innerHTML = '<p>x</p>';
-    const anchor = { kind: 'web' as const, selectors: [{ type: 'css' as const, value: '#missing' }] };
+    const anchor = {
+      kind: 'web' as const,
+      selectors: [{ type: 'css' as const, value: '#missing' }],
+    };
     expect(resolveWebAnchor(document.body, anchor)).toEqual({ range: null, approximate: false });
   });
 
   it('does not throw on a malformed css selector (untrusted snapshot); returns no match', () => {
     document.body.innerHTML = '<p>x</p>';
-    const anchor = { kind: 'web' as const, selectors: [{ type: 'css' as const, value: ')(bad-selector' }] };
+    const anchor = {
+      kind: 'web' as const,
+      selectors: [{ type: 'css' as const, value: ')(bad-selector' }],
+    };
     expect(() => resolveWebAnchor(document.body, anchor)).not.toThrow();
     expect(resolveWebAnchor(document.body, anchor)).toEqual({ range: null, approximate: false });
   });

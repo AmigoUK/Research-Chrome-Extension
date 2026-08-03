@@ -65,7 +65,8 @@ export async function registerOrigin(origin: string): Promise<{ registered: bool
 async function broadcast(url: string): Promise<void> {
   chrome.runtime.sendMessage({ control: 'annotator/changed', url }).catch(() => {});
   const tabId = await activeTabId();
-  if (tabId != null) chrome.tabs.sendMessage(tabId, { control: 'annotator/changed', url }).catch(() => {});
+  if (tabId != null)
+    chrome.tabs.sendMessage(tabId, { control: 'annotator/changed', url }).catch(() => {});
 }
 
 /** Wire the control listener. Returns synchronously; replies are async. */
@@ -94,13 +95,20 @@ export function registerAnnotatorControl(): void {
         // Side panel "Jump to" → forward to the active tab's content script (an
         // injected page context, reached via tabs.sendMessage, not runtime.sendMessage).
         const tabId = await activeTabId();
-        if (tabId != null) chrome.tabs.sendMessage(tabId, { control: 'annotator/jump', id: message.id }).catch(() => {});
+        if (tabId != null)
+          chrome.tabs
+            .sendMessage(tabId, { control: 'annotator/jump', id: message.id })
+            .catch(() => {});
         sendResponse({ ok: true });
       } else if (message.control === 'annotator/resolved' && message.url) {
         // Content script reports which annotations it could place on the page →
         // forward to the side panel so it can flag the rest as unplaced.
         chrome.runtime
-          .sendMessage({ control: 'annotator/resolved', url: message.url, resolvedIds: message.resolvedIds })
+          .sendMessage({
+            control: 'annotator/resolved',
+            url: message.url,
+            resolvedIds: message.resolvedIds,
+          })
           .catch(() => {});
         sendResponse({ ok: true });
       } else {

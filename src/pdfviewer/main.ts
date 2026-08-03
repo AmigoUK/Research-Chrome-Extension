@@ -26,8 +26,9 @@ pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T =>
   root.querySelector(sel) as T;
-const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T[] =>
-  [...root.querySelectorAll<T>(sel)];
+const $$ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T[] => [
+  ...root.querySelectorAll<T>(sel),
+];
 
 const ZOOM_MIN = 0.75;
 const ZOOM_MAX = 1.75;
@@ -212,7 +213,11 @@ function textUnderRects(textLayer: HTMLElement, pageEl: HTMLElement, rects: PxRe
     const sb = span.getBoundingClientRect();
     const cx = sb.left - pageBox.left + sb.width / 2;
     const cy = sb.top - pageBox.top + sb.height / 2;
-    if (rects.some((r) => cx >= r.left && cx <= r.left + r.width && cy >= r.top && cy <= r.top + r.height)) {
+    if (
+      rects.some(
+        (r) => cx >= r.left && cx <= r.left + r.width && cy >= r.top && cy <= r.top + r.height,
+      )
+    ) {
       out += `${span.textContent ?? ''} `;
     }
   }
@@ -300,7 +305,8 @@ function currentPageEl(): HTMLElement | null {
 function reRenderOverlays(): void {
   const layer = document.querySelector<HTMLElement>('.anno-layer');
   const pageEl = currentPageEl();
-  if (layer && pageEl) renderOverlays(layer, { width: pageEl.clientWidth, height: pageEl.clientHeight });
+  if (layer && pageEl)
+    renderOverlays(layer, { width: pageEl.clientWidth, height: pageEl.clientHeight });
 }
 
 /* ---- Text selection → anchor ---- */
@@ -349,7 +355,9 @@ interface SelAction {
 }
 function showSeltool(cx: number, top: number, actions: SelAction[]): void {
   const el = $('#seltool');
-  el.innerHTML = actions.map((a, i) => `<button data-i="${i}">${a.icon}${a.label}</button>`).join('');
+  el.innerHTML = actions
+    .map((a, i) => `<button data-i="${i}">${a.icon}${a.label}</button>`)
+    .join('');
   $$('button', el).forEach((b, i) => {
     b.onclick = () => actions[i]!.fn();
   });
@@ -456,9 +464,9 @@ async function commitAnchor(withNote: boolean): Promise<void> {
   toast(quote ? 'Highlight anchored' : 'Region anchored');
   if (withNote) {
     $('#rail').classList.add('open');
-    document.querySelector<HTMLTextAreaElement>(
-      `.ac[data-id="${CSS.escape(annotation.id)}"] .note-ta`,
-    )?.focus();
+    document
+      .querySelector<HTMLTextAreaElement>(`.ac[data-id="${CSS.escape(annotation.id)}"] .note-ta`)
+      ?.focus();
   }
 }
 
@@ -487,11 +495,13 @@ async function focusAnnotation(id: Id): Promise<void> {
 /* ---- Annotations rail ---- */
 function railData(): Annotation[] {
   return state.annotations.filter(
-    (a) => a.anchor.kind === 'pdf' && (state.scope === 'all' || anchorPage(a.anchor) === state.pageNum),
+    (a) =>
+      a.anchor.kind === 'pdf' && (state.scope === 'all' || anchorPage(a.anchor) === state.pageNum),
   );
 }
 function renderRail(): void {
-  $('#railN').textContent = `${state.annotations.length} on ${state.numPages} page${state.numPages === 1 ? '' : 's'}`;
+  $('#railN').textContent =
+    `${state.annotations.length} on ${state.numPages} page${state.numPages === 1 ? '' : 's'}`;
   const list = $('#railList');
   const hint = `<div class="hint"><b>Anchoring.</b> A PDF is fixed-layout, so notes are pinned by <b>page + coordinate rectangles</b>. The quoted text is checked against the page — if the PDF is replaced and the text no longer matches, the note is flagged as possibly moved.</div>`;
   const rows = railData();
@@ -571,13 +581,17 @@ async function deleteAnnotation(id: Id): Promise<void> {
 /* ---- Mode + scope ---- */
 function setMode(mode: 'text' | 'region'): void {
   state.mode = mode;
-  $$('#modeSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  $$('#modeSeg button').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode)),
+  );
   document.body.classList.toggle('mode-region', mode === 'region');
   hideSeltool();
 }
 function setScope(scope: 'page' | 'all'): void {
   state.scope = scope;
-  $$('#railSeg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.scope === scope)));
+  $$('#railSeg button').forEach((b) =>
+    b.setAttribute('aria-pressed', String(b.dataset.scope === scope)),
+  );
   renderRail();
 }
 

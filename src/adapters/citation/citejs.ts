@@ -94,7 +94,9 @@ export class CiteJsFormatter implements CitationFormatter {
     style: CitationStyle,
     kind: CitationKind,
   ): Promise<string> {
-    const { template: baseTemplate, csl } = await this.ensureTemplate(templateFor(style.baseStyleId));
+    const { template: baseTemplate, csl } = await this.ensureTemplate(
+      templateFor(style.baseStyleId),
+    );
     const rules = style.userRules;
     const compiled = csl ? compileCsl(csl, rules) : '';
     let template = baseTemplate;

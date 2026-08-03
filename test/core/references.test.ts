@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
-import { importReferenceByDoi, normaliseDoi, type ImportDeps } from '../../src/core/usecases/references';
+import {
+  importReferenceByDoi,
+  normaliseDoi,
+  type ImportDeps,
+} from '../../src/core/usecases/references';
 import type { RepositorySet } from '../../src/core/ports/repositories';
 
 let repos: RepositorySet;
@@ -43,7 +47,11 @@ describe('normaliseDoi', () => {
 
 describe('importReferenceByDoi', () => {
   it('stores fetched CSL-JSON as a project reference', async () => {
-    const ref = await importReferenceByDoi(repos, { projectId: 'p1', doi: 'https://doi.org/10.1002/qj.49710845502' }, deps(SAMPLE));
+    const ref = await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: 'https://doi.org/10.1002/qj.49710845502' },
+      deps(SAMPLE),
+    );
     expect(ref.projectId).toBe('p1');
     // A record fetched from doi.org is not hand-entered, and the References
     // view's ORIGIN column shows the difference.
@@ -55,7 +63,11 @@ describe('importReferenceByDoi', () => {
   });
 
   it('accepts a CSL array and takes the first entry', async () => {
-    const ref = await importReferenceByDoi(repos, { projectId: 'p1', doi: '10.1/x' }, deps([SAMPLE]));
+    const ref = await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: '10.1/x' },
+      deps([SAMPLE]),
+    );
     expect((ref.cslData as { title?: string }).title).toBe(SAMPLE.title);
   });
 
@@ -67,12 +79,22 @@ describe('importReferenceByDoi', () => {
   });
 
   it('dedupes by DOI within a project', async () => {
-    await importReferenceByDoi(repos, { projectId: 'p1', doi: '10.1002/qj.49710845502' }, deps(SAMPLE));
-    await importReferenceByDoi(repos, { projectId: 'p1', doi: 'doi:10.1002/qj.49710845502' }, deps(SAMPLE));
+    await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: '10.1002/qj.49710845502' },
+      deps(SAMPLE),
+    );
+    await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: 'doi:10.1002/qj.49710845502' },
+      deps(SAMPLE),
+    );
     expect(await repos.references.listByProject('p1')).toHaveLength(1);
   });
 
   it('rejects an empty DOI', async () => {
-    await expect(importReferenceByDoi(repos, { projectId: 'p1', doi: '   ' }, deps(SAMPLE))).rejects.toThrow();
+    await expect(
+      importReferenceByDoi(repos, { projectId: 'p1', doi: '   ' }, deps(SAMPLE)),
+    ).rejects.toThrow();
   });
 });

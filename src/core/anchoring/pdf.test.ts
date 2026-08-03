@@ -1,17 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import {
-  createPdfAnchor,
-  resolvePdfAnchor,
-  anchorPage,
-  anchorQuote,
-  isRegionAnchor,
-} from './pdf';
+import { createPdfAnchor, resolvePdfAnchor, anchorPage, anchorQuote, isRegionAnchor } from './pdf';
 
 const BOX = { width: 700, height: 900 };
 
 describe('createPdfAnchor', () => {
   it('stores rects as fractions of the page box, with the page number', () => {
-    const anchor = createPdfAnchor(3, [{ left: 70, top: 90, width: 140, height: 45 }], BOX, 'hello');
+    const anchor = createPdfAnchor(
+      3,
+      [{ left: 70, top: 90, width: 140, height: 45 }],
+      BOX,
+      'hello',
+    );
     expect(anchor.kind).toBe('pdf');
     const sel = anchor.selectors[0]!;
     expect(sel.type).toBe('pdfRegion');

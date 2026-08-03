@@ -88,7 +88,9 @@ describe('ids that would escape their attribute', () => {
     expect(() => validateSnapshotData(withDocument({ projectId: 'p"1' }))).toThrow(
       /source 1's project id/,
     );
-    expect(() => validateSnapshotData(withDocument({ fileId: 'f"1' }))).toThrow(/source 1's file id/);
+    expect(() => validateSnapshotData(withDocument({ fileId: 'f"1' }))).toThrow(
+      /source 1's file id/,
+    );
   });
 });
 
@@ -108,7 +110,14 @@ describe('values that would corrupt behaviour rather than markup', () => {
   it('refuses an activity kind the feed cannot render', () => {
     const data = good({
       activity: [
-        { id: 'e1', projectId: 'p1', actorUserId: 'me', kind: 'explosion', summary: 'x', createdAt: NOW },
+        {
+          id: 'e1',
+          projectId: 'p1',
+          actorUserId: 'me',
+          kind: 'explosion',
+          summary: 'x',
+          createdAt: NOW,
+        },
       ],
     });
     expect(() => validateSnapshotData(data)).toThrow(/history entry 1's kind/);
@@ -116,7 +125,15 @@ describe('values that would corrupt behaviour rather than markup', () => {
 
   it('refuses file contents that are not base64', () => {
     const data = good({
-      files: [{ id: 'f1', name: 'a.pdf', mime: 'application/pdf', dataBase64: 'not base64!', createdAt: NOW }],
+      files: [
+        {
+          id: 'f1',
+          name: 'a.pdf',
+          mime: 'application/pdf',
+          dataBase64: 'not base64!',
+          createdAt: NOW,
+        },
+      ],
     });
     expect(() => validateSnapshotData(data)).toThrow(/file 1's contents are not base64/);
   });

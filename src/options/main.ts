@@ -190,7 +190,12 @@ interface DashState {
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
   /** A snapshot chosen for import, held until the user confirms the plan. */
-  pendingImport: { filename: string; content: string; password: string; report: MergeReport } | null;
+  pendingImport: {
+    filename: string;
+    content: string;
+    password: string;
+    report: MergeReport;
+  } | null;
   /** Tab within the Team view. */
   teamTab: 'activity' | 'comments' | 'members' | 'sync';
   activityFilter: ActivityKind | 'all';
@@ -320,15 +325,15 @@ async function loadProjectData(): Promise<void> {
   const projectId = state.activeProjectId;
   const [documents, annotations, references, styles, members, activity, threads, baseStyles] =
     await Promise.all([
-    sendRequest({ type: 'documents/listByProject', projectId }),
-    sendRequest({ type: 'annotations/listByProject', projectId }),
-    sendRequest({ type: 'references/listByProject', projectId }),
-    sendRequest({ type: 'citationStyles/list' }),
-    sendRequest({ type: 'members/list', projectId }),
-    sendRequest({ type: 'activity/listByProject', projectId, limit: state.activityLimit }),
-    sendRequest({ type: 'comments/listByProject', projectId }),
-    sendRequest({ type: 'baseStyles/list' }),
-  ]);
+      sendRequest({ type: 'documents/listByProject', projectId }),
+      sendRequest({ type: 'annotations/listByProject', projectId }),
+      sendRequest({ type: 'references/listByProject', projectId }),
+      sendRequest({ type: 'citationStyles/list' }),
+      sendRequest({ type: 'members/list', projectId }),
+      sendRequest({ type: 'activity/listByProject', projectId, limit: state.activityLimit }),
+      sendRequest({ type: 'comments/listByProject', projectId }),
+      sendRequest({ type: 'baseStyles/list' }),
+    ]);
   state.documents = documents;
   state.annotations = annotations;
   state.references = references;
@@ -1581,7 +1586,8 @@ function systemOfBase(baseStyleId: string): CitationSystem {
 function baseLabel(baseStyleId: string): string {
   const imported = state.baseStyles.find((b) => b.id === baseStyleId);
   if (imported) return imported.name;
-  if (isCustomBaseStyleId(baseStyleId)) return `${baseStyleId.split(':')[1] ?? baseStyleId} (missing)`;
+  if (isCustomBaseStyleId(baseStyleId))
+    return `${baseStyleId.split(':')[1] ?? baseStyleId} (missing)`;
   return baseStyleInfo(baseStyleId)?.label ?? baseStyleId;
 }
 
@@ -1598,8 +1604,7 @@ function baseOptions(current: string): string {
       ? option(current, baseLabel(current))
       : '';
   return (
-    vendored +
-    (imported ? `<optgroup label="Imported">${imported}${orphan}</optgroup>` : orphan)
+    vendored + (imported ? `<optgroup label="Imported">${imported}${orphan}</optgroup>` : orphan)
   );
 }
 

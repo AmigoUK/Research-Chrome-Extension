@@ -12,7 +12,10 @@ export interface UrlWatcher {
   check: () => void;
 }
 
-export function createUrlWatcher(getUrl: () => string, onChange: (url: string) => void): UrlWatcher {
+export function createUrlWatcher(
+  getUrl: () => string,
+  onChange: (url: string) => void,
+): UrlWatcher {
   let last = getUrl();
   return {
     check() {

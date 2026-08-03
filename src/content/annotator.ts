@@ -138,7 +138,12 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
     const scan = scanDocumentRaw();
     const projectId = (await getActiveProjectId()) ?? '';
     const input = buildCaptureInput(scan, projectId);
-    const res = (await chrome.runtime.sendMessage({ type: 'web/annotate', input, anchor, withNote })) as
+    const res = (await chrome.runtime.sendMessage({
+      type: 'web/annotate',
+      input,
+      anchor,
+      withNote,
+    })) as
       | { ok: true; data: { documentId: string; annotationId: string } }
       | { ok: false; error: string };
     if (!res.ok) {
@@ -287,7 +292,9 @@ function onMouseUp(path: EventTarget[]): void {
   // the composed path reveals the ShadowRoot, whose own getSelection() has it.
   const shadowRoot = path.find((n): n is ShadowRoot => n instanceof ShadowRoot);
   if (shadowRoot) {
-    const ssel = (shadowRoot as ShadowRoot & { getSelection?: () => Selection | null }).getSelection?.();
+    const ssel = (
+      shadowRoot as ShadowRoot & { getSelection?: () => Selection | null }
+    ).getSelection?.();
     if (ssel && !ssel.isCollapsed && ssel.toString().trim()) {
       pendingTarget = {
         range: ssel.getRangeAt(0),
@@ -318,10 +325,13 @@ async function loadExisting(): Promise<void> {
     if (!res.ok) return;
     painted.length = 0;
     for (const annotation of res.data.annotations) {
-      if (annotation.anchor.kind === 'web') painted.push({ annotation, anchor: annotation.anchor, range: null });
+      if (annotation.anchor.kind === 'web')
+        painted.push({ annotation, anchor: annotation.anchor, range: null });
     }
     const resolvedIds = resolveAndRepaintAll();
-    chrome.runtime.sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds }).catch(() => {});
+    chrome.runtime
+      .sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds })
+      .catch(() => {});
   } catch {
     // Called via `void loadExisting()` on injection and on annotator/changed;
     // a rejected sync (SW asleep, context invalidated) must not surface as an

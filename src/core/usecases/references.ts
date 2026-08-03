@@ -86,7 +86,8 @@ export async function importReferenceByDoi(
   if (!doi) throw new Error('Enter a DOI to import');
 
   const fetched = await deps.fetchCsl(doi);
-  const csl = (Array.isArray(fetched) ? fetched[0] : fetched) as Record<string, unknown> | undefined;
+  const csl = (Array.isArray(fetched) ? fetched[0] : fetched) as
+    Record<string, unknown> | undefined;
   if (!csl || typeof csl !== 'object') throw new Error('No metadata found for that DOI');
 
   // Ensure the DOI is present on the stored CSL data.

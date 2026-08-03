@@ -10,16 +10,16 @@ citation-style editor, and local-first collaboration.
 
 ## What it does
 
-| Area | What you get |
-|---|---|
-| **Capture** | File the current page into a project — title, authors, year, DOI, journal — deduplicated by DOI. |
-| **Annotations** | Anchor notes to a passage using W3C selectors (quote → position → CSS), with a review status per note. On a live web page, select text and a toolbar offers **Highlight** or **Note** — painted as overlays that re-anchor after a reload; access is opt-in per site (no standing content script). |
-| **PDFs** | A bundled `pdf.js` reader: text highlights and drag-a-rectangle region anchors, stored as fraction coordinates so they survive zoom and DPR changes. |
-| **Dashboard** | Overview + Kanban by workflow status, Documents, References (with DOI import), Annotations, Citation styles, Team. |
-| **Citations** | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere. |
-| **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. Import a journal's own `.csl` file as a base style, or export the compiled one. |
-| **Team** | Members & roles with a capability matrix, an activity feed with before→after diffs, and anchored comment threads with reply / resolve. |
-| **Sync** | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. An import shows exactly what it would change before it writes anything. |
+| Area             | What you get                                                                                                                                                                                                                                                                                       |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Capture**      | File the current page into a project — title, authors, year, DOI, journal — deduplicated by DOI.                                                                                                                                                                                                   |
+| **Annotations**  | Anchor notes to a passage using W3C selectors (quote → position → CSS), with a review status per note. On a live web page, select text and a toolbar offers **Highlight** or **Note** — painted as overlays that re-anchor after a reload; access is opt-in per site (no standing content script). |
+| **PDFs**         | A bundled `pdf.js` reader: text highlights and drag-a-rectangle region anchors, stored as fraction coordinates so they survive zoom and DPR changes.                                                                                                                                               |
+| **Dashboard**    | Overview + Kanban by workflow status, Documents, References (with DOI import), Annotations, Citation styles, Team.                                                                                                                                                                                 |
+| **Citations**    | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere.                                                                                                                                                 |
+| **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. Import a journal's own `.csl` file as a base style, or export the compiled one.                                          |
+| **Team**         | Members & roles with a capability matrix, an activity feed with before→after diffs, and anchored comment threads with reply / resolve.                                                                                                                                                             |
+| **Sync**         | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. An import shows exactly what it would change before it writes anything.                                                         |
 
 **Local-first, no backend.** Everything lives in this browser's IndexedDB. Roles are therefore
 **advisory** — every collaborator holds a full copy of the project, so nothing can enforce a role,
@@ -100,7 +100,7 @@ style:
 
 ### Side panel
 
-Picking a status directly — including moving a source *back*, which click-cycling could never do:
+Picking a status directly — including moving a source _back_, which click-cycling could never do:
 
 <img src="doc/screenshots/13-side-panel-status-menu.png" alt="Side panel with the status menu open
 over a source card" width="400">
@@ -117,6 +117,7 @@ npm test           # unit tests (Vitest)
 npm run test:e2e   # end-to-end tests (Playwright, extension loaded in headed Chromium)
 npm run lint       # ESLint
 npm run typecheck  # tsc --noEmit
+npm run format     # Prettier (CI runs format:check, which only verifies)
 npm run package    # build + zip dist/ → release/context-notes-v<version>.zip, then validate it
 npm run store:assets  # regenerate the Web Store images in doc/store/ (run under xvfb)
 npm run pages      # regenerate docs/ — the published site and privacy policy
@@ -154,25 +155,25 @@ See [`doc/architecture.md`](doc/architecture.md), [`doc/data-model.md`](doc/data
 
 ## Documentation
 
-| File | Contents |
-|---|---|
-| [`doc/STATUS.md`](doc/STATUS.md) | Where the project stands and what to do next |
-| [`doc/roadmap.md`](doc/roadmap.md) | The five development phases |
-| [`doc/architecture.md`](doc/architecture.md) | Ports & adapters, testability |
-| [`doc/data-model.md`](doc/data-model.md) | Entities and anchoring |
-| [`doc/citations.md`](doc/citations.md) | CSL, styles and user rules |
-| [`doc/ui-ux.md`](doc/ui-ux.md) | Surfaces and interaction design |
-| [`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md) | Packaging and publishing to the Chrome Web Store |
-| [`doc/STORE-LISTING.md`](doc/STORE-LISTING.md) | The listing copy, ready to paste into the dashboard |
-| [`doc/PRIVACY.md`](doc/PRIVACY.md) | The privacy policy (source of the published page) |
-| [`CHANGELOG.md`](CHANGELOG.md) | Every release, Keep a Changelog format |
-| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Bundled fonts, CSL styles and their licences |
+| File                                               | Contents                                            |
+| -------------------------------------------------- | --------------------------------------------------- |
+| [`doc/STATUS.md`](doc/STATUS.md)                   | Where the project stands and what to do next        |
+| [`doc/roadmap.md`](doc/roadmap.md)                 | The five development phases                         |
+| [`doc/architecture.md`](doc/architecture.md)       | Ports & adapters, testability                       |
+| [`doc/data-model.md`](doc/data-model.md)           | Entities and anchoring                              |
+| [`doc/citations.md`](doc/citations.md)             | CSL, styles and user rules                          |
+| [`doc/ui-ux.md`](doc/ui-ux.md)                     | Surfaces and interaction design                     |
+| [`doc/DISTRIBUTION.md`](doc/DISTRIBUTION.md)       | Packaging and publishing to the Chrome Web Store    |
+| [`doc/STORE-LISTING.md`](doc/STORE-LISTING.md)     | The listing copy, ready to paste into the dashboard |
+| [`doc/PRIVACY.md`](doc/PRIVACY.md)                 | The privacy policy (source of the published page)   |
+| [`CHANGELOG.md`](CHANGELOG.md)                     | Every release, Keep a Changelog format              |
+| [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md) | Bundled fonts, CSL styles and their licences        |
 
 ## Testing
 
 309 unit tests (Vitest, `fake-indexeddb`) and 28 end-to-end tests that load the built extension into
-a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint → unit →
-build, plus an E2E job under xvfb.
+a real Chromium and drive the side panel, dashboard and PDF reader. CI runs typecheck → lint →
+format:check → unit → build, plus an E2E job under xvfb.
 
 ---
 

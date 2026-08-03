@@ -88,7 +88,9 @@ function activeProject(): Project | undefined {
  * APA, silently ignoring whatever style the user had set up in the dashboard.
  */
 function activeStyle(): CitationStyle | undefined {
-  return state.styles.find((s) => s.id === activeProject()?.defaultCitationStyleId) ?? state.styles[0];
+  return (
+    state.styles.find((s) => s.id === activeProject()?.defaultCitationStyleId) ?? state.styles[0]
+  );
 }
 
 function citeArgs(): { template: string; styleId: Id | undefined } {
@@ -199,9 +201,7 @@ async function refreshPreview(): Promise<void> {
 function renderHeader(): void {
   const project = activeProject();
   $('activeName').textContent = project?.name ?? '—';
-  $('activeSub').textContent = project
-    ? `${state.documents.length} sources · ${styleLabel()}`
-    : '';
+  $('activeSub').textContent = project ? `${state.documents.length} sources · ${styleLabel()}` : '';
 }
 
 function renderCaptureCard(): void {
@@ -246,9 +246,7 @@ function isCapturablePreview(): boolean {
 
 function annotationQuote(a: Annotation): string {
   if (a.anchor.kind !== 'web') return '';
-  const selector = a.anchor.selectors.find(
-    (s): s is TextQuoteSelector => s.type === 'textQuote',
-  );
+  const selector = a.anchor.selectors.find((s): s is TextQuoteSelector => s.type === 'textQuote');
   return selector?.exact ?? '';
 }
 
@@ -444,9 +442,7 @@ async function deletePageAnnotation(id: Id): Promise<void> {
 /** Scroll a note card into view and flash it — mirrors the content script's
  *  own overlay flash, so a click anywhere in the loop lands somewhere visible. */
 function focusOnPageCard(id: string): void {
-  const card = document.querySelector<HTMLElement>(
-    `.onpage-note[data-id="${CSS.escape(id)}"]`,
-  );
+  const card = document.querySelector<HTMLElement>(`.onpage-note[data-id="${CSS.escape(id)}"]`);
   if (!card) return;
   card.scrollIntoView({ block: 'center', behavior: 'smooth' });
   card.classList.add('flash');
@@ -631,9 +627,7 @@ function positionStatusMenu(): void {
   menu.style.left = `${Math.max(8, Math.min(box.left, window.innerWidth - menu.offsetWidth - 8))}px`;
   const below = window.innerHeight - box.bottom;
   menu.style.top =
-    below < menu.offsetHeight + 12
-      ? `${box.top - menu.offsetHeight - 6}px`
-      : `${box.bottom + 6}px`;
+    below < menu.offsetHeight + 12 ? `${box.top - menu.offsetHeight - 6}px` : `${box.bottom + 6}px`;
 }
 
 function openStatusMenu(anchor: HTMLElement, doc: Document): void {

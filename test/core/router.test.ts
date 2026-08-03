@@ -91,7 +91,10 @@ describe('handleRequest', () => {
     });
     expect(putRes).toEqual({ ok: true, data: null });
 
-    const listRes = await handleRequest(repos, { type: 'references/listByProject', projectId: 'p1' });
+    const listRes = await handleRequest(repos, {
+      type: 'references/listByProject',
+      projectId: 'p1',
+    });
     expect(listRes.ok && Array.isArray(listRes.data) && listRes.data).toHaveLength(1);
   });
 
@@ -167,7 +170,10 @@ describe('handleRequest', () => {
         id: 'an1',
         projectId: 'p1',
         documentId: 'd1',
-        anchor: { kind: 'pdf' as const, selectors: [{ type: 'pdfRegion' as const, page: 1, rects: [] }] },
+        anchor: {
+          kind: 'pdf' as const,
+          selectors: [{ type: 'pdfRegion' as const, page: 1, rects: [] }],
+        },
         content: '',
         tags: [],
         status: 'draft' as const,
@@ -184,7 +190,10 @@ describe('handleRequest', () => {
     expect(gotDoc.ok && gotDoc.data).toBeUndefined();
     const gotFile = await handleRequest(repos, { type: 'files/get', id: 'f1' });
     expect(gotFile.ok && gotFile.data).toBeUndefined();
-    const notes = await handleRequest(repos, { type: 'annotations/listByDocument', documentId: 'd1' });
+    const notes = await handleRequest(repos, {
+      type: 'annotations/listByDocument',
+      documentId: 'd1',
+    });
     expect(notes.ok && (notes.data as unknown[])).toHaveLength(0);
   });
 
@@ -246,8 +255,16 @@ describe('handleRequest', () => {
     };
     await handleRequest(repos, { type: 'projects/put', project });
 
-    const anchor = { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] };
-    const input = { projectId: 'p1', url: 'https://ex.org/a', type: 'webPage' as const, metadata: { title: 'A' } };
+    const anchor = {
+      kind: 'web' as const,
+      selectors: [{ type: 'textQuote' as const, exact: 'x' }],
+    };
+    const input = {
+      projectId: 'p1',
+      url: 'https://ex.org/a',
+      type: 'webPage' as const,
+      metadata: { title: 'A' },
+    };
 
     const res = await handleRequest(repos, { type: 'web/annotate', input, anchor, withNote: true });
     expect(res.ok).toBe(true);
@@ -259,7 +276,9 @@ describe('handleRequest', () => {
       projectId: 'p1',
       url: 'https://ex.org/a',
     });
-    const payload = forUrl.ok ? (forUrl.data as { documentId: string | null; annotations: unknown[] }) : null;
+    const payload = forUrl.ok
+      ? (forUrl.data as { documentId: string | null; annotations: unknown[] })
+      : null;
     expect(payload?.documentId).toBe(ids?.documentId);
     expect(payload?.annotations).toHaveLength(1);
 
@@ -282,9 +301,22 @@ describe('handleRequest', () => {
     };
     await handleRequest(repos, { type: 'projects/put', project });
 
-    const anchor = { kind: 'web' as const, selectors: [{ type: 'textQuote' as const, exact: 'x' }] };
-    const input = { projectId: 'existing', url: 'https://ex.org/b', type: 'webPage' as const, metadata: { title: 'B' } };
-    const annotated = await handleRequest(repos, { type: 'web/annotate', input, anchor, withNote: true });
+    const anchor = {
+      kind: 'web' as const,
+      selectors: [{ type: 'textQuote' as const, exact: 'x' }],
+    };
+    const input = {
+      projectId: 'existing',
+      url: 'https://ex.org/b',
+      type: 'webPage' as const,
+      metadata: { title: 'B' },
+    };
+    const annotated = await handleRequest(repos, {
+      type: 'web/annotate',
+      input,
+      anchor,
+      withNote: true,
+    });
     const ids = annotated.ok ? (annotated.data as { documentId: string }) : null;
 
     const forUrl = await handleRequest(repos, {
@@ -306,7 +338,9 @@ describe('handleRequest', () => {
       projectId: '',
       url: 'https://ex.org/nothing',
     });
-    expect(forUrl.ok && (forUrl.data as { documentId: string | null; annotations: unknown[] })).toEqual({
+    expect(
+      forUrl.ok && (forUrl.data as { documentId: string | null; annotations: unknown[] }),
+    ).toEqual({
       documentId: null,
       annotations: [],
     });
@@ -518,7 +552,9 @@ describe('activity recording (Phase 5, M2)', () => {
       deps,
     );
     // Re-importing into the machine it came from must not duplicate anything.
-    expect(imported.ok && (imported.data as { projectName: string }).projectName).toBe('Urban Heat');
+    expect(imported.ok && (imported.data as { projectName: string }).projectName).toBe(
+      'Urban Heat',
+    );
     expect(await repos.documents.listByProject('p1')).toHaveLength(1);
 
     // Both halves of the round trip are in the feed as sync events.

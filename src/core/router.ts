@@ -37,12 +37,7 @@ import {
   setThreadResolved,
   startThread,
 } from './usecases/comments';
-import {
-  buildSnapshot,
-  mergeSnapshot,
-  previewMerge,
-  readSnapshotData,
-} from './usecases/snapshot';
+import { buildSnapshot, mergeSnapshot, previewMerge, readSnapshotData } from './usecases/snapshot';
 import { openSnapshot, sealSnapshot } from './snapshot/envelope';
 import {
   deleteCustomBaseStyle,
@@ -59,7 +54,11 @@ function ok(data: unknown): { ok: true; data: unknown } {
 
 /** `urban-heat-2026-07-24.json`, with `.enc` marking an encrypted file. */
 function snapshotFilename(projectName: string, exportedAt: string, password: string): string {
-  const slug = projectName.replace(/[^\w.-]+/g, '-').toLowerCase().replace(/^-|-$/g, '') || 'project';
+  const slug =
+    projectName
+      .replace(/[^\w.-]+/g, '-')
+      .toLowerCase()
+      .replace(/^-|-$/g, '') || 'project';
   const day = exportedAt.slice(0, 10);
   return `${slug}-${day}${password ? '.enc' : ''}.json`;
 }
@@ -163,9 +162,13 @@ export async function handleRequest(
           const [first] = await repos.projects.list();
           projectId = first?.id;
         }
-        const document = projectId ? await findDocumentByUrl(repos, projectId, request.url) : undefined;
+        const document = projectId
+          ? await findDocumentByUrl(repos, projectId, request.url)
+          : undefined;
         const annotations = document
-          ? (await repos.annotations.listByDocument(document.id)).filter((a) => a.anchor.kind === 'web')
+          ? (await repos.annotations.listByDocument(document.id)).filter(
+              (a) => a.anchor.kind === 'web',
+            )
           : [];
         return ok({ documentId: document?.id ?? null, annotations }) as Result;
       }

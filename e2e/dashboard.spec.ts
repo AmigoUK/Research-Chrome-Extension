@@ -386,10 +386,7 @@ test('Activity tab shows a status move with a before→after diff and filters by
   await expect(page.locator('#viewTitle')).toHaveText('Team');
 
   // Activity is the tab the Team view opens on.
-  await expect(page.locator('.vtab[data-tab="activity"]')).toHaveAttribute(
-    'aria-selected',
-    'true',
-  );
+  await expect(page.locator('.vtab[data-tab="activity"]')).toHaveAttribute('aria-selected', 'true');
   await expect(page.locator('.day').first()).toContainText('Today');
 
   const moved = page.locator('.ev', { hasText: 'moved Feed status move' });
@@ -538,7 +535,9 @@ test('Sync tab exports a snapshot file, switches mode, and merges an import by D
 
   const planChooser = page.waitForEvent('filechooser');
   await page.locator('#impGo').click();
-  await (await planChooser).setFiles({
+  await (
+    await planChooser
+  ).setFiles({
     name: 'plan.json',
     mimeType: 'application/json',
     buffer: Buffer.from(built),
@@ -565,7 +564,9 @@ test('Sync tab exports a snapshot file, switches mode, and merges an import by D
 
   const confirmChooser = page.waitForEvent('filechooser');
   await page.locator('#impGo').click();
-  await (await confirmChooser).setFiles({
+  await (
+    await confirmChooser
+  ).setFiles({
     name: 'plan.json',
     mimeType: 'application/json',
     buffer: Buffer.from(built),
@@ -641,7 +642,9 @@ test('Style editor imports a third-party .csl and formats the preview through it
 
   const chooser = page.waitForEvent('filechooser');
   await page.locator('#sedImport').click();
-  await (await chooser).setFiles({
+  await (
+    await chooser
+  ).setFiles({
     name: 'house.csl',
     mimeType: 'application/xml',
     buffer: Buffer.from(csl),
@@ -715,7 +718,9 @@ test('a hostile snapshot is refused, and nothing it carried reaches the page', a
   await page.reload();
   await page.locator('#nav .nav-item[data-route="documents"]').click();
   await expect(page.locator('#pwned')).toHaveCount(0);
-  await expect(page.locator('.tbl tbody tr', { hasText: 'Looks like an ordinary source' })).toHaveCount(0);
+  await expect(
+    page.locator('.tbl tbody tr', { hasText: 'Looks like an ordinary source' }),
+  ).toHaveCount(0);
   expect(requested.filter((u) => u.includes('example.invalid'))).toEqual([]);
 
   await page.close();
