@@ -1,6 +1,10 @@
 # Privacy Policy — Scientific Context Notes
 
-_Last updated: 2026-07-27_
+_Last updated: 2026-08-03_
+
+> This file is the source. The published policy — the URL given to the Chrome Web Store — is
+> **<https://amigouk.github.io/Research-Chrome-Extension/privacy.html>**, generated from this file by
+> `npm run pages`. Edit here, regenerate, and commit `docs/`; never edit `docs/privacy.html` directly.
 
 Scientific Context Notes is a **local-first** Chrome extension. It is built so that your research
 data never leaves your browser.

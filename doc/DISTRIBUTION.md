@@ -38,8 +38,10 @@ The zip is the artifact you upload; do **not** upload the source repo.
 - **Icon:** shipped in the build (declared in the manifest).
 - **Single-purpose description:** "Organise research sources and anchor notes/citations to the exact
   passage they came from, entirely within the browser."
-- **Privacy policy URL:** host `doc/PRIVACY.md` (e.g. GitHub Pages or the repo's rendered file) and
-  link it here — **required**, because the extension requests broad optional host permissions.
+- **Privacy policy URL:** <https://amigouk.github.io/Research-Chrome-Extension/privacy.html> —
+  **required**, because the extension requests broad optional host permissions. It is generated from
+  `doc/PRIVACY.md` by `npm run pages` and served from `docs/` by GitHub Pages; regenerate and commit
+  `docs/` whenever the policy changes.
 
 ## 4. Permissions justification (the review asks for each)
 
