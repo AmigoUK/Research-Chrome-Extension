@@ -12,16 +12,36 @@ and the git history — this file is just the "where we are and what's next" so 
   format:check → unit → build (+ E2E job).
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
 - **Published site:** https://amigouk.github.io/Research-Chrome-Extension/ (GitHub Pages, from `docs/`)
-- **Latest work:** **v1.0.1 — the build to submit.** It fixes a real defect v1.0.0 shipped with: a
-  fast-failing annotate left the highlight toolbar stuck open over the selection (see `CHANGELOG.md`).
-  v1.0.0 added everything the Chrome Web Store needs except the upload:
-  - `npm run package` builds the zip **and validates it** against the store's upload rules
-    (`scripts/lib/store-package-rules.mjs`, 17 unit tests).
-  - `npm run store:assets` → `doc/store/`: five 1280×800 screenshots, a 440×280 tile, a 1400×560
-    marquee. The store refuses anything else, and `doc/screenshots/` is the wrong size for all of it.
-  - `npm run pages` → `docs/`: the landing page and the **privacy policy**, generated from
-    `doc/PRIVACY.md` and live at `/privacy.html`. Required for the broad optional host permissions.
-  - `doc/STORE-LISTING.md` — every dashboard field written out to paste.
+- **Ship this:** **v1.0.1**. `release/context-notes-v1.0.1.zip`, also attached to the v1.0.1 GitHub
+  release (verified byte-identical). **Not v1.0.0** — see the defect below.
+
+### What the last session left behind
+
+**v1.0.0 — everything the Chrome Web Store needs except the upload.**
+
+- `npm run package` builds the zip **and validates it** against the store's upload rules
+  (`scripts/lib/store-package-rules.mjs`, 17 unit tests): MV3, the 132-char summary limit, version
+  matching `package.json`, all four icons and every referenced surface present, manifest at the
+  archive root, no source maps or build junk.
+- `npm run store:assets` → `doc/store/`: five 1280×800 screenshots, a 440×280 tile, a 1400×560
+  marquee. The store accepts **only** 1280×800 or 640×400, and every image in `doc/screenshots/` is
+  the wrong size — do not upload from there.
+- `npm run pages` → `docs/`: the landing page and the **privacy policy**, generated from
+  `doc/PRIVACY.md` and live at `/privacy.html`. Required for the broad optional host permissions.
+- `doc/STORE-LISTING.md` — every dashboard field written out to paste.
+
+**v1.0.1 — a real defect v1.0.0 shipped with.** A toolbar button commits on `mousedown` (with
+`preventDefault`, so the selection survives the click); the matching `mouseup` reached the
+annotator's own document listener, was read as a fresh page selection, and re-opened the toolbar the
+failure had just dismissed. Harmless on success (the commit clears the selection first), permanent
+on failure. It only showed when the rejection beat the deferred mouse handler — a sleeping service
+worker gives exactly that coin flip, which is why it had passed as an E2E flake since v0.27.1.
+
+**Also, no product effect:** the repository is Prettier-formatted and CI now runs `format:check`
+between lint and the unit tests. **Run `npm run format` before committing**, or CI fails on
+whitespace. `.prettierignore` deliberately excludes `doc/` (hand-wrapped prose), `docs/` (generated
+by `npm run pages` — the generator and Prettier would overwrite each other) and `CHANGELOG.md`
+(released history is append-only).
 
 ## Open — MANUAL, needs a human (can't be automated here)
 
@@ -57,8 +77,8 @@ and the git history — this file is just the "where we are and what's next" so 
 ## How to start (the working pattern that worked in these sessions)
 
 - Commands: `npm run dev` (HMR; load `dist/` unpacked) · `npm run dev:annotator` (watch the separate
-  annotator bundle) · `npm test` · `npm run test:e2e` · `npm run build` · `npm run package` ·
-  `xvfb-run -a npm run store:assets` · `npm run pages`.
+  annotator bundle) · `npm test` · `npm run test:e2e` · `npm run build` · `npm run format` (do this
+  before committing) · `npm run package` · `xvfb-run -a npm run store:assets` · `npm run pages`.
 - **Process for any non-trivial change:** brainstorm (superpowers) → spec in `doc/superpowers/specs/`
   → plan in `doc/superpowers/plans/` → execute via **subagent-driven development** (fresh implementer
   per task, task review, final whole-branch review) with **TDD**. Small glue tweaks were done directly
@@ -84,3 +104,17 @@ and the git history — this file is just the "where we are and what's next" so 
   returns with no overlay; the first `.ov` appears ~18 ms later), and reading its geometry the
   instant `toHaveCount(1)` resolved caught the node one frame before it had a box. `paintedRect()`
   now polls the assertion instead. Don't reintroduce `locator.boundingBox()` there.
+
+## Two traps this codebase has now paid for twice — worth reading before touching the annotator
+
+- **The annotator must not treat events out of its own UI as input on the page** (v1.0.1). The
+  `mouseup` listener returns early when `composedPath()` contains the `HOST_ID` element. Remove that
+  guard and the stuck-toolbar defect comes straight back. A consequence worth knowing: a mouseup on
+  an existing overlay no longer closes an open toolbar — it closes on the next mouseup on the page.
+- **A presence assertion is not a valid precondition for a geometry read.** Twice now, an E2E test
+  looked flaky because it sampled layout in the frame where a node had been appended but not yet
+  laid out. If an assertion needs a box, wait for the box, not for the node.
+- **When an E2E test "flakes", reproduce it before believing that word.** Both cases here were
+  deterministic once measured — one with a per-animation-frame sample inside the page, the other
+  with a `MutationObserver` on the shadow root. The second was a real product defect that had been
+  dismissed as a flake since v0.27.1.
