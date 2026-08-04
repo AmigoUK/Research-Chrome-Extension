@@ -18,7 +18,6 @@
  */
 import {
   ACTIVITY_KINDS,
-  ANNOTATION_COLORS,
   type Anchor,
   type DocumentMetadata,
   type DocumentType,
@@ -90,6 +89,23 @@ function list(value: unknown, what: string): unknown[] {
 function record(value: unknown, what: string): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${what} is not a record`);
   return value as Record<string, unknown>;
+}
+
+/** A palette entry id: short, attribute- and selector-safe. */
+function colorId(value: unknown, what: string): string {
+  if (typeof value !== 'string' || !/^[\w-]{1,64}$/.test(value)) {
+    fail(`${what} is not a usable colour id`);
+  }
+  return value;
+}
+
+/** Strict #rrggbb — this value is injected into inline styles, so anything
+ *  looser (named colours, url(), expressions) is refused outright. */
+function swatch(value: unknown, what: string): string {
+  if (typeof value !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(value)) {
+    fail(`${what} is not a #rrggbb colour`);
+  }
+  return value;
 }
 
 /**
@@ -226,6 +242,18 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         text(s, `section ${i + 1}`, 128),
       ),
       members,
+      ...(project['colorPalette'] === undefined
+        ? {}
+        : {
+            colorPalette: list(project['colorPalette'], 'the colour palette').map((c, i) => {
+              const entry = record(c, `palette colour ${i + 1}`);
+              return {
+                id: colorId(entry['id'], `palette colour ${i + 1}'s id`),
+                swatch: swatch(entry['swatch'], `palette colour ${i + 1}'s swatch`),
+                label: text(entry['label'], `palette colour ${i + 1}'s label`, 64),
+              };
+            }),
+          }),
       ...(project['syncMode'] === undefined
         ? {}
         : { syncMode: oneOf(project['syncMode'], SYNC_MODES, 'the sync mode') }),
@@ -265,7 +293,7 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         anchor: anchor(note['anchor'], `annotation ${i + 1}'s anchor`),
         ...(note['color'] === undefined
           ? {}
-          : { color: oneOf(note['color'], ANNOTATION_COLORS, `annotation ${i + 1}'s colour`) }),
+          : { color: colorId(note['color'], `annotation ${i + 1}'s colour`) }),
         content: text(note['content'] ?? '', `annotation ${i + 1}'s content`, 65_536),
         ...(note['tags'] === undefined
           ? {}

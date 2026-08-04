@@ -94,6 +94,38 @@ describe('ids that would escape their attribute', () => {
   });
 });
 
+describe('the colour palette (the legend)', () => {
+  const withPalette = (palette: unknown): Record<string, unknown> => {
+    const data = good();
+    (data['project'] as Record<string, unknown>)['colorPalette'] = palette;
+    return data;
+  };
+
+  it('accepts a well-formed legend', () => {
+    const parsed = validateSnapshotData(
+      withPalette([{ id: 'yellow', swatch: '#FACC15', label: 'Key finding' }]),
+    );
+    expect(parsed.project.colorPalette).toEqual([
+      { id: 'yellow', swatch: '#FACC15', label: 'Key finding' },
+    ]);
+  });
+
+  it('refuses a swatch that is not strict #rrggbb — it reaches inline styles', () => {
+    for (const hostile of ['red', '#fff', '#facc15;background:url(//x)', 'url(#a)', '#facc1g']) {
+      expect(
+        () => validateSnapshotData(withPalette([{ id: 'c1', swatch: hostile, label: 'x' }])),
+        hostile,
+      ).toThrow(/palette colour 1's swatch is not a #rrggbb colour/);
+    }
+  });
+
+  it('refuses an over-long label rather than storing it', () => {
+    expect(() =>
+      validateSnapshotData(withPalette([{ id: 'c1', swatch: '#aabbcc', label: 'x'.repeat(65) }])),
+    ).toThrow(/palette colour 1's label/);
+  });
+});
+
 describe('cross-project injection', () => {
   it("refuses a record claiming another project's id, which would write into that project", () => {
     expect(() => validateSnapshotData(withDocument({ projectId: 'other-project' }))).toThrow(
@@ -130,16 +162,20 @@ describe('annotations without a usable anchor', () => {
     );
   });
 
-  it('accepts a known highlight colour and refuses an unknown one', () => {
+  it('accepts palette-id colours and refuses ids that would escape an attribute', () => {
     const withColor = (color: unknown): Record<string, unknown> => {
       const data = note({ kind: 'web', selectors: [{ type: 'textQuote', exact: 'x' }] });
       (data['annotations'] as Array<Record<string, unknown>>)[0]!['color'] = color;
       return data;
     };
+    // Defaults and custom palette entries alike are just ids.
     expect(validateSnapshotData(withColor('green')).annotations[0]?.color).toBe('green');
-    expect(() => validateSnapshotData(withColor('vermilion'))).toThrow(
-      /annotation 1's colour is not one of/,
-    );
+    expect(validateSnapshotData(withColor('c-ab12cd34')).annotations[0]?.color).toBe('c-ab12cd34');
+    for (const hostile of ['x y', 'a"b', 'a'.repeat(65), '']) {
+      expect(() => validateSnapshotData(withColor(hostile)), hostile).toThrow(
+        /annotation 1's colour is not a usable colour id/,
+      );
+    }
   });
 
   it('accepts the real web and pdf anchor shapes', () => {

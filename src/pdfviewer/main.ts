@@ -20,12 +20,13 @@ import {
   isRegionAnchor,
   type PxRect,
 } from '../core/anchoring/pdf';
-import { ANNOTATION_COLORS } from '../core/model/types';
+import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
   AnnotationColor,
   Document,
   Annotation,
   AnnotationStatus,
+  HighlightColor,
   Id,
 } from '../core/model/types';
 
@@ -130,6 +131,7 @@ async function loadDocument(): Promise<void> {
     return;
   }
   state.document = document_;
+  await loadPalette(); // the legend colours everything painted below
   $('#docTitle').textContent = document_.metadata.title ?? 'Untitled PDF';
   const project = document_.section ? ` · ${document_.section}` : '';
   $('#docSub').textContent = `PDF${project}`;
@@ -281,7 +283,18 @@ function renderOverlays(layer: HTMLElement, box: { width: number; height: number
     const rects = resolvePdfAnchor(anno.anchor, box);
     rects.forEach((r, i) => {
       const ov = document.createElement('div');
-      ov.className = `ov ${region ? 'region' : 'text'}${anno.color ? ` ov--${anno.color}` : ''}${moved ? ' moved' : ''}${state.activeId === anno.id ? ' on' : ''}`;
+      ov.className = `ov ${region ? 'region' : 'text'}${moved ? ' moved' : ''}${state.activeId === anno.id ? ' on' : ''}`;
+      const pc = paletteEntry(anno.color);
+      if (pc) {
+        ov.dataset['color'] = anno.color as string;
+        if (region) {
+          ov.style.borderColor = rgba(pc.swatch, 0.8);
+          ov.style.background = rgba(pc.swatch, 0.12);
+        } else {
+          ov.style.background = rgba(pc.swatch, 0.3);
+          ov.style.boxShadow = `inset 0 -2px 0 ${rgba(pc.swatch, 0.55)}`;
+        }
+      }
       ov.style.left = `${r.left}px`;
       ov.style.top = `${r.top}px`;
       ov.style.width = `${r.width}px`;
@@ -356,15 +369,41 @@ interface SelAction {
   icon: string;
   label: string;
   color?: AnnotationColor;
+  colorLabel?: string;
   fn: () => void;
 }
-/** One gesture, four colours — same taxonomy as the web annotator. */
+/** The project's legend; defaults until the document's project loads. */
+let palette: readonly HighlightColor[] = DEFAULT_HIGHLIGHT_COLORS;
+
+async function loadPalette(): Promise<void> {
+  try {
+    palette = await sendRequest({
+      type: 'palette/get',
+      projectId: state.document?.projectId ?? '',
+    });
+  } catch {
+    palette = DEFAULT_HIGHLIGHT_COLORS; // legend is decoration, never a blocker
+  }
+}
+
+function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
+  return colorId ? palette.find((c) => c.id === colorId) : undefined;
+}
+
+/** #rrggbb → rgba() at the given alpha — palette swatches are validated hex. */
+function rgba(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+/** One gesture, the project's own colours — same taxonomy as the web annotator. */
 function colorActions(): SelAction[] {
-  return ANNOTATION_COLORS.map((color) => ({
-    icon: `<span class="dot dot--${color}"></span>`,
+  return palette.map((c) => ({
+    icon: `<span class="dot" style="background:${c.swatch}"></span>`,
     label: '',
-    color,
-    fn: () => void commitAnchor(color),
+    color: c.id,
+    colorLabel: c.label,
+    fn: () => void commitAnchor(c.id),
   }));
 }
 
@@ -373,7 +412,7 @@ function showSeltool(cx: number, top: number, actions: SelAction[]): void {
   el.innerHTML = actions
     .map(
       (a, i) =>
-        `<button data-i="${i}"${a.color ? ` class="dotbtn" data-color="${a.color}" aria-label="Highlight in ${a.color}" title="Highlight in ${a.color}"` : ''}>${a.icon}${a.label}</button>`,
+        `<button data-i="${i}"${a.color ? ` class="dotbtn" data-color="${esc(a.color)}" aria-label="Highlight: ${esc(a.colorLabel ?? a.color)}" title="${esc(a.colorLabel ?? a.color)}"` : ''}>${a.icon}${a.label}</button>`,
     )
     .join('');
   $$('button', el).forEach((b, i) => {
@@ -540,7 +579,7 @@ function railCard(a: Annotation): string {
   const loc = region ? `p.${page} · Region` : `p.${page} · ¶ text`;
   const moved = state.movedIds.has(a.id);
   return `<article class="ac${state.activeId === a.id ? ' active' : ''}${moved ? ' moved' : ''}" data-id="${esc(a.id)}">
-    <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button>${a.color ? `<span class="cdot cdot--${a.color}"></span>` : ''}<span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
+    <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button>${paletteEntry(a.color) ? `<span class="cdot" style="background:${paletteEntry(a.color)!.swatch}" title="${esc(paletteEntry(a.color)!.label)}"></span>` : ''}<span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
     ${moved ? `<div class="anno-moved">${ICON.warn}<span>The text here no longer matches this note’s quote — the PDF may have changed.</span></div>` : ''}
     ${quote ? `<div class="quote">${esc(quote)}</div>` : ''}
     <textarea class="note-ta" data-note placeholder="Add a note…">${esc(a.content)}</textarea>

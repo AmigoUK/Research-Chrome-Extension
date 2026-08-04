@@ -183,8 +183,11 @@ test('highlighting a selection paints an overlay that repaints after reload, and
   // `position: relative` <main> ancestor above) guards against.
   const overlay = page.locator('#context-notes-annotator .ov');
   await expect(overlay).toHaveCount(1);
-  // The chosen colour paints immediately…
-  await expect(overlay).toHaveClass(/ov--green/);
+  // The chosen colour paints immediately — attribute for identity, computed
+  // style for VISIBILITY (a specificity clash once shipped black dots).
+  await expect(overlay).toHaveAttribute('data-color', 'green');
+  const paintedBg = await overlay.evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(paintedBg).toContain('74, 222, 128');
   const ovBox = await paintedRect(overlay);
   if (expectedRect) {
     expect(Math.abs(ovBox.x - expectedRect.left)).toBeLessThan(2);
@@ -201,7 +204,7 @@ test('highlighting a selection paints an overlay that repaints after reload, and
   const overlayAfterReload = page.locator('#context-notes-annotator .ov');
   await expect(overlayAfterReload).toHaveCount(1);
   // …and is stored, not cosmetic: the repaint from storage keeps it.
-  await expect(overlayAfterReload).toHaveClass(/ov--green/);
+  await expect(overlayAfterReload).toHaveAttribute('data-color', 'green');
   const ovBoxAfterReload = await paintedRect(overlayAfterReload);
   if (expectedRect) {
     expect(Math.abs(ovBoxAfterReload.x - expectedRect.left)).toBeLessThan(2);

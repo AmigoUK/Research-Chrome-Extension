@@ -46,7 +46,7 @@ function broadcastDataChanged(type: string): void {
  * inherit the full ~45-message API (bulk deletes, snapshot import, file
  * reads). Extension pages — whose sender origin is our own — keep everything.
  */
-const CONTENT_SCRIPT_MESSAGES = new Set(['web/annotate', 'web/annotationsForUrl']);
+const CONTENT_SCRIPT_MESSAGES = new Set(['web/annotate', 'web/annotationsForUrl', 'palette/get']);
 
 /** True when this sender may issue this message type. */
 export function senderMayRequest(

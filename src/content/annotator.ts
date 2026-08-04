@@ -8,7 +8,8 @@ import { createWebAnchor, resolveWebAnchor, webAnchorRoot, cssPath } from '../co
 import { scanDocumentRaw, buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId } from '../adapters/chrome/active-project';
 import { createUrlWatcher } from './url-watcher';
-import type { Annotation, WebAnchor } from '../core/model/types';
+import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
+import type { Annotation, HighlightColor, WebAnchor } from '../core/model/types';
 import annotatorCss from './annotator.css?inline';
 
 const HOST_ID = 'context-notes-annotator';
@@ -23,6 +24,30 @@ interface Painted {
 }
 
 const painted: Painted[] = [];
+
+/** The project's legend; defaults until (and unless) palette/get answers. */
+let palette: readonly HighlightColor[] = DEFAULT_HIGHLIGHT_COLORS;
+
+async function loadPalette(): Promise<void> {
+  try {
+    const projectId = (await getActiveProjectId()) ?? '';
+    const res = (await chrome.runtime.sendMessage({ type: 'palette/get', projectId })) as
+      { ok: true; data: HighlightColor[] } | { ok: false };
+    if (res.ok && res.data.length) palette = res.data;
+  } catch {
+    // The legend is decoration; painting falls back to defaults.
+  }
+}
+
+function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
+  return colorId ? palette.find((c) => c.id === colorId) : undefined;
+}
+
+/** #rrggbb → rgba() at the given alpha — palette swatches are validated hex. */
+function rgba(hex: string, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
 
 // Registered once per origin per session — the SW's registerOrigin handler is
 // idempotent, but calling it on every commit still unregisters+re-registers
@@ -76,10 +101,17 @@ function paintOne(id: string, rects: DOMRect[], color?: string): void {
   // The layer is `position: fixed`, so client rects are already
   // viewport-relative — no window.scrollX/scrollY offset needed (and adding
   // one would double-count the scroll on a fixed-position ancestor).
+  const entry = paletteEntry(color);
   for (const r of rects) {
     const ov = document.createElement('div');
-    // No colour (legacy annotations) keeps the original accent.
-    ov.className = color ? `ov ov--${color}` : 'ov';
+    // No colour (legacy annotations, or an entry deleted from the legend)
+    // keeps the original accent.
+    ov.className = 'ov';
+    if (entry) {
+      ov.dataset['color'] = entry.id;
+      ov.style.background = rgba(entry.swatch, 0.32);
+      ov.style.boxShadow = `inset 0 -2px 0 ${rgba(entry.swatch, 0.6)}`;
+    }
     ov.dataset.id = id;
     ov.style.left = `${r.left}px`;
     ov.style.top = `${r.top}px`;
@@ -128,8 +160,20 @@ function jumpTo(id: string): void {
   const first = overlays[0];
   if (!first) return;
   first.scrollIntoView({ block: 'center' });
-  overlays.forEach((ov) => ov.classList.add('flash'));
-  setTimeout(() => overlays.forEach((ov) => ov.classList.remove('flash')), 1200);
+  overlays.forEach((ov) => {
+    ov.classList.add('flash');
+    const entry = paletteEntry(ov.dataset['color']);
+    if (entry) ov.style.background = rgba(entry.swatch, 0.6);
+  });
+  setTimeout(
+    () =>
+      overlays.forEach((ov) => {
+        ov.classList.remove('flash');
+        const entry = paletteEntry(ov.dataset['color']);
+        if (entry) ov.style.background = rgba(entry.swatch, 0.32);
+      }),
+    1200,
+  );
 }
 
 async function commit(target: SelectionTarget, color: string): Promise<void> {
@@ -237,18 +281,20 @@ function showToolbar(range: Range): void {
   if (!pos) return;
   const el = document.createElement('div');
   el.className = 'toolbar';
-  // One gesture, four colours — the researcher's own taxonomy, not the
-  // review status. Notes are written afterwards in the panel card, so a
-  // separate "Note" button only added a decision to every selection.
-  for (const color of ['yellow', 'green', 'blue', 'pink']) {
+  // One gesture, the project's own colours — the researcher's taxonomy, not
+  // the review status. The tooltip carries the legend, so a colour picked
+  // here means what this project says it means. Notes are written afterwards
+  // in the panel card.
+  for (const entry of palette) {
     const b = document.createElement('button');
-    b.className = `dot dot--${color}`;
-    b.dataset.color = color;
-    b.setAttribute('aria-label', `Highlight in ${color}`);
-    b.title = `Highlight in ${color}`;
+    b.className = 'dot';
+    b.style.background = entry.swatch;
+    b.dataset.color = entry.id;
+    b.setAttribute('aria-label', `Highlight: ${entry.label}`);
+    b.title = entry.label;
     b.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      if (pendingTarget) void commit(pendingTarget, color);
+      if (pendingTarget) void commit(pendingTarget, entry.id);
     });
     el.appendChild(b);
   }
@@ -387,8 +433,9 @@ if (w.__contextNotesAnnotator) {
   window.addEventListener('scroll', scheduleReposition, { passive: true });
   window.addEventListener('resize', scheduleReposition);
   chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
-    if (m?.control === 'annotator/changed') void loadExisting();
-    else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
+    if (m?.control === 'annotator/changed') {
+      void loadPalette().then(() => loadExisting());
+    } else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
   });
 
   // Re-anchor after a client-side (SPA) navigation: the document persists but
@@ -411,7 +458,7 @@ if (w.__contextNotesAnnotator) {
   const urlPoll = setInterval(() => urlWatcher.check(), 1000);
   window.addEventListener('pagehide', () => clearInterval(urlPoll), { once: true });
 
-  void loadExisting();
+  void loadPalette().then(() => loadExisting());
 }
 
 // Honour a selection that already existed before this injection. The natural

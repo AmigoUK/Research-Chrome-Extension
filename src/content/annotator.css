@@ -27,41 +27,11 @@
   background: rgba(224, 122, 95, 0.55);
   box-shadow: inset 0 -2px 0 rgba(224, 122, 95, 1);
 }
-/* The four highlight colours — light enough to read through, distinct enough
-   to mean something at a glance. */
-.ov--yellow {
-  background: rgba(250, 204, 21, 0.32);
-  box-shadow: inset 0 -2px 0 rgba(202, 138, 4, 0.6);
-}
-.ov--green {
-  background: rgba(74, 222, 128, 0.3);
-  box-shadow: inset 0 -2px 0 rgba(22, 163, 74, 0.55);
-}
-.ov--blue {
-  background: rgba(96, 165, 250, 0.3);
-  box-shadow: inset 0 -2px 0 rgba(37, 99, 235, 0.55);
-}
-.ov--pink {
-  background: rgba(244, 114, 182, 0.3);
-  box-shadow: inset 0 -2px 0 rgba(219, 39, 119, 0.55);
-}
-.ov--yellow.flash {
-  background: rgba(250, 204, 21, 0.6);
-}
-.ov--green.flash {
-  background: rgba(74, 222, 128, 0.55);
-}
-.ov--blue.flash {
-  background: rgba(96, 165, 250, 0.55);
-}
-.ov--pink.flash {
-  background: rgba(244, 114, 182, 0.55);
-}
+/* Colour comes inline from the project palette — see paintOne(). */
 
-/* `.toolbar button` below sets `background: none` at specificity (0,1,1),
-   which out-ranks a bare `.dot--*` class (0,1,0) — that painted every dot as
-   a hole in the dark toolbar. The colour rules must carry the button in the
-   selector, hover included, or the picker shows four black circles. */
+/* Dot colours are inline styles from the project palette — inline beats any
+   selector, including `.toolbar button { background: none }` below and its
+   hover, which once painted the picker as four black circles. */
 .toolbar button.dot {
   width: 22px;
   height: 22px;
@@ -73,22 +43,6 @@
 .toolbar button.dot:hover {
   transform: scale(1.15);
   border-color: rgba(255, 255, 255, 0.85);
-}
-.toolbar button.dot--yellow,
-.toolbar button.dot--yellow:hover {
-  background: #facc15;
-}
-.toolbar button.dot--green,
-.toolbar button.dot--green:hover {
-  background: #4ade80;
-}
-.toolbar button.dot--blue,
-.toolbar button.dot--blue:hover {
-  background: #60a5fa;
-}
-.toolbar button.dot--pink,
-.toolbar button.dot--pink:hover {
-  background: #f472b6;
 }
 .toolbar {
   position: absolute;

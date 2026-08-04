@@ -45,6 +45,7 @@ import {
   listCustomBaseStyles,
 } from './usecases/base-styles';
 import { roleOf } from './model/roles';
+import { DEFAULT_HIGHLIGHT_COLORS } from './model/types';
 import type { CitationStyle, Id } from './model/types';
 import { bytesToBase64, base64ToBytes } from './files/base64';
 
@@ -165,6 +166,18 @@ export async function handleRequest(
         if (createdDocument) await recordDocumentPut(repos, capture, undefined, document);
         await recordAnnotationPut(repos, capture, undefined, annotation);
         return ok({ documentId: document.id, annotationId: annotation.id }) as Result;
+      }
+      case 'palette/get': {
+        // Same empty-id fallback as annotationsForUrl: reading must work
+        // before any project is chosen, and must never seed one.
+        let projectId: Id | undefined = request.projectId;
+        if (!projectId) {
+          const [first] = await repos.projects.list();
+          projectId = first?.id;
+        }
+        const project = projectId ? await repos.projects.get(projectId) : undefined;
+        const palette = project?.colorPalette;
+        return ok(palette && palette.length ? palette : [...DEFAULT_HIGHLIGHT_COLORS]) as Result;
       }
       case 'web/annotationsForUrl': {
         // No active project (empty/falsy id) falls back to the first existing

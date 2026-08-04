@@ -768,3 +768,58 @@ test('Kanban advances a card status with the arrow keys and persists it', async 
 
   await page.close();
 });
+
+test('the colour legend can be renamed and extended, and the popover survives its own rebuild', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+  await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    await chrome.runtime.sendMessage({
+      type: 'web/annotate',
+      input: {
+        projectId: projects.data[0]!.id,
+        url: 'https://example.org/legend-e2e',
+        type: 'webPage',
+        metadata: { title: 'Legend under test' },
+      },
+      anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'a passage' }] },
+      color: 'green',
+    });
+  });
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  // Defaults render as the legend.
+  await expect(page.locator('.legend-chip')).toHaveCount(4);
+
+  await page.locator('#aColours').click();
+  // The popover must be VISIBLE, not merely present: a document-level
+  // click-away handler used to close it with the very click that opened it.
+  await expect(page.locator('#pop #palAdd')).toBeVisible();
+  await page.locator('[data-lb="0"]').fill('Key finding');
+  // Adding a colour rebuilds the popover's DOM inside the click handler,
+  // which detaches the clicked node — the click-away check must still see
+  // the popover in the event's composed path.
+  await page.locator('#palAdd').click();
+  await expect(page.locator('[data-lb="4"]')).toBeVisible();
+  await page.locator('[data-lb="4"]').fill('Disagree');
+  await page.locator('#palSave').click();
+
+  await expect(page.locator('.legend-chip')).toHaveCount(5);
+  await expect(page.locator('.legend-chip').first()).toContainText('Key finding');
+  // Stored on the project, so the annotator and a shared snapshot see it.
+  const palette = await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const res = (await chrome.runtime.sendMessage({
+      type: 'palette/get',
+      projectId: projects.data[0]!.id,
+    })) as { data: Array<{ id: string; label: string }> };
+    return res.data.map((c) => c.label);
+  });
+  expect(palette).toEqual(['Key finding', 'Green', 'Blue', 'Pink', 'Disagree']);
+  await page.close();
+});

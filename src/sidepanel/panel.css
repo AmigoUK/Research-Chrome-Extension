@@ -786,15 +786,4 @@ body {
   margin-right: 6px;
   vertical-align: baseline;
 }
-.cdot--yellow {
-  background: #facc15;
-}
-.cdot--green {
-  background: #4ade80;
-}
-.cdot--blue {
-  background: #60a5fa;
-}
-.cdot--pink {
-  background: #f472b6;
-}
+/* cdot colour comes inline from the project palette. */

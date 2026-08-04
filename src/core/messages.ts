@@ -6,6 +6,7 @@
  */
 import type {
   AnnotationColor,
+  HighlightColor,
   Project,
   Document,
   Annotation,
@@ -49,6 +50,9 @@ export interface MessageMap {
     req: { input: CaptureInput; anchor: WebAnchor; color?: AnnotationColor };
     res: { documentId: Id; annotationId: Id };
   };
+  /** The active legend for a project (defaults when unset). Readable by the
+   *  injected annotator, hence its own narrow message rather than projects/*. */
+  'palette/get': { req: { projectId: Id }; res: HighlightColor[] };
   'web/annotationsForUrl': {
     req: { projectId: Id; url: string };
     res: { documentId: Id | null; annotations: Annotation[] };

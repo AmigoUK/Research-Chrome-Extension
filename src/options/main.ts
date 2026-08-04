@@ -11,6 +11,7 @@
 import './dashboard.css';
 import { sendRequest } from '../adapters/chrome/messaging';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
+import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
   Project,
   Document,
@@ -21,6 +22,7 @@ import type {
   ActivityKind,
   Anchor,
   CommentThread,
+  HighlightColor,
   SyncMode,
   Reference,
   CitationStyle,
@@ -709,17 +711,36 @@ function openStatusPop(anchor: HTMLElement, doc: Document): void {
   });
   placePop(anchor);
 }
+/** The element the open popover belongs to — so the document-level
+ *  click-away handler does not close a popover with the very click that
+ *  opened it. Openers used to need `e.stopPropagation()` and any that
+ *  forgot rendered an invisible popover (opacity 0, pointer-events none):
+ *  the content was there, the user saw nothing. */
+let popAnchor: HTMLElement | null = null;
+
 function placePop(anchor: HTMLElement): void {
+  popAnchor = anchor;
   const pop = $('#pop');
   const r = anchor.getBoundingClientRect();
   pop.classList.add('open');
+  const margin = 12;
+  // A popover taller than the space it has must scroll inside itself —
+  // otherwise the flip-above branch below produced a NEGATIVE top and the
+  // content sat off-screen, unclickable (the page then "intercepted" clicks
+  // on buttons that were never really visible: the Post-button papercut, and
+  // the same for a long legend editor).
+  pop.style.maxHeight = `${window.innerHeight - 2 * margin}px`;
+  pop.style.overflowY = 'auto';
   const pw = pop.offsetWidth;
   const ph = pop.offsetHeight;
-  const left = Math.min(r.left, window.innerWidth - pw - 12);
-  let top = r.bottom + 6;
-  if (top + ph > window.innerHeight - 12) top = r.top - ph - 6;
-  pop.style.left = `${Math.max(12, left)}px`;
-  pop.style.top = `${top}px`;
+  const left = Math.min(r.left, window.innerWidth - pw - margin);
+  const below = r.bottom + 6;
+  const above = r.top - ph - 6;
+  // Prefer below; flip above only when it actually fits on screen there.
+  let top = below;
+  if (below + ph > window.innerHeight - margin && above >= margin) top = above;
+  pop.style.left = `${Math.max(margin, left)}px`;
+  pop.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - ph - margin))}px`;
 }
 
 /* ---- Documents ---- */
@@ -733,7 +754,14 @@ function renderDocuments(view: HTMLElement, actions: HTMLElement): void {
     );
     return;
   }
+  const legend = activePalette()
+    .map(
+      (c) =>
+        `<span class="legend-chip"><span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}</span>`,
+    )
+    .join('');
   view.innerHTML = `
+    <div class="legend" aria-label="Highlight colour legend">${legend}</div>
     <div class="toolbar">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -839,6 +867,90 @@ function drawDocuments(): void {
  * was a dead end. One field per line keeps the form honest about what is
  * stored; authors are one-per-line, "Family, Given".
  */
+/**
+ * The legend editor. Defaults are recolourable and renameable but not
+ * deletable (an empty palette would leave nothing to pick); custom colours
+ * come and go freely. Saved onto the PROJECT, so the legend travels in
+ * snapshots and a collaborator sees what each colour means here.
+ */
+function openPalettePop(anchor: HTMLElement): void {
+  const project = activeProject();
+  if (!project) return;
+  const entries: HighlightColor[] = activePalette().map((c) => ({ ...c }));
+  const pop = $('#pop');
+  const DEFAULT_IDS = new Set(DEFAULT_HIGHLIGHT_COLORS.map((c) => c.id));
+
+  const draw = (): void => {
+    pop.innerHTML =
+      `<div class="pl">Highlight colours — the legend</div>` +
+      entries
+        .map(
+          (c, i) => `<div class="pop-form" data-row="${i}">
+            <input type="color" value="${esc(c.swatch)}" data-sw="${i}" aria-label="Colour swatch" style="width:34px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px">
+            <input class="sel" value="${esc(c.label)}" data-lb="${i}" aria-label="What this colour means" placeholder="What does this colour mean?" style="width:190px">
+            ${DEFAULT_IDS.has(c.id) ? '' : `<button class="btn btn--ghost btn--sm" data-del="${i}" aria-label="Remove colour">✕</button>`}
+          </div>`,
+        )
+        .join('') +
+      `<div class="pop-form" style="margin-top:8px">
+        <button class="btn btn--sm" id="palAdd">+ Add colour</button>
+        <button class="btn btn--primary btn--sm" id="palSave">${ICON.check} Save</button>
+      </div>`;
+
+    const sync = (): void => {
+      entries.forEach((c, i) => {
+        c.swatch = pop.querySelector<HTMLInputElement>(`[data-sw="${i}"]`)?.value ?? c.swatch;
+        c.label = (pop.querySelector<HTMLInputElement>(`[data-lb="${i}"]`)?.value ?? c.label).slice(
+          0,
+          64,
+        );
+      });
+    };
+    pop.querySelectorAll<HTMLButtonElement>('[data-del]').forEach((b) => {
+      b.onclick = () => {
+        sync();
+        entries.splice(Number(b.dataset['del']), 1);
+        draw();
+      };
+    });
+    const add = pop.querySelector<HTMLButtonElement>('#palAdd');
+    if (add)
+      add.onclick = () => {
+        sync();
+        entries.push({ id: `c-${crypto.randomUUID().slice(0, 8)}`, swatch: '#a78bfa', label: '' });
+        draw();
+      };
+    const save = pop.querySelector<HTMLButtonElement>('#palSave');
+    if (save)
+      save.onclick = () => {
+        void (async () => {
+          sync();
+          const cleaned = entries.map((c) => ({
+            ...c,
+            label: c.label.trim() || c.id,
+            swatch: /^#[0-9a-fA-F]{6}$/.test(c.swatch) ? c.swatch : '#facc15',
+          }));
+          try {
+            await sendRequest({
+              type: 'projects/put',
+              project: { ...project, colorPalette: cleaned, updatedAt: nowIso() },
+            });
+            state.projects = state.projects.map((pr) =>
+              pr.id === project.id ? { ...pr, colorPalette: cleaned, updatedAt: nowIso() } : pr,
+            );
+            closePop();
+            render();
+            toast('Legend saved', ICON.check);
+          } catch (err) {
+            toast(err instanceof Error ? err.message : 'Couldn’t save the legend', ICON.warn, true);
+          }
+        })();
+      };
+    placePop(anchor);
+  };
+  draw();
+}
+
 function openEditDocPop(anchor: HTMLElement, doc: Document): void {
   const m = doc.metadata;
   const pop = $('#pop');
@@ -1049,8 +1161,18 @@ function anchorLabel(anchor: Anchor): string {
   return 'Web selection';
 }
 
+/** The active project's highlight legend (defaults when the project has none). */
+function activePalette(): HighlightColor[] {
+  const own = activeProject()?.colorPalette;
+  return own && own.length ? own : [...DEFAULT_HIGHLIGHT_COLORS];
+}
+function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
+  return colorId ? activePalette().find((c) => c.id === colorId) : undefined;
+}
+
 function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
-  actions.innerHTML = '';
+  actions.innerHTML = `<button class="btn btn--sm" id="aColours">Colours</button>`;
+  $('#aColours', actions).onclick = (e) => openPalettePop(e.currentTarget as HTMLElement);
   if (state.annotations.length === 0) {
     view.innerHTML = emptyState(
       'No annotations yet',
@@ -1058,7 +1180,14 @@ function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
     );
     return;
   }
+  const legend = activePalette()
+    .map(
+      (c) =>
+        `<span class="legend-chip"><span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}</span>`,
+    )
+    .join('');
   view.innerHTML = `
+    <div class="legend" aria-label="Highlight colour legend">${legend}</div>
     <div class="toolbar">
       <div class="search">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -1128,7 +1257,7 @@ function drawAnnotations(): void {
         : '';
       const st = ANNO_STATUS[a.status];
       return `<article class="anno" data-id="${esc(a.id)}">
-        <div class="anno-top">${a.color ? `<span class="cdot cdot--${a.color}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
+        <div class="anno-top">${paletteEntry(a.color) ? `<span class="cdot" style="background:${esc(paletteEntry(a.color)!.swatch)}" title="${esc(paletteEntry(a.color)!.label)}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
         <div class="anno-body">${esc(a.content)}</div>
         <div class="anno-foot">
           <button class="stat-tag ${st.cls}" data-status aria-label="Change review status">${st.label}</button>
@@ -2915,6 +3044,7 @@ function toast(msg: string, icon = ICON.check, error = false): void {
 
 /* ---- Popover (shared; used by later milestones) ---- */
 function closePop(): void {
+  popAnchor = null;
   $('#pop').classList.remove('open');
 }
 
@@ -2942,7 +3072,15 @@ async function init(): Promise<void> {
   document.addEventListener('click', (e) => {
     const target = e.target as HTMLElement;
     if (!target.closest('.proj-switch')) toggleProjMenu(false);
-    if (!target.closest('#pop') && !target.closest('.spill')) closePop();
+    // `composedPath()` is frozen at dispatch, so it still names the popover
+    // even when the handler REBUILT the popover's DOM (the legend editor's
+    // add/remove buttons do exactly that) and detached the clicked node —
+    // `target.closest('#pop')` then returns null and the click-away logic
+    // would close the popover the user is working in.
+    const path = e.composedPath();
+    const insidePop = path.some((n) => n instanceof HTMLElement && n.id === 'pop');
+    const onAnchor = popAnchor !== null && path.includes(popAnchor);
+    if (!insidePop && !onAnchor) closePop();
   });
   window.addEventListener('scroll', closePop, true);
   document.addEventListener('keydown', (e) => {

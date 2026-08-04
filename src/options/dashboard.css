@@ -2487,15 +2487,20 @@ button.stat-tag:hover {
   margin-right: 6px;
   flex: 0 0 auto;
 }
-.cdot--yellow {
-  background: #facc15;
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 12.5px;
+  color: var(--muted);
 }
-.cdot--green {
-  background: #4ade80;
-}
-.cdot--blue {
-  background: #60a5fa;
-}
-.cdot--pink {
-  background: #f472b6;
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--surface);
 }

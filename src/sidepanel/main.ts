@@ -20,6 +20,7 @@ import type {
   AnnotationStatus,
   CitationStyle,
   Document,
+  HighlightColor,
   Id,
   Project,
   TextQuoteSelector,
@@ -179,6 +180,19 @@ async function loadDocuments(): Promise<void> {
 
 async function loadStyles(): Promise<void> {
   state.styles = await sendRequest({ type: 'citationStyles/list' });
+}
+
+/** The active project's highlight legend (defaults when unset). */
+let palette: HighlightColor[] = [];
+async function loadPalette(): Promise<void> {
+  try {
+    palette = await sendRequest({ type: 'palette/get', projectId: state.activeProjectId ?? '' });
+  } catch {
+    palette = [];
+  }
+}
+function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
+  return colorId ? palette.find((c) => c.id === colorId) : undefined;
 }
 
 async function loadAnnotationCount(): Promise<void> {
@@ -358,10 +372,12 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   if (quote) {
     const q = document.createElement('div');
     q.className = 'onpage-note__quote';
-    if (a.color) {
+    const entry = paletteEntry(a.color);
+    if (entry) {
       const dot = document.createElement('span');
-      dot.className = `cdot cdot--${a.color}`;
-      dot.title = `${a.color} highlight`;
+      dot.className = 'cdot';
+      dot.style.background = entry.swatch;
+      dot.title = entry.label; // the legend, on hover
       q.append(dot);
     }
     q.append(document.createTextNode(quote)); // never innerHTML — page content.
@@ -971,6 +987,7 @@ async function switchProject(projectId: string): Promise<void> {
   state.filedReferenceId = null;
   state.filedUrl = null;
   await setActiveProjectId(projectId);
+  await loadPalette();
   await loadDocuments();
   render();
   await refreshPreview();
@@ -1207,6 +1224,7 @@ async function init(): Promise<void> {
       void (async () => {
         state.projects = await sendRequest({ type: 'projects/list' });
         await loadStyles();
+        await loadPalette();
         await loadDocuments();
         await loadAnnotationCount();
         await loadPageAnnotations();
@@ -1264,6 +1282,7 @@ async function init(): Promise<void> {
   await ensureSeedProject();
   await restoreActiveProject();
   await loadStyles();
+  await loadPalette();
   await loadDocuments();
   await loadAnnotationCount();
   render();

@@ -99,6 +99,8 @@ export interface Project {
   defaultCitationStyleId?: Id;
   sections: string[];
   members: ProjectMember[];
+  /** The highlight legend. Absent → DEFAULT_HIGHLIGHT_COLORS. */
+  colorPalette?: HighlightColor[];
   /** Defaults to `local` when absent — projects created before Phase 5 M4. */
   syncMode?: SyncMode;
   createdAt: IsoDateTime;
@@ -148,11 +150,32 @@ export interface Document {
  * Highlight colours — the researcher's own stable taxonomy ("method",
  * "key finding", "disagree"…), chosen at the moment of highlighting.
  * Deliberately NOT the review status: status changes as work progresses,
- * a colour means what its author decided it means. Legacy annotations have
- * no colour and render in the original accent.
+ * a colour means what its author decided it means.
+ *
+ * The palette lives ON THE PROJECT (`Project.colorPalette`), so the legend
+ * travels with a shared snapshot: a collaborator sees not just "green" but
+ * what green MEANS here. Absent palette → `DEFAULT_HIGHLIGHT_COLORS`. An
+ * annotation stores the palette entry's id; legacy annotations with no
+ * colour render in the original accent.
  */
-export const ANNOTATION_COLORS = ['yellow', 'green', 'blue', 'pink'] as const;
-export type AnnotationColor = (typeof ANNOTATION_COLORS)[number];
+export interface HighlightColor {
+  /** Stable id the annotations reference — never reused after deletion. */
+  id: Id;
+  /** Strict `#rrggbb`. Validated hard: this value reaches inline styles. */
+  swatch: string;
+  /** The legend: what this colour means to this project. */
+  label: string;
+}
+
+export const DEFAULT_HIGHLIGHT_COLORS: readonly HighlightColor[] = [
+  { id: 'yellow', swatch: '#facc15', label: 'Yellow' },
+  { id: 'green', swatch: '#4ade80', label: 'Green' },
+  { id: 'blue', swatch: '#60a5fa', label: 'Blue' },
+  { id: 'pink', swatch: '#f472b6', label: 'Pink' },
+];
+
+/** A palette entry id ('yellow', or a custom entry's id). */
+export type AnnotationColor = string;
 
 export type AnnotationStatus = 'draft' | 'accepted' | 'rejected' | 'includedInReport';
 

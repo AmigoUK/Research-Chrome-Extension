@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.5.0] — 2026-08-04
+
+### Added
+
+- **The colours are yours, and they carry a legend.** Highlight colours are
+  now a property of the project: rename and recolour the four defaults, add
+  your own, and the legend ("Key finding", "Method", "Disagree"…) shows above
+  the Annotations view, in the picker's tooltips and on every colour dot. The
+  palette travels in snapshots, so a collaborator sees not just *green* but
+  what green means here. Swatches are validated as strict `#rrggbb` at the
+  import boundary — the value reaches inline styles.
+
+### Fixed
+
+- **Popovers no longer close on the click that opens them.** The
+  document-level click-away handler closed any popover whose opener forgot
+  `stopPropagation()`, and closed rebuilt popovers (the legend editor's
+  add/remove) because the clicked node was already detached. Both are fixed
+  at the source — the handler now checks the event's composed path and the
+  opening anchor — which also settles the long-standing "Post button does
+  nothing" papercut. A tall popover now scrolls inside itself instead of
+  being positioned off-screen.
+
 ## [1.4.1] — 2026-08-04
 
 ### Fixed
