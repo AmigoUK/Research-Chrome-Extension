@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.7.3] — 2026-08-04
+
+### Fixed
+
+- **Copying a citation is findable now.** The Documents view — where you go
+  to look at your sources — had no cite action at all: only open, edit and
+  delete. Every row now has a **Cite** button offering both forms **by
+  name**: *In-text citation* and *Bibliography entry*, in the project's
+  active style.
+- **The side panel's cite buttons work on any source in the project**, not
+  only one filed seconds ago. Re-opening the panel on a page captured last
+  week left *In-text* and *Bibliography* greyed out, which reads as "there is
+  no way to copy a citation here".
+
 ## [1.7.2] — 2026-08-04
 
 ### Fixed

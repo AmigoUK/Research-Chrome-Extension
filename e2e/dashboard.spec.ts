@@ -904,3 +904,62 @@ test('a source row opens its page, and an annotation card offers to show the hig
   await jumpPage.close();
   await page.close();
 });
+
+test('every source row offers both citation forms, named', async () => {
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    (window as unknown as { __copied: string[] }).__copied = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (t: string) => {
+          (window as unknown as { __copied: string[] }).__copied.push(t);
+        },
+      },
+      configurable: true,
+    });
+  });
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+  await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'capture/page',
+      input: {
+        projectId: projects.data[0]!.id,
+        url: 'https://example.org/citable-source',
+        type: 'article',
+        metadata: {
+          title: 'A citable source',
+          authors: ['Oke, T. R.'],
+          year: 1982,
+          journal: 'QJRMS',
+        },
+      },
+    });
+    void now;
+  });
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+
+  const row = page.locator('.tbl tbody tr', { hasText: 'A citable source' });
+  await row.locator('[data-cite-doc]').click();
+  // Both forms are offered BY NAME — a single unlabelled button was the
+  // reason people could not find how to copy a citation at all.
+  await expect(page.locator('#pop [data-form="inText"]')).toBeVisible();
+  await expect(page.locator('#pop [data-form="bibliography"]')).toBeVisible();
+
+  await page.locator('#pop [data-form="inText"]').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied.at(-1)))
+    .toContain('Oke');
+
+  await row.locator('[data-cite-doc]').click();
+  await page.locator('#pop [data-form="bibliography"]').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __copied: string[] }).__copied.at(-1)))
+    .toContain('A citable source');
+  await page.close();
+});

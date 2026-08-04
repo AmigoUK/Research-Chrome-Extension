@@ -844,6 +844,7 @@ function drawDocuments(): void {
         <td style="white-space:nowrap">
           ${canOpenInReader(d) ? `<button class="btn btn--ghost btn--sm" data-open title="Open in reader" aria-label="Open in reader">${ICON.open}</button>` : ''}
           ${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}
+          <button class="btn btn--ghost btn--sm" data-cite-doc title="Copy a citation" aria-label="Copy a citation">${ICON.copy} Cite</button>
           <button class="btn btn--ghost btn--sm" data-edit title="Edit metadata" aria-label="Edit metadata">Edit</button>
           <button class="btn btn--ghost btn--sm" data-del title="Delete source" aria-label="Delete source">${ICON.trash}</button>
         </td>
@@ -885,6 +886,13 @@ function drawDocuments(): void {
         e.preventDefault();
         open();
       }
+    });
+  });
+  $$('[data-cite-doc]', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('tr')?.getAttribute('data-id');
+      if (id) openCitePop(e.currentTarget as HTMLElement, id);
     });
   });
   $$('[data-edit]', box).forEach((b) => {
@@ -1578,17 +1586,38 @@ async function setAnnotationStatus(anno: Annotation, status: AnnotationStatus): 
   toast(`Note set to “${ANNO_STATUS[status].label}”`, ICON.check);
 }
 
-async function citeDocument(documentId: Id): Promise<void> {
+/**
+ * Copy a citation for a source, in the project's active style. Two forms,
+ * both named: "in-text" is what goes in a sentence, "bibliography entry" is
+ * what goes in the list — guessing which one a single button copies was the
+ * reason people could not find this at all.
+ */
+function openCitePop(anchor: HTMLElement, documentId: Id): void {
+  const pop = $('#pop');
+  const style = activeStyle();
+  pop.innerHTML =
+    `<div class="pl">Copy citation · ${esc(style?.name ?? 'APA')}</div>` +
+    `<button class="pi" data-form="inText"><span>In-text citation</span></button>` +
+    `<button class="pi" data-form="bibliography"><span>Bibliography entry</span></button>`;
+  $$('[data-form]', pop).forEach((b) => {
+    b.onclick = () => {
+      const form = b.dataset['form'] === 'inText' ? 'inText' : 'bibliography';
+      closePop();
+      void citeDocument(documentId, form);
+    };
+  });
+  placePop(anchor);
+}
+
+async function citeDocument(
+  documentId: Id,
+  form: 'inText' | 'bibliography' = 'bibliography',
+): Promise<void> {
   const { template, styleId } = citeArgs();
   try {
-    const { bibliography } = await sendRequest({
-      type: 'citations/document',
-      documentId,
-      template,
-      styleId,
-    });
-    await navigator.clipboard.writeText(bibliography);
-    toast('Citation copied', ICON.copy);
+    const out = await sendRequest({ type: 'citations/document', documentId, template, styleId });
+    await navigator.clipboard.writeText(form === 'inText' ? out.inText : out.bibliography);
+    toast(form === 'inText' ? 'In-text citation copied' : 'Bibliography entry copied', ICON.copy);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t copy citation', ICON.warn, true);
   }

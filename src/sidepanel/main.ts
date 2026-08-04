@@ -341,8 +341,13 @@ function renderCaptureCard(): void {
     ? 'Filed ✓'
     : `File into “${activeProject()?.name ?? 'project'}”`;
 
-  $<HTMLButtonElement>('copyInText').disabled = state.filedReferenceId === null;
-  $<HTMLButtonElement>('copyBiblio').disabled = state.filedReferenceId === null;
+  // Enabled whenever this page is IN the project — not only when it was filed
+  // in this session. Re-opening the panel on a source captured last week left
+  // both buttons greyed out, which reads as "there is no way to copy a
+  // citation here".
+  const citable = state.filedReferenceId !== null || state.pageDocumentId !== null;
+  $<HTMLButtonElement>('copyInText').disabled = !citable;
+  $<HTMLButtonElement>('copyBiblio').disabled = !citable;
 }
 
 // --------------------------------------------------------------------------
@@ -1104,29 +1109,42 @@ async function copyDocCitation(doc: Document): Promise<void> {
   }
 }
 
-async function copyCaptureInText(): Promise<void> {
-  if (!state.filedReferenceId) return;
-  try {
-    const out = await sendRequest({
+/** The citation for the page on screen: the reference just filed if there is
+ *  one, else the document this page already is in the project. */
+async function citeCurrentPage(
+  form: 'inText' | 'bibliography',
+): Promise<{ inText: string; bibliography: string } | null> {
+  if (state.filedReferenceId) {
+    return sendRequest({
       type: 'citations/reference',
       referenceId: state.filedReferenceId,
       ...citeArgs(),
     });
-    await copyToClipboard(out.inText, 'In-text citation');
+  }
+  if (state.pageDocumentId) {
+    return sendRequest({
+      type: 'citations/document',
+      documentId: state.pageDocumentId,
+      ...citeArgs(),
+    });
+  }
+  void form;
+  return null;
+}
+
+async function copyCaptureInText(): Promise<void> {
+  try {
+    const out = await citeCurrentPage('inText');
+    if (out) await copyToClipboard(out.inText, 'In-text citation');
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t build citation', true);
   }
 }
 
 async function copyCaptureBiblio(): Promise<void> {
-  if (!state.filedReferenceId) return;
   try {
-    const out = await sendRequest({
-      type: 'citations/reference',
-      referenceId: state.filedReferenceId,
-      ...citeArgs(),
-    });
-    await copyToClipboard(out.bibliography, 'Bibliography entry');
+    const out = await citeCurrentPage('bibliography');
+    if (out) await copyToClipboard(out.bibliography, 'Bibliography entry');
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t build bibliography entry', true);
   }

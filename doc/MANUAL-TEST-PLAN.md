@@ -1,7 +1,7 @@
 # Plan testów manualnych — Scientific Context Notes
 
-_Wersja pod testy: **v1.2.2** · plan z 2026-08-04. Aktualizuj razem z funkcjami; testy
-automatyczne (363 unit + 33 e2e) pokrywają logikę — ten plan pokrywa to, czego automat nie
+_Wersja pod testy: **v1.7.3** · plan z 2026-08-04. Aktualizuj razem z funkcjami; testy
+automatyczne (376 unit + 39 e2e) pokrywają logikę — ten plan pokrywa to, czego automat nie
 może: natywne uprawnienia Chrome, prawdziwe strony wydawców, gesty użytkownika i odczucie
 całej podróży._
 
@@ -291,9 +291,16 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 
 ## S7. Cytowania i style
 
-### S7.1 In-text / Bibliography po zapisie
-- **Oczekiwane**: przyciski aktywne dopiero po zapisaniu strony; schowek dostaje np.
-  `(Azevedo et al., 2016)` — **samo nazwisko**, nie pełne imię.
+### S7.1 Gdzie skopiować cytat (trzy miejsca)
+- **Kroki**: (a) Dashboard → **Documents** → **Cite** w wierszu → wybierz *In-text citation*, potem
+  *Bibliography entry*; (b) panel → **Cite** na wierszu listy; (c) panel → przyciski **In-text** /
+  **Bibliography** w karcie „On this page" — na stronie, która **jest już w projekcie** (nie tylko
+  tuż po zapisaniu).
+- **Oczekiwane**: wszystkie trzy kopiują w **aktywnym stylu projektu**; in-text to np.
+  `(Azevedo, Chapman, & Muller, 2016)` — **samo nazwisko**, nie pełne imię; toast nazywa, co
+  skopiowano.
+- **Problemy**: przyciski w karcie „On this page" są nieaktywne, gdy strony nie ma w projekcie —
+  wtedy najpierw **File into project**.
 
 ### S7.2 Poprawność APA (checkpointy z audytu)
 - **Kroki**: Copy bibliography przy ≥ 2 źródłach.
