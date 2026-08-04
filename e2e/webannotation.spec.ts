@@ -457,3 +457,58 @@ test('"show me that highlight" scrolls the open page to it, without opening a du
   await asker.close();
   await page.close();
 });
+
+test("the side panel jumps by URL, so it lands on the notes' page and not the active tab", async () => {
+  // The panel outlives tab switches: a jump sent blind to "the active tab"
+  // landed wherever the user happened to be looking. It now addresses the
+  // page the notes belong to, which is what these two tabs prove.
+  const article = await context.newPage();
+  await article.setViewportSize({ width: 900, height: 500 });
+  await article.goto(`chrome-extension://${extensionId}/e2e-tall-article.html`);
+  await article.addScriptTag({ url: annotatorUrl() });
+  await article.evaluate((quote) => {
+    const p = [...document.querySelectorAll('p')].find((el) => el.textContent === quote)!;
+    p.scrollIntoView({ block: 'center' });
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }, TALL_TARGET);
+  await article.locator('#context-notes-annotator .toolbar button[data-color="pink"]').click();
+  await expect(article.locator('#context-notes-annotator .ov')).not.toHaveCount(0);
+  await article.evaluate(() => window.scrollTo(0, 0));
+
+  // A DIFFERENT tab is the active one when the jump is asked for.
+  const decoy = await context.newPage();
+  await decoy.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  await decoy.bringToFront();
+
+  const target = await decoy.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const annos = (await chrome.runtime.sendMessage({
+      type: 'annotations/listByProject',
+      projectId: projects.data[0]!.id,
+    })) as { data: Array<{ id: string; documentId: string }> };
+    const docs = (await chrome.runtime.sendMessage({
+      type: 'documents/listByProject',
+      projectId: projects.data[0]!.id,
+    })) as { data: Array<{ id: string; url: string }> };
+    const doc = docs.data.find((d) => d.url.includes('tall'))!;
+    const anno = annos.data.filter((a) => a.documentId === doc.id).at(-1)!;
+    return { id: anno.id, url: doc.url };
+  });
+  await decoy.evaluate(
+    async (t) =>
+      chrome.runtime.sendMessage({ control: 'annotator/openAndJump', url: t.url, id: t.id }),
+    target,
+  );
+
+  // The article scrolled, even though it was not the active tab.
+  await expect.poll(() => article.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  await decoy.close();
+  await article.close();
+});

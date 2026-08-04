@@ -359,6 +359,22 @@ function annotationQuote(a: Annotation): string {
   return selector?.exact ?? '';
 }
 
+/**
+ * Scroll the page these notes belong to, to one of them.
+ *
+ * Addressed by URL, not "whatever tab is active": the panel outlives tab
+ * switches, so a blind jump used to land on whichever page the user happened
+ * to be looking at — or nowhere at all.
+ */
+function jumpToAnnotation(id: Id): void {
+  const url = state.preview?.url;
+  chrome.runtime
+    .sendMessage(
+      url ? { control: 'annotator/openAndJump', url, id } : { control: 'annotator/jump', id },
+    )
+    .catch(() => {});
+}
+
 /** `jumpable` is false for a note in the "couldn't place" list: its anchor did
  *  not resolve on this page, so there is no overlay to scroll to — offering
  *  "Jump to" would be a silent no-op. */
@@ -379,7 +395,7 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
       const el = e.target as HTMLElement;
       // The note editor, the status select and the buttons own their clicks.
       if (el.closest('button, select, textarea')) return;
-      chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
+      jumpToAnnotation(a.id);
     };
     card.addEventListener('click', jump);
     card.addEventListener('keydown', (e) => {
@@ -437,10 +453,9 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
     jumpBtn.type = 'button';
     jumpBtn.className = 'btn onpage-note__jump';
     jumpBtn.textContent = 'Jump to';
-    jumpBtn.addEventListener('click', () => {
-      // Panel → SW → active tab's content script; the panel has no direct
-      // tabs.sendMessage access to an injected page context.
-      chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
+    jumpBtn.addEventListener('click', (e) => {
+      e.stopPropagation(); // the card's own click would otherwise fire too
+      jumpToAnnotation(a.id);
     });
     foot.append(jumpBtn);
   }

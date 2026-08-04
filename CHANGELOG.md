@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.7.2] — 2026-08-04
+
+### Fixed
+
+- **The side panel's jump lands on the right page.** A note card (and its
+  "Jump to" button) asked the *active tab* to scroll — but the panel outlives
+  tab switches, so the request went wherever the user happened to be looking,
+  or nowhere. Both now address the page the notes belong to, using the same
+  mechanism the dashboard uses: the page is found by asking each annotator
+  whether it is showing that URL, and opened if none is.
+
+### Verified
+
+- The whole journey re-run step by step against a live publisher article
+  (MDPI, `10.3390/rs8020153`): capture with DOI enrichment (3 authors, 2016,
+  vol. 8, p. 153), the colour picker and a green highlight on the real DOM,
+  re-anchoring after reload, the jump into the already-open tab, the jump
+  with the page closed (reopens and scrolls), the panel card's jump, and a
+  correct APA bibliography entry — 10 of 10.
+
 ## [1.7.1] — 2026-08-04
 
 ### Added
