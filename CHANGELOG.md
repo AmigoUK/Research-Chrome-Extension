@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.2.1] — 2026-08-04
+
+### Fixed
+
+- **The capture card no longer blames the page when Chrome is the obstacle.**
+  With the panel left open, `activeTab` covers only the tab where the toolbar
+  icon was clicked and expires on navigation — every next page showed
+  "No page metadata" while a perfectly tagged article was open. The card now
+  says plainly that the tab cannot be read yet and offers **Allow reading
+  pages** (the optional host grant the manifest always declared, local-only,
+  revocable per site in Site access); granting it makes the preview work on
+  every tab from then on. Declining keeps the one-tab behaviour and explains
+  it. Locked in by a new e2e test.
+
 ## [1.2.0] — 2026-08-04
 
 The onboarding release: the workflow now teaches itself.
