@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { findDoi, buildDocumentMetadata, inferDocumentType, toCslData } from './metadata';
+import {
+  findDoi,
+  buildDocumentMetadata,
+  inferDocumentType,
+  isSearchPage,
+  toCslData,
+} from './metadata';
 
 describe('findDoi', () => {
   it('extracts and normalises a DOI from varied candidates', () => {
@@ -44,6 +50,39 @@ describe('inferDocumentType', () => {
     expect(inferDocumentType({ doi: '10.1/x' })).toBe('article');
     expect(inferDocumentType({ journal: 'Nature' })).toBe('article');
     expect(inferDocumentType({ title: 'A blog post' })).toBe('webPage');
+  });
+});
+
+describe('isSearchPage', () => {
+  // The exact URL that motivated the guard, captured from a live session:
+  // filing it stored "«query» - Google Scholar" as a source's title.
+  const SCHOLAR_SERP =
+    'https://scholar.google.com/scholar?hl=en&as_sdt=0%2C5&q=urban+heat+island+effect&btnG=';
+
+  it('flags scholarly and web search surfaces', () => {
+    expect(isSearchPage(SCHOLAR_SERP, {})).toBe(true);
+    expect(isSearchPage('https://www.google.com/search?q=urban+heat', {})).toBe(true);
+    expect(isSearchPage('https://duckduckgo.com/?q=uhi', {})).toBe(true);
+    expect(isSearchPage('https://pubmed.ncbi.nlm.nih.gov/?term=heat+island', {})).toBe(true);
+    expect(isSearchPage('https://www.sciencedirect.com/search?qs=heat', {})).toBe(true);
+    expect(isSearchPage('https://onlinelibrary.wiley.com/action/doSearch?AllField=uhi', {})).toBe(
+      true,
+    );
+    expect(isSearchPage('https://arxiv.org/list/physics.ao-ph/2301', {})).toBe(true);
+  });
+
+  it('never flags a page that declares bibliographic meta tags', () => {
+    expect(isSearchPage(SCHOLAR_SERP, { citation_title: 'A real article' })).toBe(false);
+    expect(isSearchPage('https://ex.org/search?q=x', { citation_doi: '10.1/x' })).toBe(false);
+    expect(isSearchPage('https://ex.org/search?q=x', { 'dc.title': 'Titled' })).toBe(false);
+  });
+
+  it('leaves article-looking pages capturable', () => {
+    expect(isSearchPage('https://www.mdpi.com/2072-4292/8/2/153', {})).toBe(false);
+    expect(isSearchPage('https://arxiv.org/abs/1705.00504', {})).toBe(false);
+    // A deep path with a stray ?q= is not a search page.
+    expect(isSearchPage('https://ex.org/2020/article-slug?q=highlight', {})).toBe(false);
+    expect(isSearchPage('not a url', {})).toBe(false);
   });
 });
 

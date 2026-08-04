@@ -55,6 +55,44 @@ function parseYear(value: string | undefined): number | undefined {
   return match?.[1] ? Number(match[1]) : undefined;
 }
 
+/**
+ * Hosts whose every page is a discovery surface, never a citable source.
+ * Google Scholar is the canonical trap: filing its results page stores
+ * "«query» - Google Scholar" as a source's title.
+ */
+const SEARCH_HOSTS = [/(^|\.)scholar\.google\./i, /(^|\.)duckduckgo\.com$/i, /(^|\.)bing\.com$/i];
+
+/** Path/query shapes that mark search or listing pages on any host. */
+const SEARCH_PATHS = [
+  /\/search\b/i, // google.com/search, sciencedirect.com/search, semanticscholar.org/search…
+  /\/action\/doSearch\b/i, // Atypon platforms (Wiley, T&F…)
+  /\/action\/doBasicSearch\b/i, // JSTOR
+  /^\/list\//i, // arxiv.org/list/…
+];
+const SEARCH_QUERY_KEYS = ['q', 'query', 'term'];
+
+/**
+ * True when the page is a search/results/listing surface rather than an
+ * article. Bibliographic meta tags always win: a page that declares
+ * `citation_title` or a DOI is an article whatever its URL looks like.
+ */
+export function isSearchPage(url: string, metaTags: Record<string, string>): boolean {
+  if (metaTags['citation_title'] || metaTags['citation_doi'] || metaTags['dc.title']) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+  if (SEARCH_HOSTS.some((h) => h.test(parsed.hostname))) return true;
+  if (SEARCH_PATHS.some((p) => p.test(parsed.pathname))) return true;
+  // A search query on a root path (pubmed.ncbi.nlm.nih.gov/?term=…). A ?q= on
+  // a deep article path stays capturable — better a rare junk capture than a
+  // blocked legitimate one.
+  const queryMatches = SEARCH_QUERY_KEYS.some((k) => parsed.searchParams.has(k));
+  return queryMatches && parsed.pathname === '/';
+}
+
 /** Build structured `DocumentMetadata` from raw page primitives. */
 export function buildDocumentMetadata(raw: RawPageMetadata): DocumentMetadata {
   const tags = raw.metaTags ?? {};

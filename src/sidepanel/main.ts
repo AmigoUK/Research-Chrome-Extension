@@ -6,6 +6,7 @@ import './panel.css';
 import { sendRequest } from '../adapters/chrome/messaging';
 import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
+import { isSearchPage } from '../core/extract/metadata';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import type {
@@ -36,6 +37,10 @@ interface State {
   styles: CitationStyle[];
   filter: ListFilter;
   preview: CaptureInput | null;
+  /** The previewed page is a search/results surface — filing it would store
+   *  the query string as a "source". The File button is disabled with an
+   *  explanation instead. */
+  previewIsSearchPage: boolean;
   /** Id of the most recently filed reference — drives the cite buttons. */
   filedReferenceId: string | null;
   /** URL of the most recently filed page — so "Filed ✓" tracks the *page*, not
@@ -59,6 +64,7 @@ const state: State = {
   styles: [],
   filter: { search: '', status: 'all' },
   preview: null,
+  previewIsSearchPage: false,
   filedReferenceId: null,
   filedUrl: null,
   pageAnnotations: [],
@@ -151,8 +157,10 @@ async function loadPreview(): Promise<void> {
   try {
     const scan = await scanActiveTab();
     state.preview = buildCaptureInput(scan, state.activeProjectId);
+    state.previewIsSearchPage = isSearchPage(scan.url, scan.raw.metaTags ?? {});
   } catch {
     state.preview = null;
+    state.previewIsSearchPage = false;
   }
 }
 
@@ -215,6 +223,17 @@ function renderCaptureCard(): void {
     title.textContent = 'Open an article to capture it';
     meta.textContent = '';
     fileBtn.disabled = true;
+    return;
+  }
+
+  if (state.previewIsSearchPage) {
+    // Filing a results page would store the query string as a "source" —
+    // the Google Scholar trap. Say so instead of offering a broken capture.
+    type.textContent = 'Search results page';
+    title.textContent = 'Open an article from these results to file it';
+    meta.textContent = 'Search pages carry no article metadata.';
+    fileBtn.disabled = true;
+    fileBtn.textContent = 'Nothing to file here';
     return;
   }
 
@@ -591,6 +610,12 @@ function render(): void {
 
 async function fileCurrentPage(): Promise<void> {
   if (!state.activeProjectId) return;
+  if (state.previewIsSearchPage) {
+    // Belt to the button's braces: the disabled state could be stale if the
+    // tab changed between render and click.
+    toast('This is a search page — open an article to file it', true);
+    return;
+  }
   try {
     const result = await captureActiveTab(state.activeProjectId);
     state.filedReferenceId = result.reference.id;
