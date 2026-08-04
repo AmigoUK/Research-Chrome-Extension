@@ -22,6 +22,22 @@ describe('scanDocumentRaw', () => {
     expect(raw.authors).toEqual(['Nowak, A.', 'Okafor, M.']);
     expect(raw.metaTags?.['citation_doi']).toBe('10.1234/uhi.2023');
   });
+
+  it('prefers citation_author and ignores dc.creator when both exist — the MDPI double list', () => {
+    document.head.innerHTML += `
+      <meta name="dc.creator" content="Nowak, Anna">
+      <meta name="dc.creator" content="Okafor, Mary">`;
+    const { raw } = scanDocumentRaw();
+    expect(raw.authors).toEqual(['Nowak, A.', 'Okafor, M.']);
+  });
+
+  it('falls back to dc.creator when no citation_author exists', () => {
+    document.head.innerHTML = `
+      <meta name="citation_title" content="A paper">
+      <meta name="dc.creator" content="Nichol, Janet">`;
+    const { raw } = scanDocumentRaw();
+    expect(raw.authors).toEqual(['Nichol, Janet']);
+  });
 });
 
 describe('buildCaptureInput', () => {

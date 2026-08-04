@@ -20,13 +20,20 @@ export interface RawPageScan {
 export function scanDocumentRaw(): RawPageScan {
   const metaTags: Record<string, string> = {};
   const authors: string[] = [];
+  const fallbackAuthors: string[] = [];
 
   for (const meta of Array.from(document.querySelectorAll('meta'))) {
     const key = (meta.getAttribute('name') ?? meta.getAttribute('property') ?? '').toLowerCase();
     const content = meta.getAttribute('content');
     if (!key || !content) continue;
-    if (key === 'citation_author' || key === 'dc.creator') {
+    // citation_author and dc.creator carry the SAME people in different
+    // shapes ("Juliana Antunes Azevedo" vs "Azevedo, Juliana Antunes") —
+    // MDPI serves both. Pooling them doubled every author list, so they are
+    // kept apart and dc.creator is used only when no Highwire tags exist.
+    if (key === 'citation_author') {
       authors.push(content.trim());
+    } else if (key === 'dc.creator') {
+      fallbackAuthors.push(content.trim());
     } else if (!(key in metaTags)) {
       metaTags[key] = content;
     }
@@ -39,6 +46,7 @@ export function scanDocumentRaw(): RawPageScan {
   const raw: RawPageMetadata = { metaTags };
   if (document.title) raw.title = document.title;
   if (authors.length) raw.authors = authors;
+  else if (fallbackAuthors.length) raw.authors = fallbackAuthors;
   if (canonical) raw.canonicalUrl = canonical;
 
   return { url, raw };

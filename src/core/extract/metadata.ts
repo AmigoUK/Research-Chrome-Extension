@@ -110,6 +110,64 @@ export function isSearchPage(url: string, metaTags: Record<string, string>): boo
   return queryMatches && parsed.pathname === '/';
 }
 
+/** A parsed personal name, or a literal for what cannot safely be split. */
+export type CslName = { family: string; given: string } | { literal: string };
+
+/** Names that are organisations, not people — splitting them corrupts them. */
+const ORG_HINTS =
+  /\b(university|institute|department|agency|committee|consortium|group|laboratory|centre|center|council|ministry|office|organisation|organization|society|association)\b/i;
+
+/**
+ * Parse a display name into CSL `family`/`given`.
+ *
+ * Stored `literal` names looked harmless but broke every citation format:
+ * citeproc cannot invert ("Sobstyl, J. M."), cannot shorten to a surname for
+ * in-text ("(Sobstyl et al., 2018)" came out as the full name), and sorts
+ * bibliographies by first initial instead of surname. Publishers emit either
+ * "Family, Given" (dc.creator, Ingenta) or "Given Family" (citation_author,
+ * MDPI/APS) — both parse; organisations and single tokens stay literal.
+ */
+export function parseAuthorName(name: string): CslName {
+  const clean = name.replace(/\s+/g, ' ').trim();
+  if (!clean) return { literal: name };
+  if (ORG_HINTS.test(clean)) return { literal: clean };
+  const comma = clean.indexOf(',');
+  if (comma > 0) {
+    const family = clean.slice(0, comma).trim();
+    const given = clean.slice(comma + 1).trim();
+    return given ? { family, given } : { literal: family };
+  }
+  const parts = clean.split(' ');
+  if (parts.length < 2) return { literal: clean };
+  const family = parts[parts.length - 1] as string;
+  return { family, given: parts.slice(0, -1).join(' ') };
+}
+
+/** A comparison key that treats "J. Argete", "Argete, J." and "J Argete" as
+ *  one person — used to fold duplicate author entries from a single page. */
+function authorKey(name: string): string {
+  const parsed = parseAuthorName(name);
+  const flat = 'literal' in parsed ? parsed.literal : `${parsed.family} ${parsed.given.charAt(0)}`;
+  return flat
+    .toLowerCase()
+    .replace(/[.\s]+/g, ' ')
+    .trim();
+}
+
+function dedupeAuthors(names: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of names) {
+    const clean = name.replace(/\s+/g, ' ').trim();
+    if (!clean) continue;
+    const key = authorKey(clean);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(clean);
+  }
+  return out;
+}
+
 /** Build structured `DocumentMetadata` from raw page primitives. */
 export function buildDocumentMetadata(raw: RawPageMetadata): DocumentMetadata {
   const tags = raw.metaTags ?? {};
@@ -118,7 +176,10 @@ export function buildDocumentMetadata(raw: RawPageMetadata): DocumentMetadata {
 
   const title = pick(tags, META.title) ?? raw.title;
   if (title) metadata.title = title;
-  if (raw.authors?.length) metadata.authors = raw.authors;
+  if (raw.authors?.length) {
+    const authors = dedupeAuthors(raw.authors);
+    if (authors.length) metadata.authors = authors;
+  }
   const year = parseYear(pick(tags, META.year));
   if (year !== undefined) metadata.year = year;
   if (doi) metadata.doi = doi;
@@ -160,7 +221,7 @@ export function toCslData(metadata: DocumentMetadata, url: string): Record<strin
   const csl: Record<string, unknown> = { type };
   if (metadata.title) csl['title'] = metadata.title;
   if (metadata.authors?.length) {
-    csl['author'] = metadata.authors.map((name) => ({ literal: name }));
+    csl['author'] = metadata.authors.map(parseAuthorName);
   }
   if (metadata.year !== undefined) csl['issued'] = { 'date-parts': [[metadata.year]] };
   if (metadata.journal) csl['container-title'] = metadata.journal;

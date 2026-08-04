@@ -4,6 +4,7 @@ import {
   buildDocumentMetadata,
   inferDocumentType,
   isSearchPage,
+  parseAuthorName,
   toCslData,
 } from './metadata';
 
@@ -92,6 +93,48 @@ describe('buildDocumentMetadata', () => {
   });
 });
 
+describe('parseAuthorName', () => {
+  it('parses "Family, Given" and "Given Family" alike', () => {
+    expect(parseAuthorName('Azevedo, Juliana Antunes')).toEqual({
+      family: 'Azevedo',
+      given: 'Juliana Antunes',
+    });
+    expect(parseAuthorName('Juliana Antunes Azevedo')).toEqual({
+      family: 'Azevedo',
+      given: 'Juliana Antunes',
+    });
+  });
+
+  it('collapses stray whitespace — Taylor & Francis emits "M.  Tiangco"', () => {
+    expect(parseAuthorName('M.  Tiangco')).toEqual({ family: 'Tiangco', given: 'M.' });
+  });
+
+  it('keeps organisations and single tokens literal', () => {
+    expect(parseAuthorName('Department for Environment, Food & Rural Affairs')).toEqual({
+      literal: 'Department for Environment, Food & Rural Affairs',
+    });
+    expect(parseAuthorName('Aristotle')).toEqual({ literal: 'Aristotle' });
+  });
+});
+
+describe('author deduplication', () => {
+  it('folds the same people arriving in both name orders — the MDPI double list', () => {
+    // Live capture from mdpi.com served 6 entries for 3 people.
+    const meta = buildDocumentMetadata({
+      authors: [
+        'Juliana Antunes Azevedo',
+        'Lee Chapman',
+        'Catherine L. Muller',
+        'Azevedo, Juliana Antunes',
+        'Chapman, Lee',
+        'Muller, Catherine L.',
+      ],
+      metaTags: { citation_title: 'Quantifying the UHI' },
+    });
+    expect(meta.authors).toEqual(['Juliana Antunes Azevedo', 'Lee Chapman', 'Catherine L. Muller']);
+  });
+});
+
 describe('inferDocumentType', () => {
   it('classifies scholarly sources as articles', () => {
     expect(inferDocumentType({ doi: '10.1/x' })).toBe('article');
@@ -143,6 +186,9 @@ describe('toCslData', () => {
     expect(csl['DOI']).toBe('10.1/x');
     expect(csl['URL']).toBe('https://example.org/a');
     expect(csl['issued']).toEqual({ 'date-parts': [[1982]] });
+    // Structured, not literal — literal names cannot be inverted, shortened
+    // to a surname in-text, or sorted by family name.
+    expect(csl['author']).toEqual([{ family: 'Oke', given: 'T. R.' }]);
   });
 
   it('carries volume, issue and pages into CSL', () => {
