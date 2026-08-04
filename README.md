@@ -4,19 +4,41 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v1.0.1** — the build to
+> **Status:** **all five roadmap phases delivered.** Current release: **v1.1.0** — the build to
 > submit to the Chrome Web Store. See [`CHANGELOG.md`](CHANGELOG.md) and
 > [`doc/STATUS.md`](doc/STATUS.md).
+
+## Quick start
+
+1. **Install**: from the Chrome Web Store, or unpacked — `npm ci && npm run build`, then
+   `chrome://extensions` → Developer mode → _Load unpacked_ → the `dist/` folder.
+2. **Open the side panel** with the toolbar icon. A default project ("My Research") is created for
+   you; the header switches or creates projects.
+3. **File a source**: open the **article page itself** (not a search-results page — the panel will
+   tell you if you try) and press **File into project**. If the page carries a DOI, the record is
+   auto-completed from the DOI registry: structured authors, year, journal, volume, issue, pages.
+4. **Fix anything by hand**: Dashboard → Documents → **Edit** on any row — full bibliographic
+   record, plus **Refresh from DOI**.
+5. **Annotate**: press **Annotate this page**, approve the one-time per-site prompt, then select
+   text → **Highlight** or **Note**. Highlights repaint on your next visit. Revoke a site any time
+   in `chrome://extensions` → Details → _Site access_ — the extension cleans up after you.
+6. **PDFs**: Dashboard → Documents → **Add PDF** opens the bundled reader — text highlights, drawn
+   region anchors, notes and review statuses, all surviving zoom and reload.
+7. **Cite**: pick a style (APA, Harvard — Cite Them Right **or Solent University**, Chicago ×2,
+   MLA, Vancouver — or your own rules in the style editor), then **Cite** on a row for an in-text
+   citation or **Copy bibliography** for the whole project.
+8. **Share**: Team → Sync → **Export** (optionally password-encrypted). Your collaborator imports
+   the file and sees exactly what would change before anything is written.
 
 ## What it does
 
 | Area             | What you get                                                                                                                                                                                                                                                                                       |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Capture**      | File the current page into a project — title, authors, year, DOI, journal — deduplicated by DOI.                                                                                                                                                                                                   |
+| **Capture**      | File the current page into a project — title, authors, year, DOI, journal, volume/issue/pages — deduplicated by DOI and auto-completed from the DOI registry. Search-results pages (Google Scholar & friends) refuse to file instead of storing junk.                                              |
 | **Annotations**  | Anchor notes to a passage using W3C selectors (quote → position → CSS), with a review status per note. On a live web page, select text and a toolbar offers **Highlight** or **Note** — painted as overlays that re-anchor after a reload; access is opt-in per site (no standing content script). |
 | **PDFs**         | A bundled `pdf.js` reader: text highlights and drag-a-rectangle region anchors, stored as fraction coordinates so they survive zoom and DPR changes.                                                                                                                                               |
 | **Dashboard**    | Overview + Kanban by workflow status, Documents, References (with DOI import), Annotations, Citation styles, Team.                                                                                                                                                                                 |
-| **Citations**    | citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere.                                                                                                                                                 |
+| **Citations**    | citeproc-js with APA, Harvard (Cite Them Right and Solent University), Vancouver, MLA and Chicago (author–date **and** notes) — copy an in-text citation or a bibliography entry anywhere. Author names are parsed into family/given so in-text citations, inversion and sorting come out right.   |
 | **Style editor** | A full-screen editor turning plain rules (max authors, et al., DOI/URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live citeproc preview. Import a journal's own `.csl` file as a base style, or export the compiled one.                                          |
 | **Team**         | Members & roles with a capability matrix, an activity feed with before→after diffs, and anchored comment threads with reply / resolve.                                                                                                                                                             |
 | **Sync**         | The whole project as one portable JSON snapshot — optionally encrypted with AES-GCM — that merges back on import, deduplicating sources and references **by DOI**. An import shows exactly what it would change before it writes anything.                                                         |

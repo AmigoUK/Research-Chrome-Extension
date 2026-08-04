@@ -1,6 +1,6 @@
 {
   "name": "scientific-context-notes",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "File web pages and PDFs into research projects, anchor notes to the exact passage, and generate real CSL citations — all locally.",
   "type": "module",
   "private": true,

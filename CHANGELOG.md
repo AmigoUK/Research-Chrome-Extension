@@ -9,6 +9,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.1.0] — 2026-08-04
+
+The metadata release, driven by a live audit against Google Scholar and real
+publisher pages: every capture used to produce a wrong or incomplete citation.
+
+### Added
+
+- **DOI enrichment of captures.** Filing a DOI-bearing page now auto-completes
+  its metadata from the DOI registry (the same doi.org path DOI import uses):
+  structured authors, year, journal, volume, issue, pages. Best-effort — a
+  failed lookup keeps the captured values. Also available on demand as
+  "Refresh from DOI" in the new edit popover.
+- **Metadata editing.** Every Documents row has an Edit popover over the full
+  bibliographic record — extraction failures are no longer dead ends.
+- **Harvard (Solent University)** base citation style, vendored from the CSL
+  styles repository.
+- **JSON-LD fallback.** Pages with schema.org Article data and no meta tags
+  (institutional repositories, news sites) now capture properly.
+- **Volume, issue and pages** are captured from publisher meta tags and flow
+  through to citations.
+- Snapshots now carry the imported `.csl` bases that shared style profiles
+  compile on top of — no more silent APA fallback on the other machine.
+
+### Fixed
+
+- **Author names parse into CSL family/given** (both "Family, Given" and
+  "Given Family" orders), so in-text citations shorten to the surname,
+  bibliographies invert and sort correctly, and organisations stay literal.
+  The citation_author/dc.creator double list (six authors for three people on
+  MDPI) is folded to one person each.
+- **Search-results pages refuse to file.** Capturing on Google Scholar stored
+  "«query» - Google Scholar" as a source; the capture card now says it is a
+  search page and disables filing.
+- **Every surface stays fresh.** The side panel and dashboard re-read after
+  any write from another surface (dashboard, PDF reader, another window) —
+  no more "0 sources" beside a filled project.
+- arXiv abs pages no longer cite as journal "arXiv.org" — they capture as
+  preprints; missing years are recovered from online-date fallbacks.
+- Reading-list rows open their source; citing is an explicit "Cite" button
+  (clicking a row used to silently copy a citation). "Annotate this page"
+  reports why nothing happened on pages Chrome refuses to script. The
+  references Import opens the DOI form directly instead of advertising
+  disabled Zotero/BibTeX/RIS stubs. The style editor asks before discarding
+  unsaved changes and actually restores the pristine style.
+- Snapshot import hardened: anchors validated (one malformed imported note
+  used to permanently break a page's annotation list), metadata type-checked,
+  records must belong to the snapshot's own project, document DOI dedup
+  normalises before lookup, KDF iteration counts are bounded, and an imported
+  snapshot can no longer overwrite your own identity row. Snapshot export no
+  longer leaks collaborators from other projects. Deleting a document also
+  removes the comment threads anchored to it. Content scripts may only issue
+  the two annotator messages, not the whole API.
+- Licensing: LICENSE file added; THIRD-PARTY-NOTICES corrected (citeproc-js
+  is CPAL-1.0 OR AGPL-1.0, redistributed under CPAL-1.0 with its attribution
+  shown in the dashboard footer); pdf.js and CSL licence texts reproduced;
+  the privacy policy now describes per-site persistent injection after
+  opt-in, and revoking a site in Chrome's Site access removes the
+  registration automatically.
+
 ## [1.0.1] — 2026-08-03
 
 ### Fixed
