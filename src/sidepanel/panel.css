@@ -746,3 +746,33 @@ body {
   font-size: 12px;
   color: var(--muted);
 }
+
+/* --- "What's new" update banner ---------------------------------------- */
+.whatsnew {
+  display: flex;
+}
+/* An author `display` beats the [hidden] UA default — without this the
+   "hidden" banner still renders as an empty strip. */
+.whatsnew[hidden] {
+  display: none;
+}
+.whatsnew {
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.whatsnew a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 560;
+}
+.whatsnew a:hover {
+  text-decoration: underline;
+}
+.whatsnew .gs-close {
+  margin-left: auto;
+}

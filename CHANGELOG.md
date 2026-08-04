@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.3.0] — 2026-08-04
+
+### Added
+
+- **You now learn about updates.** The Chrome Web Store updates extensions
+  silently; the extension now announces them itself — a NEW badge on the
+  toolbar icon and a dismissable one-line "Updated to vX.Y.Z — see what's
+  new" banner in the side panel linking to the release notes. Dismissing the
+  banner clears the badge. First installs still get the guide; updates never
+  open surprise tabs.
+
+### Fixed
+
+- **"Note" on a web page now opens the pen, not just the panel.** The
+  toolbar's Note button behaved identically to Highlight (its intent flag
+  was silently dropped); now the side panel scrolls the fresh note into
+  view and puts the caret straight into its textarea — the same
+  write-immediately flow the PDF reader has always had.
+
 ## [1.2.2] — 2026-08-04
 
 ### Fixed

@@ -61,6 +61,26 @@ test('the panel header reaches the guide and the dashboard', async () => {
   await page.close();
 });
 
+test("a pending update shows the what's-new banner until dismissed, and dismissal sticks", async () => {
+  // The store updates extensions silently; the SW records the update in
+  // storage on onInstalled. Seed that flag the same way and drive the banner.
+  const page = await context.newPage();
+  await page.goto(url('src', 'sidepanel', 'index.html'));
+  await page.evaluate(() => chrome.storage.local.set({ whatsNewVersion: '9.9.9' }));
+  await page.reload();
+  const banner = page.locator('#whatsNew');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('Updated to v9.9.9');
+  await expect(page.locator('#whatsNew a')).toHaveAttribute('href', /releases/);
+
+  await page.locator('#whatsNewDismiss').click();
+  await expect(banner).toBeHidden();
+  await page.reload();
+  await expect(page.locator('#activeName')).toHaveText('My Research');
+  await expect(page.locator('#whatsNew')).toBeHidden();
+  await page.close();
+});
+
 test('an unscriptable tab shows the honest no-access state, not "no page metadata"', async () => {
   // The panel-as-a-tab harness IS the field failure mode: Chrome refuses to
   // inject into this tab (extension page here; a spent activeTab grant in

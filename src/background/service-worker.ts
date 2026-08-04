@@ -9,6 +9,7 @@ import { openContextNotesDB } from '../adapters/idb/db';
 import { createRepositories } from '../adapters/idb/repositories';
 import { registerMessageRouter } from '../adapters/chrome/messaging';
 import { registerAnnotatorControl } from './annotator-control';
+import { recordUpdate } from '../adapters/chrome/update-notice';
 import { CiteJsFormatter, type CslLoader } from '../adapters/citation/citejs';
 import { createFetchCslLoader } from '../adapters/citation/csl-assets';
 import { isCustomBaseStyleId } from '../core/citation/parse';
@@ -46,6 +47,15 @@ chrome.runtime.onInstalled.addListener((details) => {
     void chrome.tabs
       .create({ url: chrome.runtime.getURL('src/onboarding/index.html') })
       .catch(() => {});
+  }
+  // Updates are silent by store design — announce them quietly instead: a
+  // NEW badge on the icon plus a dismissable one-liner in the panel. No
+  // surprise tabs.
+  if (details.reason === 'update') {
+    const version = chrome.runtime.getManifest().version;
+    if (details.previousVersion && details.previousVersion !== version) {
+      void recordUpdate(version);
+    }
   }
 });
 

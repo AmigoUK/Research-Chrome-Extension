@@ -42,6 +42,7 @@ import {
   dismissGettingStarted,
   markCitationCopied,
 } from '../adapters/chrome/onboarding-state';
+import { getUpdateNotice, dismissUpdateNotice } from '../adapters/chrome/update-notice';
 
 interface State {
   projects: Project[];
@@ -1261,6 +1262,18 @@ async function init(): Promise<void> {
   state.gettingStartedDismissed = onboarding.dismissed;
   state.copiedCitation = onboarding.copiedCitation;
   state.standingAccess = await hasStandingPageAccess();
+
+  // Store updates are silent — surface the pending one until the user
+  // dismisses it (which also takes the NEW badge off the toolbar icon).
+  const updated = await getUpdateNotice();
+  if (updated) {
+    $('whatsNewText').textContent = `Updated to v${updated} —`;
+    $('whatsNew').hidden = false;
+    $('whatsNewDismiss').addEventListener('click', () => {
+      $('whatsNew').hidden = true;
+      void dismissUpdateNotice();
+    });
+  }
 
   await ensureSeedProject();
   await restoreActiveProject();
