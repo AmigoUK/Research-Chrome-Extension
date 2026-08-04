@@ -4,6 +4,8 @@ import {
   groupByStatus,
   statusCounts,
   computeProgress,
+  gettingStartedSteps,
+  gettingStartedComplete,
 } from '../../src/sidepanel/view-model';
 import type { Document } from '../../src/core/model/types';
 import type { DocumentStatus } from '../../src/core/model/workflow';
@@ -63,5 +65,52 @@ describe('computeProgress', () => {
   });
   it('handles an empty list', () => {
     expect(computeProgress([])).toEqual({ total: 0, reviewed: 0, percent: 0 });
+  });
+});
+
+describe('gettingStartedSteps', () => {
+  const fresh = {
+    hasCapturablePage: false,
+    documentCount: 0,
+    annotationCount: 0,
+    movedBeyondToRead: false,
+    copiedCitation: false,
+  };
+
+  it('starts with everything undone on a fresh install', () => {
+    const steps = gettingStartedSteps(fresh);
+    expect(steps).toHaveLength(5);
+    expect(steps.every((s) => !s.done)).toBe(true);
+    expect(gettingStartedComplete(steps)).toBe(false);
+  });
+
+  it('checks steps off from real data, not user claims', () => {
+    const steps = gettingStartedSteps({
+      hasCapturablePage: true,
+      documentCount: 2,
+      annotationCount: 1,
+      movedBeyondToRead: false,
+      copiedCitation: false,
+    });
+    const byId = Object.fromEntries(steps.map((s) => [s.id, s.done]));
+    expect(byId).toEqual({ open: true, file: true, annotate: true, status: false, cite: false });
+  });
+
+  it('treats a filed project as proof the user has opened an article before', () => {
+    // The panel may sit on a new tab; a non-empty project still means step 1
+    // was done once — the checklist must not un-check history.
+    const steps = gettingStartedSteps({ ...fresh, documentCount: 1 });
+    expect(steps.find((s) => s.id === 'open')?.done).toBe(true);
+  });
+
+  it('reports complete only when every step is done', () => {
+    const steps = gettingStartedSteps({
+      hasCapturablePage: true,
+      documentCount: 1,
+      annotationCount: 1,
+      movedBeyondToRead: true,
+      copiedCitation: true,
+    });
+    expect(gettingStartedComplete(steps)).toBe(true);
   });
 });

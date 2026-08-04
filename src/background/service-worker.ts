@@ -36,10 +36,17 @@ function createCslLoader(): CslLoader {
 }
 
 // Clicking the toolbar action opens the side panel — the primary surface.
-chrome.runtime.onInstalled.addListener(() => {
+chrome.runtime.onInstalled.addListener((details) => {
   void chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((err: unknown) => console.error('[context-notes] setPanelBehavior failed', err));
+  // First install only — not updates: a returning user already knows the
+  // moves, and a surprise tab on every update is how tutorials get hated.
+  if (details.reason === 'install') {
+    void chrome.tabs
+      .create({ url: chrome.runtime.getURL('src/onboarding/index.html') })
+      .catch(() => {});
+  }
 });
 
 // Route typed messages from the UI to the pure domain router.

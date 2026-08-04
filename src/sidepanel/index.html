@@ -12,6 +12,19 @@
       <header class="head">
         <div class="head__top">
           <div class="wordmark"><span class="glyph"></span>Context&nbsp;Notes</div>
+          <div class="head__actions">
+            <button class="headbtn" id="guideBtn" title="Open the getting-started guide">
+              Guide
+            </button>
+            <button
+              class="headbtn"
+              id="dashBtn"
+              data-od-id="open-dashboard"
+              title="Open the full dashboard — Kanban, references, styles, team"
+            >
+              Dashboard
+            </button>
+          </div>
         </div>
         <div class="switch">
           <button class="switch__btn" id="switchBtn" aria-haspopup="menu" aria-expanded="false">
@@ -25,6 +38,16 @@
       </header>
 
       <div class="body" id="scrollBody">
+        <section class="gstart" id="gsCard" data-od-id="getting-started" hidden>
+          <div class="section-label">
+            Getting started <span class="rule"></span>
+            <button class="gs-close" id="gsDismiss" aria-label="Hide the getting-started list">
+              ✕
+            </button>
+          </div>
+          <ol class="gs-list" id="gsList"></ol>
+        </section>
+
         <section class="capture" id="captureCard" data-od-id="capture-card">
           <div class="section-label">On this page <span class="rule"></span></div>
           <div class="cap-src">

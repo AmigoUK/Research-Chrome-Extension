@@ -79,3 +79,70 @@ export function computeProgress(docs: Document[]): Progress {
   const reviewed = docs.filter((d) => isReviewed(d.status)).length;
   return { total, reviewed, percent: total === 0 ? 0 : Math.round((reviewed / total) * 100) };
 }
+
+// ---------------------------------------------------------------------------
+// Getting-started checklist — the panel's built-in tutorial.
+// ---------------------------------------------------------------------------
+
+export interface GettingStartedInputs {
+  /** The previewed tab is a filable article/web page (not a search page). */
+  hasCapturablePage: boolean;
+  documentCount: number;
+  annotationCount: number;
+  /** At least one source has moved past "To read". */
+  movedBeyondToRead: boolean;
+  /** The user has copied any citation or bibliography at least once. */
+  copiedCitation: boolean;
+}
+
+export interface GettingStartedStep {
+  id: 'open' | 'file' | 'annotate' | 'status' | 'cite';
+  label: string;
+  /** One short sentence shown for the first not-done step. */
+  hint: string;
+  done: boolean;
+}
+
+/**
+ * The five moves that make the tool make sense, checked off from real data —
+ * a tutorial that reads the project instead of trusting the user to say
+ * "done". Order is the workflow order; the first undone step is "current".
+ */
+export function gettingStartedSteps(i: GettingStartedInputs): GettingStartedStep[] {
+  return [
+    {
+      id: 'open',
+      label: 'Open an article page',
+      hint: 'Open the paper itself in this tab — search-results pages have nothing to file.',
+      done: i.hasCapturablePage || i.documentCount > 0,
+    },
+    {
+      id: 'file',
+      label: 'File it into your project',
+      hint: 'Press “File into project” above — a DOI fills in authors, year, volume and pages.',
+      done: i.documentCount > 0,
+    },
+    {
+      id: 'annotate',
+      label: 'Highlight a passage',
+      hint: 'Press “Annotate this page”, allow the site once, then select text → Highlight or Note.',
+      done: i.annotationCount > 0,
+    },
+    {
+      id: 'status',
+      label: 'Move a source along the workflow',
+      hint: 'Use the status chip on a reading-list row: To read → In review → Analysed → Used.',
+      done: i.movedBeyondToRead,
+    },
+    {
+      id: 'cite',
+      label: 'Copy a citation',
+      hint: 'Press “Cite” on a row, or “Copy bibliography” below for the whole project.',
+      done: i.copiedCitation,
+    },
+  ];
+}
+
+export function gettingStartedComplete(steps: GettingStartedStep[]): boolean {
+  return steps.every((s) => s.done);
+}

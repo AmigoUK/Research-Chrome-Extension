@@ -15,8 +15,10 @@ export default defineConfig({
     target: 'esnext',
     sourcemap: true,
     rollupOptions: {
-      // The PDF reader is web-accessible (not a manifest surface), so declare it
-      // as an explicit Rollup HTML input for @crxjs to bundle (script + pdf.js).
+      // The PDF reader is opened by extension-page URL (not a manifest surface
+      // and NOT web-accessible — the manifest deliberately declares no
+      // web_accessible_resources), so declare it as an explicit Rollup HTML
+      // input for @crxjs to bundle (script + pdf.js).
       //
       // The annotator content script is NOT built here. It used to be a second
       // Rollup input folded into an 'annotator' chunk via manualChunks, but
@@ -27,6 +29,9 @@ export default defineConfig({
       // vite.annotator.config.ts, run as a second build step after this one.
       input: {
         pdfviewer: fileURLToPath(new URL('./src/pdfviewer/index.html', import.meta.url)),
+        // The onboarding guide is opened by URL (first install, the panel's
+        // Guide button), not declared in the manifest — same as the reader.
+        onboarding: fileURLToPath(new URL('./src/onboarding/index.html', import.meta.url)),
       },
     },
   },

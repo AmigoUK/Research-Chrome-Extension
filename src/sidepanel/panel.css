@@ -668,3 +668,81 @@ body {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
+
+/* --- Header actions: Guide + Dashboard --------------------------------- */
+.head__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.headbtn {
+  font: 500 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition:
+    color 0.15s var(--ease),
+    border-color 0.15s var(--ease);
+}
+.headbtn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* --- Getting-started checklist ----------------------------------------- */
+.gstart {
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-soft);
+}
+.gs-close {
+  margin-left: 8px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.gs-close:hover {
+  color: var(--fg);
+}
+.gs-list {
+  list-style: none;
+  margin-top: 8px;
+  display: grid;
+  gap: 5px;
+}
+.gs-step {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+}
+.gs-step .tick {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  flex: 0 0 14px;
+}
+.gs-step.done .tick {
+  color: var(--s-analysed);
+}
+.gs-step.done .lbl {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+.gs-step.current .lbl {
+  font-weight: 600;
+}
+.gs-hint {
+  margin: 2px 0 4px 22px;
+  font-size: 12px;
+  color: var(--muted);
+}

@@ -27,8 +27,15 @@ import {
   filterDocuments,
   groupByStatus,
   computeProgress,
+  gettingStartedSteps,
+  gettingStartedComplete,
   type ListFilter,
 } from './view-model';
+import {
+  getOnboardingState,
+  dismissGettingStarted,
+  markCitationCopied,
+} from '../adapters/chrome/onboarding-state';
 
 interface State {
   projects: Project[];
@@ -55,6 +62,10 @@ interface State {
    *  load of the page. Empty means "no report yet" — render everything
    *  normally rather than presuming every note is lost. */
   resolvedIds: Set<string>;
+  /** Getting-started checklist inputs the documents list cannot prove. */
+  annotationCount: number;
+  copiedCitation: boolean;
+  gettingStartedDismissed: boolean;
 }
 
 const state: State = {
@@ -70,6 +81,9 @@ const state: State = {
   pageAnnotations: [],
   pageDocumentId: null,
   resolvedIds: new Set(),
+  annotationCount: 0,
+  copiedCitation: false,
+  gettingStartedDismissed: true, // hidden until storage says otherwise
 };
 
 const ANNO_STATUS: Record<AnnotationStatus, string> = {
@@ -152,6 +166,22 @@ async function loadStyles(): Promise<void> {
   state.styles = await sendRequest({ type: 'citationStyles/list' });
 }
 
+async function loadAnnotationCount(): Promise<void> {
+  if (!state.activeProjectId) {
+    state.annotationCount = 0;
+    return;
+  }
+  try {
+    const annotations = await sendRequest({
+      type: 'annotations/listByProject',
+      projectId: state.activeProjectId,
+    });
+    state.annotationCount = annotations.length;
+  } catch {
+    // The checklist is decoration; a failed count must not break the panel.
+  }
+}
+
 async function loadPreview(): Promise<void> {
   if (!state.activeProjectId) return;
   try {
@@ -200,6 +230,7 @@ async function refreshPreview(): Promise<void> {
   await loadPageAnnotations();
   renderCaptureCard();
   renderOnPageCard();
+  renderGettingStarted(); // its first step tracks the previewed tab
 }
 
 // --------------------------------------------------------------------------
@@ -617,8 +648,64 @@ function renderProgress(): void {
   );
 }
 
+/**
+ * Journey nudges: when an action completes, say what the natural NEXT action
+ * is, in the moment it becomes natural — file → annotate → set a status →
+ * cite → share. Each nudge fires at most once per panel session, never after
+ * the user dismissed the tutorial, and waits out the action's own toast so it
+ * doesn't overwrite the confirmation the user is reading.
+ */
+const firedNudges = new Set<string>();
+function nudgeNext(id: string, message: string): void {
+  if (state.gettingStartedDismissed || firedNudges.has(id)) return;
+  firedNudges.add(id);
+  setTimeout(() => toast(message), 2700);
+}
+
+/**
+ * The built-in tutorial: five workflow steps checked off from real project
+ * data, shown until every step is done or the user closes it. The first
+ * undone step carries a one-line hint — teaching one move at a time instead
+ * of a wall of instructions.
+ */
+function renderGettingStarted(): void {
+  const card = $('gsCard');
+  const steps = gettingStartedSteps({
+    hasCapturablePage: isCapturablePreview() && !state.previewIsSearchPage,
+    documentCount: state.documents.length,
+    annotationCount: state.annotationCount,
+    movedBeyondToRead: state.documents.some((d) => d.status !== 'toRead'),
+    copiedCitation: state.copiedCitation,
+  });
+  const hide = state.gettingStartedDismissed || gettingStartedComplete(steps);
+  card.hidden = hide;
+  if (hide) return;
+
+  const list = $('gsList');
+  const firstUndone = steps.find((s) => !s.done)?.id;
+  list.replaceChildren(
+    ...steps.flatMap((step) => {
+      const li = document.createElement('li');
+      li.className = `gs-step${step.done ? ' done' : ''}${step.id === firstUndone ? ' current' : ''}`;
+      const tick = document.createElement('span');
+      tick.className = 'tick';
+      tick.textContent = step.done ? '✓' : '○';
+      const lbl = document.createElement('span');
+      lbl.className = 'lbl';
+      lbl.textContent = step.label;
+      li.append(tick, lbl);
+      if (step.id !== firstUndone) return [li];
+      const hint = document.createElement('li');
+      hint.className = 'gs-hint';
+      hint.textContent = step.hint;
+      return [li, hint];
+    }),
+  );
+}
+
 function render(): void {
   renderHeader();
+  renderGettingStarted();
   renderCaptureCard();
   renderOnPageCard();
   renderSegmented();
@@ -645,6 +732,9 @@ async function fileCurrentPage(): Promise<void> {
     await loadDocuments();
     render();
     toast(result.deduped ? 'Already filed — reused existing source' : 'Filed into project');
+    if (state.annotationCount === 0) {
+      nudgeNext('after-file', 'Next: “Annotate this page”, then select a passage to highlight it');
+    }
     // Page tags are patchy (missing years, no volume/pages, inconsistent
     // author forms); the registry record behind the same DOI is complete.
     // Best-effort: the capture already succeeded, so a failed lookup (offline,
@@ -857,6 +947,12 @@ async function setStatus(doc: Document, status: DocumentStatus): Promise<void> {
     await loadDocuments();
     render();
     toast(`Moved to “${statusLabel(status)}”`);
+    if (status !== 'toRead' && !state.copiedCitation) {
+      nudgeNext(
+        'after-status',
+        'When it’s analysed, “Cite” on the row copies its in-text citation',
+      );
+    }
   } catch (err) {
     // Without this the write rejected unhandled: the list never updated and the
     // user got no signal that the status change was lost.
@@ -868,6 +964,17 @@ async function copyToClipboard(text: string, label: string): Promise<void> {
   try {
     await navigator.clipboard.writeText(text);
     toast(`${label} copied`);
+    if (!state.copiedCitation) {
+      // Every copy in this panel is a citation of some form — that is the
+      // one checklist step no stored record can prove.
+      state.copiedCitation = true;
+      void markCitationCopied();
+      renderGettingStarted();
+      nudgeNext(
+        'after-cite',
+        '“Copy bibliography” compiles every source — and Dashboard → Team → Sync shares the project as one file',
+      );
+    }
   } catch {
     toast('Couldn’t copy — clipboard blocked', true);
   }
@@ -978,6 +1085,19 @@ async function init(): Promise<void> {
     e.stopPropagation();
     openProjectMenu($('switchBtn'));
   });
+  // The dashboard was unreachable from the panel — the primary surface had
+  // no route to the main workspace at all.
+  $('dashBtn').addEventListener('click', () => {
+    void chrome.runtime.openOptionsPage();
+  });
+  $('guideBtn').addEventListener('click', () => {
+    void chrome.tabs.create({ url: chrome.runtime.getURL('src/onboarding/index.html') });
+  });
+  $('gsDismiss').addEventListener('click', () => {
+    state.gettingStartedDismissed = true;
+    void dismissGettingStarted();
+    renderGettingStarted();
+  });
 
   // The popovers are light: anything else the user does dismisses them.
   document.addEventListener('click', (e) => {
@@ -1017,6 +1137,7 @@ async function init(): Promise<void> {
         state.projects = await sendRequest({ type: 'projects/list' });
         await loadStyles();
         await loadDocuments();
+        await loadAnnotationCount();
         await loadPageAnnotations();
         render();
       })();
@@ -1029,8 +1150,17 @@ async function init(): Promise<void> {
         onDataChanged();
       } else if (message?.control === 'annotator/changed') {
         void (async () => {
+          const hadNone = state.annotationCount === 0;
           await loadPageAnnotations();
+          await loadAnnotationCount();
           renderOnPageCard();
+          renderGettingStarted();
+          if (hadNone && state.annotationCount > 0) {
+            nudgeNext(
+              'after-annotate',
+              'Saved — when you start working through this source, move it to “In review” from its status chip',
+            );
+          }
         })();
       } else if (message?.control === 'annotator/resolved') {
         if (message.url && message.url === state.preview?.url) {
@@ -1043,15 +1173,21 @@ async function init(): Promise<void> {
     },
   );
 
+  const onboarding = await getOnboardingState();
+  state.gettingStartedDismissed = onboarding.dismissed;
+  state.copiedCitation = onboarding.copiedCitation;
+
   await ensureSeedProject();
   await restoreActiveProject();
   await loadStyles();
   await loadDocuments();
+  await loadAnnotationCount();
   render();
   await loadPreview();
   await loadPageAnnotations();
   renderCaptureCard();
   renderOnPageCard();
+  renderGettingStarted();
 }
 
 document.addEventListener('DOMContentLoaded', () => void init());

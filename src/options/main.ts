@@ -541,8 +541,22 @@ function renderOverview(view: HTMLElement, actions: HTMLElement): void {
       <div class="tile"><div class="tl">Annotations</div><div class="tv">${state.annotations.length}</div><div class="tsub">${inReport} included in the report</div></div>
       <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${styleValue}</div><div class="tsub">${styleSub}</div></div>
     </div>
+    ${
+      state.documents.length === 0
+        ? `<div class="panel" style="margin-bottom:18px">
+             <p class="panel-note" style="margin:0">
+               <b>No sources yet.</b> File your first from the <b>side panel</b> — the
+               Context&nbsp;Notes toolbar icon, on the article page you are reading — or
+               <button class="btn btn--sm" id="ovAddPdf" style="margin:0 4px">Add a PDF</button>
+               here. New to the flow? <a href="../onboarding/index.html" target="_blank" rel="noopener">Open the guide</a>.
+             </p>
+           </div>`
+        : ''
+    }
     <div class="sec-h"><h2>Workflow</h2><span class="ln"></span><span class="cnt">drag · or focus a card and press ← →</span></div>
     <div class="kanban" id="kanban"></div>`;
+  const ovAddPdf = view.querySelector<HTMLButtonElement>('#ovAddPdf');
+  if (ovAddPdf) ovAddPdf.onclick = () => void addPdf();
   renderKanban($('#kanban', view));
 }
 

@@ -1,0 +1,180 @@
+/*
+ * Onboarding guide — the same design tokens as the side panel
+ * (src/sidepanel/panel.css), laid out as a single readable page. Static
+ * content only; the two buttons are wired in main.ts.
+ */
+@import '../assets/fonts/fonts.css';
+
+:root {
+  --bg: oklch(98% 0.004 95);
+  --surface: oklch(100% 0.002 95);
+  --fg: oklch(20% 0.018 70);
+  --muted: oklch(45% 0.014 70);
+  --border: oklch(90% 0.006 95);
+  --accent: oklch(52% 0.1 28);
+  --accent-soft: oklch(52% 0.1 28 / 0.1);
+
+  --font-display: 'Iowan Old Style', 'Charter', 'Charis SIL', Georgia, serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'iA Writer Mono', 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  line-height: 1.55;
+}
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+}
+
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.glyph {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  margin: 14px 0 10px;
+}
+.lede {
+  color: var(--muted);
+  max-width: 58ch;
+}
+.cta {
+  display: flex;
+  gap: 10px;
+  margin: 20px 0 8px;
+}
+
+.btn {
+  font: 500 13px var(--font-body);
+  padding: 9px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.steps {
+  list-style: none;
+  margin-top: 36px;
+  display: grid;
+  gap: 14px;
+}
+.step {
+  display: flex;
+  gap: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.step .n {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  color: var(--accent);
+  border: 1.5px solid var(--accent);
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+}
+.step h2,
+.extra h2 {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.step p,
+.extra p {
+  color: var(--muted);
+  font-size: 14px;
+}
+.step b,
+.extra b,
+.lede b {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.ui {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 4px;
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.kbd {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  padding: 1px 5px;
+  background: var(--surface);
+  white-space: nowrap;
+}
+.kbd--link {
+  cursor: pointer;
+  color: var(--accent);
+  border-color: var(--accent-soft);
+}
+.kbd--link:hover {
+  border-color: var(--accent);
+}
+
+.extra {
+  margin-top: 28px;
+  border-top: 1px solid var(--border);
+  padding-top: 22px;
+}
+
+.foot {
+  margin-top: 34px;
+  color: var(--muted);
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}

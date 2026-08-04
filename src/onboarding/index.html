@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Welcome — Scientific Context Notes</title>
+    <link rel="stylesheet" href="./onboarding.css" />
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div class="wordmark"><span class="glyph"></span>Context&nbsp;Notes</div>
+        <h1>Five moves and it makes sense</h1>
+        <p class="lede">
+          Everything you file, note and cite stays <b>in this browser</b> — no account, no server,
+          no telemetry. The side panel lives behind the toolbar icon
+          <span class="kbd">puzzle&nbsp;piece → pin Context&nbsp;Notes</span>; the full dashboard is
+          one click from there.
+        </p>
+        <p class="lede">
+          Each move hands you to the next — file a paper and the panel suggests highlighting it,
+          highlight and it suggests tracking it, and so on. The <b>Getting started</b> list in the
+          panel checks itself off as you go, from what you actually did.
+        </p>
+        <div class="cta">
+          <button class="btn btn--primary" id="openPanel">Open the side panel</button>
+          <button class="btn" id="openDashboard">Open the dashboard</button>
+          <button class="btn" id="closeGuide">I’ll explore on my own</button>
+        </div>
+      </header>
+
+      <ol class="steps">
+        <li class="step">
+          <div class="n">1</div>
+          <div>
+            <h2>File a source</h2>
+            <p>
+              Open the <b>article page itself</b> — not the search results; the panel will tell you
+              when a page has nothing to file — and press <span class="ui">File into project</span>.
+              When the page carries a DOI, the record is completed from the DOI registry: structured
+              authors, year, journal, volume, issue, pages. Fix anything by hand later via
+              <span class="ui">Dashboard → Documents → Edit</span>.
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="n">2</div>
+          <div>
+            <h2>Highlight what matters</h2>
+            <p>
+              Press <span class="ui">Annotate this page</span> and allow the site once — the
+              annotator loads <b>only on sites you approve</b>, and you can revoke any site under
+              <button class="kbd kbd--link" id="openSiteAccess" type="button">
+                Site access settings</button
+              >. Then select text: <span class="ui">Highlight</span> paints it,
+              <span class="ui">Note</span> attaches your words to the exact passage. Both repaint on
+              your next visit.
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="n">3</div>
+          <div>
+            <h2>Read PDFs the same way</h2>
+            <p>
+              <span class="ui">Dashboard → Documents → Add PDF</span> opens the bundled reader: text
+              highlights, drawn region anchors, notes and review statuses — all placed by page
+              fractions, so they survive zoom and reload.
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="n">4</div>
+          <div>
+            <h2>Track your reading</h2>
+            <p>
+              Every source moves
+              <span class="ui">To read → In review → Analysed → Used in output</span>. Change it
+              from the status chip on any row, or drag cards across the Kanban board on the
+              dashboard’s <span class="ui">Overview</span> (arrow keys work too).
+            </p>
+          </div>
+        </li>
+        <li class="step">
+          <div class="n">5</div>
+          <div>
+            <h2>Cite without retyping</h2>
+            <p>
+              <span class="ui">Cite</span> on a row copies an in-text citation;
+              <span class="ui">Copy bibliography</span> compiles the project. Seven base styles —
+              APA, Harvard (Cite Them Right and Solent University), Chicago ×2, MLA, Vancouver — or
+              open the <span class="ui">style editor</span> and turn plain rules into your journal’s
+              own format, with a live preview.
+            </p>
+          </div>
+        </li>
+      </ol>
+
+      <section class="extra">
+        <h2>When you work with others</h2>
+        <p>
+          <span class="ui">Team → Sync</span> exports the whole project as one file — optionally
+          password-encrypted — and an import always shows exactly what it would change
+          <b>before</b> anything is written. Roles are advisory and the Team view says so plainly:
+          with no server, every collaborator holds a full copy.
+        </p>
+      </section>
+
+      <footer class="foot">
+        <span>This guide stays available from the <b>Guide</b> button in the side panel.</span>
+      </footer>
+    </main>
+  </body>
+</html>
