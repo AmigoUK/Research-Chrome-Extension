@@ -198,6 +198,46 @@ describe('merge rules', () => {
     expect(annotation?.documentId).toBe('local-doc');
   });
 
+  it('dedups by DOI even when the snapshot carries the resolver-prefixed form', async () => {
+    const data = await buildSnapshot(repos, 'p1');
+    // Same paper, but written the way a hand-edited or older file might carry
+    // it: uppercase, with the resolver prefix. Normalisation must fold it.
+    const doc = data.documents[0]!;
+    data.documents[0] = {
+      ...doc,
+      id: 'remote-doc',
+      metadata: { ...doc.metadata, doi: 'https://doi.org/10.1000/HEAT' },
+    };
+    data.annotations = data.annotations.map((a) => ({ ...a, documentId: 'remote-doc' }));
+
+    const target = await otherMachine();
+    await target.projects.put(project);
+    await target.documents.put(makeDocument({ id: 'local-doc' }));
+
+    const report = await mergeSnapshot(target, deps, data);
+
+    expect(report.dedupedByDoi).toBeGreaterThanOrEqual(1);
+    // One source, not a split pair with the annotations divided between them.
+    expect(await target.documents.listByProject('p1')).toHaveLength(1);
+    const [annotation] = await target.annotations.listByProject('p1');
+    expect(annotation?.documentId).toBe('local-doc');
+  });
+
+  it("keeps the importer's own identity when the snapshot carries the exporter's 'me' row", async () => {
+    const data = await buildSnapshot(repos, 'p1'); // exporter's users include 'me' named 'You'
+    data.users = [{ id: 'me', name: 'Collaborator', rolesPerProject: { p1: 'editor' } }];
+
+    const target = await otherMachine();
+    await target.projects.put(project);
+    await target.users.put({ id: 'me', name: 'Dr Local', rolesPerProject: {} });
+
+    await mergeSnapshot(target, deps, data);
+
+    const me = await target.users.get('me');
+    expect(me?.name).toBe('Dr Local'); // not silently renamed to the collaborator
+    expect(me?.rolesPerProject['p1']).toBe('editor'); // roles still travel
+  });
+
   it('keeps the newer record on both sides', async () => {
     await repos.annotations.put(makeAnnotation({ content: 'Newer note', updatedAt: LATER }));
     const data = await buildSnapshot(repos, 'p1');

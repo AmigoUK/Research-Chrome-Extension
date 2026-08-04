@@ -16,7 +16,13 @@
  * normalised to UTC. Import fails closed, naming what is wrong: a snapshot that
  * cannot be trusted in part cannot be trusted in whole.
  */
-import { ACTIVITY_KINDS, type SyncMode } from '../model/types';
+import {
+  ACTIVITY_KINDS,
+  type Anchor,
+  type DocumentMetadata,
+  type DocumentType,
+  type SyncMode,
+} from '../model/types';
 import { DOCUMENT_STATUSES } from '../model/workflow';
 import { ROLES } from '../model/roles';
 import type { SnapshotData } from '../usecases/snapshot';
@@ -30,6 +36,16 @@ export const ID_PATTERN = /^[\w.:@+-]{1,128}$/;
 
 const ANNOTATION_STATUSES = ['draft', 'accepted', 'rejected', 'includedInReport'] as const;
 const SYNC_MODES: readonly SyncMode[] = ['local', 'file'];
+const DOCUMENT_TYPES: readonly DocumentType[] = [
+  'article',
+  'report',
+  'dataset',
+  'foi',
+  'case',
+  'webPage',
+  'pdf',
+];
+const WEB_SELECTOR_TYPES = ['textQuote', 'textPosition', 'css'] as const;
 const BASE64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 class SnapshotError extends Error {}
@@ -76,6 +92,110 @@ function record(value: unknown, what: string): Record<string, unknown> {
 }
 
 /**
+ * Every record in a snapshot must belong to the snapshot's own project. The
+ * old check only asked "is it a well-formed id?" — which let a crafted file
+ * write documents, notes, or history into *any other* local project while the
+ * merge report claimed an import of the named one.
+ */
+function sameProject(value: unknown, projectId: string, what: string): string {
+  const pid = id(value, `${what}'s project id`);
+  if (pid !== projectId) fail(`${what} belongs to a different project`);
+  return pid;
+}
+
+function finite(value: unknown, what: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) fail(`${what} is not a number`);
+  return value;
+}
+
+/** A URL we are willing to store and later render as a link. `javascript:`
+ *  (and anything else that executes) is refused outright — an href is the one
+ *  attribute where escaping alone cannot help. */
+function url(value: unknown, what: string): string {
+  const raw = text(value, what, 4096);
+  if (/^\s*(javascript|data|vbscript):/i.test(raw)) fail(`${what} uses a forbidden scheme`);
+  return raw;
+}
+
+/**
+ * Rebuild metadata from its known fields only. The old shape-check
+ * (`is it a record?`) let a tampered snapshot smuggle markup through fields
+ * like `year` that the dashboard interpolates — and typos like a string year
+ * would silently break sorting either way.
+ */
+function documentMetadata(value: unknown, what: string): DocumentMetadata {
+  const raw = record(value, what);
+  const out: DocumentMetadata = {};
+  if (raw['title'] !== undefined) out.title = text(raw['title'], `${what}'s title`, 2048);
+  if (raw['authors'] !== undefined) {
+    out.authors = list(raw['authors'], `${what}'s authors`).map((a, i) =>
+      text(a, `${what}'s author ${i + 1}`, 512),
+    );
+  }
+  if (raw['year'] !== undefined) out.year = finite(raw['year'], `${what}'s year`);
+  if (raw['doi'] !== undefined) out.doi = text(raw['doi'], `${what}'s DOI`, 512);
+  if (raw['journal'] !== undefined) out.journal = text(raw['journal'], `${what}'s journal`, 1024);
+  if (raw['publisher'] !== undefined) {
+    out.publisher = text(raw['publisher'], `${what}'s publisher`, 1024);
+  }
+  if (raw['identifiers'] !== undefined) {
+    const ids = record(raw['identifiers'], `${what}'s identifiers`);
+    const clean: Record<string, string> = {};
+    for (const [key, val] of Object.entries(ids)) {
+      clean[text(key, `${what}'s identifier name`, 128)] = text(
+        val,
+        `${what}'s identifier value`,
+        1024,
+      );
+    }
+    out.identifiers = clean;
+  }
+  return out;
+}
+
+/**
+ * An annotation with no anchor (or a malformed one) used to pass shape-free —
+ * and then `a.anchor.kind` threw inside `web/annotationsForUrl`'s filter,
+ * permanently erroring the annotation list for that page. Fail at the border.
+ */
+function anchor(value: unknown, what: string): Anchor {
+  const raw = record(value, what);
+  if (raw['kind'] === 'web') {
+    const selectors = list(raw['selectors'], `${what}'s selectors`).map((s, i) => {
+      const sel = record(s, `${what}'s selector ${i + 1}`);
+      const type = oneOf(sel['type'], WEB_SELECTOR_TYPES, `${what}'s selector ${i + 1} type`);
+      if (type === 'textQuote') text(sel['exact'], `${what}'s selector ${i + 1} quote`, 20_000);
+      if (type === 'textPosition') {
+        finite(sel['start'], `${what}'s selector ${i + 1} start`);
+        finite(sel['end'], `${what}'s selector ${i + 1} end`);
+      }
+      if (type === 'css') text(sel['value'], `${what}'s selector ${i + 1} path`, 4096);
+      return sel;
+    });
+    const shadowHost =
+      raw['shadowHost'] === undefined
+        ? {}
+        : { shadowHost: text(raw['shadowHost'], `${what}'s shadow host`, 4096) };
+    return { kind: 'web', selectors, ...shadowHost } as unknown as Anchor;
+  }
+  if (raw['kind'] === 'pdf') {
+    const selectors = list(raw['selectors'], `${what}'s selectors`).map((s, i) => {
+      const sel = record(s, `${what}'s selector ${i + 1}`);
+      finite(sel['page'], `${what}'s selector ${i + 1} page`);
+      list(sel['rects'], `${what}'s selector ${i + 1} rects`).forEach((r, j) => {
+        const rect = record(r, `${what}'s rect ${j + 1}`);
+        for (const side of ['page', 'left', 'top', 'width', 'height'] as const) {
+          finite(rect[side], `${what}'s rect ${j + 1} ${side}`);
+        }
+      });
+      return sel;
+    });
+    return { kind: 'pdf', selectors } as unknown as Anchor;
+  }
+  return fail(`${what} is not a web or pdf anchor`);
+}
+
+/**
  * Validate and normalise a decoded snapshot payload. Returns a fresh object —
  * the caller never merges the raw parse.
  */
@@ -114,12 +234,17 @@ export function validateSnapshotData(value: unknown): SnapshotData {
       return {
         ...(doc as unknown as SnapshotData['documents'][number]),
         id: id(doc['id'], `source ${i + 1}'s id`),
-        projectId: id(doc['projectId'], `source ${i + 1}'s project id`),
+        projectId: sameProject(doc['projectId'], projectId, `source ${i + 1}`),
+        url: url(doc['url'], `source ${i + 1}'s URL`),
+        type: oneOf(doc['type'], DOCUMENT_TYPES, `source ${i + 1}'s type`),
+        ...(doc['section'] === undefined
+          ? {}
+          : { section: text(doc['section'], `source ${i + 1}'s section`, 256) }),
         ...(doc['fileId'] === undefined
           ? {}
           : { fileId: id(doc['fileId'], `source ${i + 1}'s file id`) }),
         status: oneOf(doc['status'], DOCUMENT_STATUSES, `source ${i + 1}'s status`),
-        metadata: record(doc['metadata'], `source ${i + 1}'s metadata`) as never,
+        metadata: documentMetadata(doc['metadata'], `source ${i + 1}'s metadata`),
         createdAt: timestamp(doc['createdAt'], `source ${i + 1}'s creation date`),
         updatedAt: timestamp(doc['updatedAt'], `source ${i + 1}'s update date`),
       };
@@ -130,9 +255,18 @@ export function validateSnapshotData(value: unknown): SnapshotData {
       return {
         ...(note as unknown as SnapshotData['annotations'][number]),
         id: id(note['id'], `annotation ${i + 1}'s id`),
-        projectId: id(note['projectId'], `annotation ${i + 1}'s project id`),
+        projectId: sameProject(note['projectId'], projectId, `annotation ${i + 1}`),
         documentId: id(note['documentId'], `annotation ${i + 1}'s source id`),
         author: id(note['author'], `annotation ${i + 1}'s author`),
+        anchor: anchor(note['anchor'], `annotation ${i + 1}'s anchor`),
+        content: text(note['content'] ?? '', `annotation ${i + 1}'s content`, 65_536),
+        ...(note['tags'] === undefined
+          ? {}
+          : {
+              tags: list(note['tags'], `annotation ${i + 1}'s tags`).map((t, j) =>
+                text(t, `annotation ${i + 1}'s tag ${j + 1}`, 256),
+              ),
+            }),
         status: oneOf(note['status'], ANNOTATION_STATUSES, `annotation ${i + 1}'s status`),
         createdAt: timestamp(note['createdAt'], `annotation ${i + 1}'s creation date`),
         updatedAt: timestamp(note['updatedAt'], `annotation ${i + 1}'s update date`),
@@ -144,7 +278,7 @@ export function validateSnapshotData(value: unknown): SnapshotData {
       return {
         ...(ref as unknown as SnapshotData['references'][number]),
         id: id(ref['id'], `reference ${i + 1}'s id`),
-        projectId: id(ref['projectId'], `reference ${i + 1}'s project id`),
+        projectId: sameProject(ref['projectId'], projectId, `reference ${i + 1}`),
         ...(ref['documentId'] === undefined
           ? {}
           : { documentId: id(ref['documentId'], `reference ${i + 1}'s source id`) }),
@@ -171,6 +305,9 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         ...(user as unknown as SnapshotData['users'][number]),
         id: id(user['id'], `person ${i + 1}'s id`),
         name: text(user['name'], `person ${i + 1}'s name`, 512),
+        ...(user['email'] === undefined
+          ? {}
+          : { email: text(user['email'], `person ${i + 1}'s email`, 512) }),
         rolesPerProject: record(user['rolesPerProject'] ?? {}, `person ${i + 1}'s roles`) as never,
       };
     }),
@@ -180,7 +317,7 @@ export function validateSnapshotData(value: unknown): SnapshotData {
       return {
         ...(event as unknown as SnapshotData['activity'][number]),
         id: id(event['id'], `history entry ${i + 1}'s id`),
-        projectId: id(event['projectId'], `history entry ${i + 1}'s project id`),
+        projectId: sameProject(event['projectId'], projectId, `history entry ${i + 1}`),
         actorUserId: id(event['actorUserId'], `history entry ${i + 1}'s actor`),
         kind: oneOf(event['kind'], ACTIVITY_KINDS, `history entry ${i + 1}'s kind`),
         summary: text(event['summary'], `history entry ${i + 1}'s summary`),
@@ -196,7 +333,7 @@ export function validateSnapshotData(value: unknown): SnapshotData {
       return {
         ...(thread as unknown as SnapshotData['commentThreads'][number]),
         id: id(thread['id'], `thread ${i + 1}'s id`),
-        projectId: id(thread['projectId'], `thread ${i + 1}'s project id`),
+        projectId: sameProject(thread['projectId'], projectId, `thread ${i + 1}`),
         ...(thread['documentId'] === undefined
           ? {}
           : { documentId: id(thread['documentId'], `thread ${i + 1}'s source id`) }),

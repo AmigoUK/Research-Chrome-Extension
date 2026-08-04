@@ -89,4 +89,27 @@ describe('rejecting files that are not snapshots', () => {
     const text = JSON.stringify({ ...META, format: SNAPSHOT_FORMAT + 1, encrypted: false });
     await expect(openSnapshot(text)).rejects.toThrow(/newer version \(format 2\)/);
   });
+
+  it('refuses a nonsense format number (NaN-shaped, zero, fractional)', async () => {
+    for (const format of [0, -1, 1.5]) {
+      const text = JSON.stringify({ ...META, format, encrypted: false });
+      await expect(openSnapshot(text)).rejects.toThrow(/not a snapshot/);
+    }
+  });
+
+  it('refuses an absurd KDF iteration count instead of grinding the CPU on it', async () => {
+    const sealed = JSON.parse(await sealSnapshot(PAYLOAD, META, 'pw')) as Record<string, unknown>;
+    (sealed['kdf'] as Record<string, unknown>)['iterations'] = 1_000_000_000;
+    await expect(openSnapshot(JSON.stringify(sealed), 'pw')).rejects.toThrow(
+      /key-derivation header is malformed/,
+    );
+  });
+
+  it('names a truncated encrypted header instead of throwing a raw TypeError', async () => {
+    const sealed = JSON.parse(await sealSnapshot(PAYLOAD, META, 'pw')) as Record<string, unknown>;
+    delete sealed['ciphertext'];
+    await expect(openSnapshot(JSON.stringify(sealed), 'pw')).rejects.toThrow(
+      /the ciphertext is malformed/,
+    );
+  });
 });

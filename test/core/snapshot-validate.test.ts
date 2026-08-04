@@ -94,6 +94,89 @@ describe('ids that would escape their attribute', () => {
   });
 });
 
+describe('cross-project injection', () => {
+  it("refuses a record claiming another project's id, which would write into that project", () => {
+    expect(() => validateSnapshotData(withDocument({ projectId: 'other-project' }))).toThrow(
+      /source 1 belongs to a different project/,
+    );
+  });
+});
+
+describe('annotations without a usable anchor', () => {
+  const note = (anchor: unknown): Record<string, unknown> =>
+    good({
+      annotations: [
+        {
+          id: 'a1',
+          projectId: 'p1',
+          documentId: 'd1',
+          author: 'me',
+          anchor,
+          content: '',
+          status: 'draft',
+          createdAt: NOW,
+          updatedAt: NOW,
+        },
+      ],
+    });
+
+  it('refuses a missing anchor — it used to pass, then permanently broke that page\'s "on this page" list', () => {
+    expect(() => validateSnapshotData(note(undefined))).toThrow(/annotation 1's anchor/);
+  });
+
+  it('refuses an anchor of unknown kind', () => {
+    expect(() => validateSnapshotData(note({ kind: 'hologram', selectors: [] }))).toThrow(
+      /annotation 1's anchor is not a web or pdf anchor/,
+    );
+  });
+
+  it('accepts the real web and pdf anchor shapes', () => {
+    const web = note({
+      kind: 'web',
+      selectors: [{ type: 'textQuote', exact: 'a passage', prefix: 'before ' }],
+    });
+    expect(validateSnapshotData(web).annotations[0]?.anchor.kind).toBe('web');
+    const pdf = note({
+      kind: 'pdf',
+      selectors: [
+        {
+          type: 'pdfRegion',
+          page: 1,
+          rects: [{ page: 1, left: 0.1, top: 0.2, width: 0.5, height: 0.05 }],
+        },
+      ],
+    });
+    expect(validateSnapshotData(pdf).annotations[0]?.anchor.kind).toBe('pdf');
+  });
+});
+
+describe('metadata that would corrupt rendering or sorting', () => {
+  it('refuses markup smuggled through year, which the Kanban interpolates', () => {
+    expect(() => validateSnapshotData(withDocument({ metadata: { year: '<img src=x>' } }))).toThrow(
+      /source 1's metadata's year is not a number/,
+    );
+  });
+
+  it('refuses a javascript: URL — an href escaping cannot save', () => {
+    expect(() => validateSnapshotData(withDocument({ url: 'javascript:alert(1)' }))).toThrow(
+      /source 1's URL uses a forbidden scheme/,
+    );
+  });
+
+  it('drops unknown metadata fields instead of storing them', () => {
+    const parsed = validateSnapshotData(
+      withDocument({ metadata: { title: 'T', smuggled: '<script>' } }),
+    );
+    expect(parsed.documents[0]?.metadata).toEqual({ title: 'T' });
+  });
+
+  it('refuses a document type outside the model', () => {
+    expect(() => validateSnapshotData(withDocument({ type: 'tweet' }))).toThrow(
+      /source 1's type is not one of/,
+    );
+  });
+});
+
 describe('values that would corrupt behaviour rather than markup', () => {
   it('refuses a status outside the pipeline, which would hide the source from every column', () => {
     expect(() => validateSnapshotData(withDocument({ status: 'archived' }))).toThrow(

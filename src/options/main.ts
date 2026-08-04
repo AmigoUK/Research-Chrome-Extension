@@ -532,7 +532,7 @@ function kanbanCard(d: Document): string {
   const notes = notesFor(d.id);
   return `<article class="kcard${state.flash === d.id ? ' flash' : ''}" draggable="true" data-id="${esc(d.id)}" tabindex="0" role="listitem" aria-label="${esc(title)} — ${label}. Arrow keys move between stages, Enter to change status.">
     <div class="kt">${esc(title)}</div>
-    <div class="km">${esc(authorLabel(d.metadata.authors))}${d.metadata.year ? ` · ${d.metadata.year}` : ''}</div>
+    <div class="km">${esc(authorLabel(d.metadata.authors))}${d.metadata.year ? ` · ${esc(String(d.metadata.year))}` : ''}</div>
     <div class="kf">
       <button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${label}</button>
       ${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : ''}

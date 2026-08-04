@@ -26,6 +26,7 @@ import type {
   User,
 } from '../model/types';
 import { bytesToBase64, base64ToBytes } from '../files/base64';
+import { SELF_USER_ID } from '../model/identity';
 import type { CaptureDeps } from './capture';
 import { recordActivity } from './activity';
 import { validateSnapshotData } from '../snapshot/validate';
@@ -192,10 +193,15 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
   // --- Users: identity, keyed by id. ---
   for (const user of data.users ?? []) {
     const local = await repos.users.get(user.id);
+    // Every install calls itself 'me' (model/identity.ts), so a snapshot
+    // always carries the *exporter's* 'me' row. Letting it overwrite the
+    // importer's own row silently renamed the local user to the collaborator;
+    // keep the local identity and take only the incoming role map.
+    const keepLocalIdentity = local !== undefined && user.id === SELF_USER_ID;
     const merged = local
       ? {
           ...local,
-          ...user,
+          ...(keepLocalIdentity ? {} : user),
           rolesPerProject: { ...local.rolesPerProject, ...user.rolesPerProject },
         }
       : user;
@@ -208,7 +214,11 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
   for (const document of data.documents ?? []) {
     const doi = doiOf(document.metadata.doi);
     if (doi) {
-      const existing = await repos.documents.findByDoi(projectId, document.metadata.doi ?? '');
+      // Look up by the NORMALISED doi — capture stores DOIs lowercased with
+      // the resolver prefix stripped, and the document index matches exactly,
+      // so passing the raw value ("https://doi.org/10.1/X") would miss the
+      // local record and split one source (and its annotations) in two.
+      const existing = await repos.documents.findByDoi(projectId, doi);
       if (existing && existing.id !== document.id) {
         documentIdMap.set(document.id, existing.id);
         report.dedupedByDoi++;

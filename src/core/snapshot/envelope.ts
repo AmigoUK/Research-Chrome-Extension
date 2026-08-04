@@ -105,6 +105,24 @@ export async function sealSnapshot(
   return JSON.stringify(envelope, null, 2);
 }
 
+/**
+ * The KDF cost we will honour from a file. Legitimate files carry
+ * KDF_ITERATIONS; the ceiling leaves room for future increases while refusing
+ * a crafted envelope declaring 10⁹ iterations, which would pin the service
+ * worker in PBKDF2 for minutes before any password check — a CPU-DoS carried
+ * by the very file the user was asked to "just open".
+ */
+const MAX_KDF_ITERATIONS = 5_000_000;
+
+const BASE64_RE = /^[A-Za-z0-9+/]+={0,2}$/;
+
+function base64Field(value: unknown, what: string): string {
+  if (typeof value !== 'string' || value.length === 0 || !BASE64_RE.test(value)) {
+    throw new Error(`That file is not a snapshot (${what} is malformed)`);
+  }
+  return value;
+}
+
 function parseEnvelope(text: string): SnapshotEnvelope {
   let parsed: unknown;
   try {
@@ -113,13 +131,35 @@ function parseEnvelope(text: string): SnapshotEnvelope {
     throw new Error('That file is not a snapshot (invalid JSON)');
   }
   const envelope = parsed as Partial<SnapshotEnvelope>;
-  if (typeof envelope?.format !== 'number' || typeof envelope.encrypted !== 'boolean') {
+  if (
+    typeof envelope?.format !== 'number' ||
+    !Number.isInteger(envelope.format) ||
+    envelope.format < 1 ||
+    typeof envelope.encrypted !== 'boolean'
+  ) {
     throw new Error('That file is not a snapshot');
   }
   if (envelope.format > SNAPSHOT_FORMAT) {
     throw new Error(
       `This snapshot was written by a newer version (format ${envelope.format}). Update the extension first.`,
     );
+  }
+  if (envelope.encrypted) {
+    // A truncated or tampered encrypted file used to surface as a raw
+    // TypeError from fromBase64/deriveKey; name the problem instead.
+    const enc = envelope as Partial<EncryptedEnvelope>;
+    const kdf = enc.kdf;
+    if (
+      typeof kdf?.iterations !== 'number' ||
+      !Number.isInteger(kdf.iterations) ||
+      kdf.iterations < 1 ||
+      kdf.iterations > MAX_KDF_ITERATIONS
+    ) {
+      throw new Error('That file is not a snapshot (its key-derivation header is malformed)');
+    }
+    base64Field(kdf.salt, 'the salt');
+    base64Field(enc.iv, 'the IV');
+    base64Field(enc.ciphertext, 'the ciphertext');
   }
   return envelope as SnapshotEnvelope;
 }
