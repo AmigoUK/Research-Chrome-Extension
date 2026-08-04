@@ -5,6 +5,7 @@
  * lives in the domain core so both sides share one source of truth.
  */
 import type {
+  AnnotationColor,
   Project,
   Document,
   Annotation,
@@ -45,7 +46,7 @@ export interface MessageMap {
   'annotations/put': { req: { annotation: Annotation }; res: null };
   'annotations/delete': { req: { id: Id }; res: null };
   'web/annotate': {
-    req: { input: CaptureInput; anchor: WebAnchor };
+    req: { input: CaptureInput; anchor: WebAnchor; color?: AnnotationColor };
     res: { documentId: Id; annotationId: Id };
   };
   'web/annotationsForUrl': {

@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.4.0] — 2026-08-04
+
+### Changed
+
+- **One gesture, four colours.** The selection toolbar's Highlight/Note pair
+  is replaced by four colour dots (yellow, green, blue, pink) on web pages
+  AND in the PDF reader — the researcher's own stable taxonomy, deliberately
+  independent of the review status. The colour is stored on the annotation,
+  survives reloads, travels in snapshots (validated), and shows as a dot on
+  panel cards, the PDF rail and the dashboard's Annotations view. Notes are
+  written in the annotation card, so the separate "Note" button (and the
+  decision it forced on every selection) is gone. Legacy annotations keep
+  the original accent.
+
 ## [1.3.0] — 2026-08-04
 
 ### Added

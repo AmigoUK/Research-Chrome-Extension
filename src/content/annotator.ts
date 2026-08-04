@@ -71,14 +71,15 @@ function pageRects(range: Range): DOMRect[] {
   return [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1);
 }
 
-function paintOne(id: string, rects: DOMRect[]): void {
+function paintOne(id: string, rects: DOMRect[], color?: string): void {
   const layer = overlayLayer();
   // The layer is `position: fixed`, so client rects are already
   // viewport-relative — no window.scrollX/scrollY offset needed (and adding
   // one would double-count the scroll on a fixed-position ancestor).
   for (const r of rects) {
     const ov = document.createElement('div');
-    ov.className = 'ov';
+    // No colour (legacy annotations) keeps the original accent.
+    ov.className = color ? `ov ov--${color}` : 'ov';
     ov.dataset.id = id;
     ov.style.left = `${r.left}px`;
     ov.style.top = `${r.top}px`;
@@ -117,7 +118,7 @@ function resolveAndRepaintAll(): string[] {
 function repositionAll(): void {
   overlayLayer().replaceChildren();
   for (const p of painted) {
-    paintOne(p.annotation.id, p.range ? pageRects(p.range) : []);
+    paintOne(p.annotation.id, p.range ? pageRects(p.range) : [], p.annotation.color);
   }
   repositionToolbar();
 }
@@ -131,7 +132,7 @@ function jumpTo(id: string): void {
   setTimeout(() => overlays.forEach((ov) => ov.classList.remove('flash')), 1200);
 }
 
-async function commit(target: SelectionTarget, withNote: boolean): Promise<void> {
+async function commit(target: SelectionTarget, color: string): Promise<void> {
   const { range, root, shadowHost } = target;
   try {
     const anchor = createWebAnchor(root, range, shadowHost);
@@ -142,6 +143,7 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
       type: 'web/annotate',
       input,
       anchor,
+      color,
     })) as
       | { ok: true; data: { documentId: string; annotationId: string } }
       | { ok: false; error: string };
@@ -151,20 +153,13 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
     }
     // Paint and dismiss immediately — the highlight must not wait on the opt-in
     // permission round trip below.
-    paintOne(res.data.annotationId, pageRects(range));
+    paintOne(res.data.annotationId, pageRects(range), color);
     window.getSelection()?.removeAllRanges();
     hideToolbar();
-    // Let the service worker open the side panel + broadcast the change.
-    // "Note" means "I want to write NOW": carry the new annotation's id so
-    // the panel puts the caret straight into its textarea — the same
-    // zero-hunting flow the PDF reader has always had.
-    chrome.runtime
-      .sendMessage({
-        control: 'annotator/changed',
-        url: scan.url,
-        ...(withNote ? { focusId: res.data.annotationId } : {}),
-      })
-      .catch(() => {});
+    // Let the service worker open the side panel + broadcast the change. The
+    // fresh card is where the user writes their note if they want one — one
+    // gesture on the page, words in the panel.
+    chrome.runtime.sendMessage({ control: 'annotator/changed', url: scan.url }).catch(() => {});
     // Opt this origin in for future page loads (needs a host-permission grant).
     // Once per origin per session, and only after a real result — see optInOrigin.
     if (!registeredOrigins.has(location.origin)) void optInOrigin();
@@ -242,15 +237,18 @@ function showToolbar(range: Range): void {
   if (!pos) return;
   const el = document.createElement('div');
   el.className = 'toolbar';
-  for (const [label, withNote] of [
-    ['Highlight', false],
-    ['Note', true],
-  ] as const) {
+  // One gesture, four colours — the researcher's own taxonomy, not the
+  // review status. Notes are written afterwards in the panel card, so a
+  // separate "Note" button only added a decision to every selection.
+  for (const color of ['yellow', 'green', 'blue', 'pink']) {
     const b = document.createElement('button');
-    b.textContent = label;
+    b.className = `dot dot--${color}`;
+    b.dataset.color = color;
+    b.setAttribute('aria-label', `Highlight in ${color}`);
+    b.title = `Highlight in ${color}`;
     b.addEventListener('mousedown', (e) => {
       e.preventDefault();
-      if (pendingTarget) void commit(pendingTarget, withNote);
+      if (pendingTarget) void commit(pendingTarget, color);
     });
     el.appendChild(b);
   }

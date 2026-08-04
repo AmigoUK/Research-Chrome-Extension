@@ -168,13 +168,15 @@ test('highlighting a selection paints an overlay that repaints after reload, and
   });
   expect(expectedRect).not.toBeNull();
 
-  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await page.locator('#context-notes-annotator .toolbar button[data-color="green"]').click();
 
   // The overlay exists in the shadow root, and lines up with the selection —
   // the regression a `position: fixed` overlay layer (immune to the
   // `position: relative` <main> ancestor above) guards against.
   const overlay = page.locator('#context-notes-annotator .ov');
   await expect(overlay).toHaveCount(1);
+  // The chosen colour paints immediately…
+  await expect(overlay).toHaveClass(/ov--green/);
   const ovBox = await paintedRect(overlay);
   if (expectedRect) {
     expect(Math.abs(ovBox.x - expectedRect.left)).toBeLessThan(2);
@@ -190,6 +192,8 @@ test('highlighting a selection paints an overlay that repaints after reload, and
 
   const overlayAfterReload = page.locator('#context-notes-annotator .ov');
   await expect(overlayAfterReload).toHaveCount(1);
+  // …and is stored, not cosmetic: the repaint from storage keeps it.
+  await expect(overlayAfterReload).toHaveClass(/ov--green/);
   const ovBoxAfterReload = await paintedRect(overlayAfterReload);
   if (expectedRect) {
     expect(Math.abs(ovBoxAfterReload.x - expectedRect.left)).toBeLessThan(2);
@@ -247,7 +251,7 @@ test('a failed annotate dismisses the toolbar and paints nothing, without hangin
 
   await selectTargetSentence(page);
   await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
-  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await page.locator('#context-notes-annotator .toolbar button[data-color="yellow"]').click();
 
   // The commit's send rejected — but `commit()` must catch it: the toolbar is
   // dismissed (not left stuck over the selection) and nothing is painted. Before
@@ -275,7 +279,7 @@ test('re-anchors across a client-side (SPA) navigation', async () => {
   // Highlight on ?spa=1 → one overlay, stored under this URL.
   await selectTargetSentence(page);
   await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
-  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await page.locator('#context-notes-annotator .toolbar button[data-color="yellow"]').click();
   await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
 
   // SPA-navigate to ?spa=2 (no annotations). pushState is invisible to a
@@ -342,7 +346,7 @@ test('anchors a selection made inside an open shadow root, and repaints after re
   });
 
   await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
-  await page.locator('#context-notes-annotator .toolbar button', { hasText: 'Highlight' }).click();
+  await page.locator('#context-notes-annotator .toolbar button[data-color="yellow"]').click();
   await expect(page.locator('#context-notes-annotator .ov')).toHaveCount(1);
 
   // Reload: the fixture is static (no shadow root of its own — see

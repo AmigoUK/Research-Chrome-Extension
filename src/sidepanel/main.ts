@@ -358,7 +358,13 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   if (quote) {
     const q = document.createElement('div');
     q.className = 'onpage-note__quote';
-    q.textContent = quote; // never innerHTML — the quote is page content, not ours.
+    if (a.color) {
+      const dot = document.createElement('span');
+      dot.className = `cdot cdot--${a.color}`;
+      dot.title = `${a.color} highlight`;
+      q.append(dot);
+    }
+    q.append(document.createTextNode(quote)); // never innerHTML — page content.
     card.append(q);
   }
 
@@ -547,19 +553,6 @@ function focusOnPageCard(id: string): void {
   card.scrollIntoView({ block: 'center', behavior: 'smooth' });
   card.classList.add('flash');
   setTimeout(() => card.classList.remove('flash'), 1200);
-}
-
-/** "Note" on the page toolbar means "I want to write NOW": scroll the fresh
- *  card into view and put the caret in its textarea, exactly as the PDF
- *  reader does — no hunting for the input after the click. */
-function focusNoteEditor(id: string): void {
-  focusOnPageCard(id);
-  const ta = document.querySelector<HTMLTextAreaElement>(
-    `.onpage-note[data-id="${CSS.escape(id)}"] .onpage-note__ta`,
-  );
-  if (!ta) return;
-  ta.focus();
-  ta.setSelectionRange(ta.value.length, ta.value.length);
 }
 
 function statusColor(status: DocumentStatus): string {
@@ -1223,13 +1216,7 @@ async function init(): Promise<void> {
   };
 
   chrome.runtime.onMessage.addListener(
-    (message: {
-      control?: string;
-      id?: string;
-      url?: string;
-      focusId?: string;
-      resolvedIds?: string[];
-    }) => {
+    (message: { control?: string; id?: string; url?: string; resolvedIds?: string[] }) => {
       if (message?.control === 'data/changed') {
         onDataChanged();
       } else if (message?.control === 'annotator/changed') {
@@ -1239,7 +1226,6 @@ async function init(): Promise<void> {
           await loadAnnotationCount();
           renderOnPageCard();
           renderGettingStarted();
-          if (message.focusId) focusNoteEditor(message.focusId);
           if (hadNone && state.annotationCount > 0) {
             nudgeNext(
               'after-annotate',

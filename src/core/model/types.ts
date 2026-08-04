@@ -144,6 +144,16 @@ export interface Document {
   updatedAt: IsoDateTime;
 }
 
+/**
+ * Highlight colours — the researcher's own stable taxonomy ("method",
+ * "key finding", "disagree"…), chosen at the moment of highlighting.
+ * Deliberately NOT the review status: status changes as work progresses,
+ * a colour means what its author decided it means. Legacy annotations have
+ * no colour and render in the original accent.
+ */
+export const ANNOTATION_COLORS = ['yellow', 'green', 'blue', 'pink'] as const;
+export type AnnotationColor = (typeof ANNOTATION_COLORS)[number];
+
 export type AnnotationStatus = 'draft' | 'accepted' | 'rejected' | 'includedInReport';
 
 export interface Annotation {
@@ -151,6 +161,7 @@ export interface Annotation {
   projectId: Id;
   documentId: Id;
   anchor: Anchor;
+  color?: AnnotationColor;
   content: string;
   tags: string[];
   status: AnnotationStatus;

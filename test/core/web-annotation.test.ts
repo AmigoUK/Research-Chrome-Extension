@@ -51,6 +51,8 @@ describe('annotateWebPage', () => {
   it('creates the document on first annotation, then reuses it by URL', async () => {
     const first = await annotateWebPage(repos, input('https://ex.org/a'), anchor, deps);
     expect(first.createdDocument).toBe(true);
+    // No colour chosen → none stored (legacy annotations render the accent).
+    expect(first.annotation.color).toBeUndefined();
 
     const second = await annotateWebPage(repos, input('https://ex.org/a'), anchor, deps);
     expect(second.createdDocument).toBe(false);
@@ -121,5 +123,20 @@ describe('resolveProjectId / no-active-project fallback (spec: web-annotation de
   it('resolveProjectId returns the given id unchanged when that project exists', async () => {
     await repos.projects.put(project('p1'));
     expect(await resolveProjectId(repos, 'p1', deps)).toBe('p1');
+  });
+});
+
+describe('highlight colours', () => {
+  it('stores the chosen colour on the annotation', async () => {
+    const { annotation } = await annotateWebPage(
+      repos,
+      input('https://ex.org/colored'),
+      anchor,
+      deps,
+      'pink',
+    );
+    expect(annotation.color).toBe('pink');
+    const stored = await repos.annotations.get(annotation.id);
+    expect(stored?.color).toBe('pink');
   });
 });

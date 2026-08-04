@@ -178,7 +178,7 @@ test('selecting text and clicking Highlight creates a persisted anchor', async (
   await page.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
 
   await expect(page.locator('#seltool.on')).toBeVisible();
-  await page.locator('#seltool button', { hasText: 'Highlight' }).click();
+  await page.locator('#seltool button[data-color="yellow"]').click();
 
   await expect(page.locator('.anno-layer .ov.text')).toBeVisible();
   await expect(page.locator('#railList .ac')).not.toHaveCount(0);
@@ -228,7 +228,7 @@ test('dragging a region in Region mode anchors a rectangle that persists', async
   }
 
   await expect(page.locator('#seltool.on')).toBeVisible();
-  await page.locator('#seltool button', { hasText: 'Anchor region' }).click();
+  await page.locator('#seltool button[data-color="blue"]').click();
 
   await expect(page.locator('.anno-layer .ov.region')).toBeVisible();
   await expect(page.locator('#railList .ac .ac-kind', { hasText: 'Region' })).toBeVisible();

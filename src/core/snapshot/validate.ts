@@ -18,6 +18,7 @@
  */
 import {
   ACTIVITY_KINDS,
+  ANNOTATION_COLORS,
   type Anchor,
   type DocumentMetadata,
   type DocumentType,
@@ -262,6 +263,9 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         documentId: id(note['documentId'], `annotation ${i + 1}'s source id`),
         author: id(note['author'], `annotation ${i + 1}'s author`),
         anchor: anchor(note['anchor'], `annotation ${i + 1}'s anchor`),
+        ...(note['color'] === undefined
+          ? {}
+          : { color: oneOf(note['color'], ANNOTATION_COLORS, `annotation ${i + 1}'s colour`) }),
         content: text(note['content'] ?? '', `annotation ${i + 1}'s content`, 65_536),
         ...(note['tags'] === undefined
           ? {}

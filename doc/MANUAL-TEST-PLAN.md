@@ -181,8 +181,8 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 ### S4.1 Kolejność naturalna: zaznacz → aktywuj
 - **Kroki**: strona artykułu (ze stałą zgodą annotator aktywuje się sam — patrz S4.2);
   bez stałej zgody: zaznacz zdanie, dopiero potem kliknij **Annotate this page**.
-- **Oczekiwane**: pasek **Highlight / Note pojawia się od razu** przy istniejącym zaznaczeniu —
-  bez powtarzania zaznaczenia.
+- **Oczekiwane**: pasek **4 kolorowych kropek pojawia się od razu** przy istniejącym zaznaczeniu —
+  bez powtarzania zaznaczenia; klik kropki maluje w tym kolorze.
 - **Debug**: brak paska → w konsoli strony (kontekst Scientific Context Notes) sprawdź
   `document.getElementById('context-notes-annotator')` — `null` znaczy, że wstrzyknięcie nie
   doszło (uprawnienia); element jest, paska brak → zaznaczenie było puste/zwinięte.
@@ -193,20 +193,22 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
   brzmi „select text on the page…" (bez zgody brzmi „press Annotate this page…").
 
 ### S4.3 Highlight + trwałość + rejestracja per witryna
-- **Kroki**: Highlight zdania → przeładuj stronę.
+- **Kroki**: podświetl zdanie na zielono, inne na różowo → przeładuj stronę.
 - **Oczekiwane**: przy pierwszej adnotacji na witrynie może pojawić się prompt per-origin
-  (bez stałej zgody); podświetlenie **odmalowuje się po przeładowaniu** w tym samym miejscu;
+  (bez stałej zgody); podświetlenia **odmalowują się po przeładowaniu w swoich kolorach**
+  (zielone zielone, różowe różowe — kolor jest zapisany, nie kosmetyczny); kropka koloru
+  widoczna na karcie w panelu i w Dashboard → Annotations;
   `getRegisteredContentScripts()` pokazuje wpis dla originu.
 - **Potencjalne problemy**: przesunięte overlaye po zmianie rozmiaru okna → zgłoś z zrzutem;
   podświetlenie „gubi się" po A/B teście treści strony — trafia do sekcji
   „Couldn't place on this page" w panelu (to zachowanie poprawne, nie błąd).
 
 ### S4.4 Note, edycja, status, Jump to, usuwanie
-- **Kroki**: Note na innym zdaniu → w panelu wpisz treść (autozapis) → zmień status na
-  Accepted → **Jump to** → ✕.
-- **Oczekiwane**: po **Note** kursor ląduje **od razu** w polu tekstowym świeżej karty w panelu
-  (bez klikania — jak w czytniku PDF); treść przeżywa przeładowanie panelu; Jump przewija
-  stronę i błyska podświetleniem; ✕ usuwa overlay natychmiast.
+- **Kroki**: na karcie świeżego podświetlenia w panelu wpisz treść (autozapis) → zmień status
+  na Accepted → **Jump to** → ✕.
+- **Oczekiwane**: treść przeżywa przeładowanie panelu; Jump przewija stronę i błyska
+  podświetleniem; ✕ usuwa overlay natychmiast. (Osobnego przycisku "Note" nie ma — notatkę
+  dopisujesz na karcie; kolor to jedyna decyzja przy zaznaczeniu.)
 - **Debug**: autozapis jest debounced 500 ms — zamknięcie panelu w < 0,5 s od wpisania może
   zgubić ostatnie znaki (znany kompromis).
 
@@ -224,8 +226,8 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 - **Debug**: pusta strona → F12 czytnika: błędy pdf.js (worker 404 = problem builda).
 
 ### S5.2 Zakreślenie tekstu / S5.3 Region / S5.4 trwałość
-- **Kroki**: zaznacz tekst → **Highlight**; tryb **Region** → przeciągnij prostokąt →
-  **Anchor region**; dopisz notatkę i status w szynie; przeładuj kartę; zmień zoom.
+- **Kroki**: zaznacz tekst → kropka koloru; tryb **Region** → przeciągnij prostokąt →
+  kropka koloru; dopisz notatkę i status w szynie; przeładuj kartę; zmień zoom.
 - **Oczekiwane**: obie kotwice odmalowują się po przeładowaniu **i przy innym zoomie**
   (współrzędne to ułamki strony); notatka i status zachowane.
 - **Potencjalne problemy**: > 50 MB pliku → odmowa z komunikatem (limit celowy); bardzo duży

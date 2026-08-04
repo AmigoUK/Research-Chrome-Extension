@@ -776,3 +776,25 @@ body {
 .whatsnew .gs-close {
   margin-left: auto;
 }
+
+/* --- Highlight colour dots ---------------------------------------------- */
+.cdot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: baseline;
+}
+.cdot--yellow {
+  background: #facc15;
+}
+.cdot--green {
+  background: #4ade80;
+}
+.cdot--blue {
+  background: #60a5fa;
+}
+.cdot--pink {
+  background: #f472b6;
+}

@@ -2477,3 +2477,25 @@ button.stat-tag:hover {
     font-size: 10px;
   }
 }
+
+/* Highlight colour dots (annotations view) */
+.cdot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex: 0 0 auto;
+}
+.cdot--yellow {
+  background: #facc15;
+}
+.cdot--green {
+  background: #4ade80;
+}
+.cdot--blue {
+  background: #60a5fa;
+}
+.cdot--pink {
+  background: #f472b6;
+}

@@ -130,6 +130,18 @@ describe('annotations without a usable anchor', () => {
     );
   });
 
+  it('accepts a known highlight colour and refuses an unknown one', () => {
+    const withColor = (color: unknown): Record<string, unknown> => {
+      const data = note({ kind: 'web', selectors: [{ type: 'textQuote', exact: 'x' }] });
+      (data['annotations'] as Array<Record<string, unknown>>)[0]!['color'] = color;
+      return data;
+    };
+    expect(validateSnapshotData(withColor('green')).annotations[0]?.color).toBe('green');
+    expect(() => validateSnapshotData(withColor('vermilion'))).toThrow(
+      /annotation 1's colour is not one of/,
+    );
+  });
+
   it('accepts the real web and pdf anchor shapes', () => {
     const web = note({
       kind: 'web',

@@ -7,7 +7,7 @@
  * Pure — id and clock are injected, storage is reached through the ports.
  */
 import type { RepositorySet } from '../ports/repositories';
-import type { Annotation, Document, Id, Project, WebAnchor } from '../model/types';
+import type { Annotation, AnnotationColor, Document, Id, Project, WebAnchor } from '../model/types';
 import { capturePage, type CaptureDeps, type CaptureInput } from './capture';
 
 export async function findDocumentByUrl(
@@ -55,6 +55,7 @@ export async function annotateWebPage(
   input: CaptureInput,
   anchor: WebAnchor,
   deps: CaptureDeps,
+  color?: AnnotationColor,
 ): Promise<{ document: Document; annotation: Annotation; createdDocument: boolean }> {
   const projectId = await resolveProjectId(repos, input.projectId, deps);
   const effectiveInput = { ...input, projectId };
@@ -73,6 +74,7 @@ export async function annotateWebPage(
     projectId: document.projectId,
     documentId: document.id,
     anchor,
+    ...(color ? { color } : {}),
     content: '',
     tags: [],
     status: 'draft',

@@ -808,3 +808,84 @@ body {
 .rail-toggle {
   display: none;
 }
+
+/* --- Highlight colours --------------------------------------------------- */
+.ov.text.ov--yellow {
+  background: rgba(250, 204, 21, 0.32);
+  box-shadow: inset 0 -2px 0 rgba(202, 138, 4, 0.6);
+}
+.ov.text.ov--green {
+  background: rgba(74, 222, 128, 0.3);
+  box-shadow: inset 0 -2px 0 rgba(22, 163, 74, 0.55);
+}
+.ov.text.ov--blue {
+  background: rgba(96, 165, 250, 0.3);
+  box-shadow: inset 0 -2px 0 rgba(37, 99, 235, 0.55);
+}
+.ov.text.ov--pink {
+  background: rgba(244, 114, 182, 0.3);
+  box-shadow: inset 0 -2px 0 rgba(219, 39, 119, 0.55);
+}
+.ov.region.ov--yellow {
+  border-color: rgba(202, 138, 4, 0.8);
+  background: rgba(250, 204, 21, 0.14);
+}
+.ov.region.ov--green {
+  border-color: rgba(22, 163, 74, 0.8);
+  background: rgba(74, 222, 128, 0.12);
+}
+.ov.region.ov--blue {
+  border-color: rgba(37, 99, 235, 0.8);
+  background: rgba(96, 165, 250, 0.12);
+}
+.ov.region.ov--pink {
+  border-color: rgba(219, 39, 119, 0.8);
+  background: rgba(244, 114, 182, 0.12);
+}
+
+#seltool button.dotbtn {
+  padding: 6px;
+}
+#seltool .dot {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+}
+#seltool button.dotbtn:hover .dot {
+  transform: scale(1.15);
+  border-color: rgba(0, 0, 0, 0.5);
+}
+.dot--yellow {
+  background: #facc15;
+}
+.dot--green {
+  background: #4ade80;
+}
+.dot--blue {
+  background: #60a5fa;
+}
+.dot--pink {
+  background: #f472b6;
+}
+
+.ac-top .cdot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.cdot--yellow {
+  background: #facc15;
+}
+.cdot--green {
+  background: #4ade80;
+}
+.cdot--blue {
+  background: #60a5fa;
+}
+.cdot--pink {
+  background: #f472b6;
+}

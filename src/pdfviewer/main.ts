@@ -20,7 +20,14 @@ import {
   isRegionAnchor,
   type PxRect,
 } from '../core/anchoring/pdf';
-import type { Document, Annotation, AnnotationStatus, Id } from '../core/model/types';
+import { ANNOTATION_COLORS } from '../core/model/types';
+import type {
+  AnnotationColor,
+  Document,
+  Annotation,
+  AnnotationStatus,
+  Id,
+} from '../core/model/types';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -274,7 +281,7 @@ function renderOverlays(layer: HTMLElement, box: { width: number; height: number
     const rects = resolvePdfAnchor(anno.anchor, box);
     rects.forEach((r, i) => {
       const ov = document.createElement('div');
-      ov.className = `ov ${region ? 'region' : 'text'}${moved ? ' moved' : ''}${state.activeId === anno.id ? ' on' : ''}`;
+      ov.className = `ov ${region ? 'region' : 'text'}${anno.color ? ` ov--${anno.color}` : ''}${moved ? ' moved' : ''}${state.activeId === anno.id ? ' on' : ''}`;
       ov.style.left = `${r.left}px`;
       ov.style.top = `${r.top}px`;
       ov.style.width = `${r.width}px`;
@@ -342,21 +349,32 @@ function onTextSelect(): void {
     box: { width: box.width, height: box.height },
   };
   const last = clientRects[clientRects.length - 1]!;
-  showSeltool(last.left + last.width / 2, last.top, [
-    { icon: ICON.hl, label: 'Highlight', fn: () => void commitAnchor(false) },
-    { icon: ICON.note, label: 'Note', fn: () => void commitAnchor(true) },
-  ]);
+  showSeltool(last.left + last.width / 2, last.top, [...colorActions()]);
 }
 
 interface SelAction {
   icon: string;
   label: string;
+  color?: AnnotationColor;
   fn: () => void;
 }
+/** One gesture, four colours — same taxonomy as the web annotator. */
+function colorActions(): SelAction[] {
+  return ANNOTATION_COLORS.map((color) => ({
+    icon: `<span class="dot dot--${color}"></span>`,
+    label: '',
+    color,
+    fn: () => void commitAnchor(color),
+  }));
+}
+
 function showSeltool(cx: number, top: number, actions: SelAction[]): void {
   const el = $('#seltool');
   el.innerHTML = actions
-    .map((a, i) => `<button data-i="${i}">${a.icon}${a.label}</button>`)
+    .map(
+      (a, i) =>
+        `<button data-i="${i}"${a.color ? ` class="dotbtn" data-color="${a.color}" aria-label="Highlight in ${a.color}" title="Highlight in ${a.color}"` : ''}>${a.icon}${a.label}</button>`,
+    )
     .join('');
   $$('button', el).forEach((b, i) => {
     b.onclick = () => actions[i]!.fn();
@@ -425,13 +443,10 @@ function onRegionMouseUp(e: MouseEvent): void {
     rects: [r],
     box: { width: b.width, height: b.height },
   };
-  showSeltool(b.left + r.left + r.width / 2, b.top + r.top, [
-    { icon: ICON.region, label: 'Anchor region', fn: () => void commitAnchor(false) },
-    { icon: ICON.note, label: 'Note', fn: () => void commitAnchor(true) },
-  ]);
+  showSeltool(b.left + r.left + r.width / 2, b.top + r.top, [...colorActions()]);
 }
 
-async function commitAnchor(withNote: boolean): Promise<void> {
+async function commitAnchor(color: AnnotationColor): Promise<void> {
   const p = state.pending;
   if (!p || !state.document || !state.documentId) return;
   const quote = state.mode === 'region' ? undefined : p.quote;
@@ -441,6 +456,7 @@ async function commitAnchor(withNote: boolean): Promise<void> {
     projectId: state.document.projectId,
     documentId: state.documentId,
     anchor: createPdfAnchor(p.page, p.rects, p.box, quote),
+    color,
     content: '',
     tags: [],
     status: 'draft',
@@ -462,12 +478,6 @@ async function commitAnchor(withNote: boolean): Promise<void> {
   await renderPage();
   renderRail();
   toast(quote ? 'Highlight anchored' : 'Region anchored');
-  if (withNote) {
-    $('#rail').classList.add('open');
-    document
-      .querySelector<HTMLTextAreaElement>(`.ac[data-id="${CSS.escape(annotation.id)}"] .note-ta`)
-      ?.focus();
-  }
 }
 
 async function focusAnnotation(id: Id): Promise<void> {
@@ -530,7 +540,7 @@ function railCard(a: Annotation): string {
   const loc = region ? `p.${page} · Region` : `p.${page} · ¶ text`;
   const moved = state.movedIds.has(a.id);
   return `<article class="ac${state.activeId === a.id ? ' active' : ''}${moved ? ' moved' : ''}" data-id="${esc(a.id)}">
-    <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button><span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
+    <div class="ac-top"><button class="loc">${region ? ICON.region : ICON.hl}<span>${esc(loc)}</span></button>${a.color ? `<span class="cdot cdot--${a.color}"></span>` : ''}<span class="ac-kind">${region ? 'Region' : 'Text'}</span></div>
     ${moved ? `<div class="anno-moved">${ICON.warn}<span>The text here no longer matches this note’s quote — the PDF may have changed.</span></div>` : ''}
     ${quote ? `<div class="quote">${esc(quote)}</div>` : ''}
     <textarea class="note-ta" data-note placeholder="Add a note…">${esc(a.content)}</textarea>

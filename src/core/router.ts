@@ -160,6 +160,7 @@ export async function handleRequest(
           request.input,
           request.anchor,
           capture,
+          request.color,
         );
         if (createdDocument) await recordDocumentPut(repos, capture, undefined, document);
         await recordAnnotationPut(repos, capture, undefined, annotation);

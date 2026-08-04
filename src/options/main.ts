@@ -1128,7 +1128,7 @@ function drawAnnotations(): void {
         : '';
       const st = ANNO_STATUS[a.status];
       return `<article class="anno" data-id="${esc(a.id)}">
-        <div class="anno-top"><span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
+        <div class="anno-top">${a.color ? `<span class="cdot cdot--${a.color}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
         <div class="anno-body">${esc(a.content)}</div>
         <div class="anno-foot">
           <button class="stat-tag ${st.cls}" data-status aria-label="Change review status">${st.label}</button>
