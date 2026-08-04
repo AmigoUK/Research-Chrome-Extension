@@ -1,7 +1,7 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-08-03 — **v1.0.1, the build to submit to the Chrome Web Store**;
-**all five roadmap phases delivered**; **polish list complete**;
+_Last updated: 2026-08-04 — **v1.1.0, the metadata release — the build to submit to the Chrome
+Web Store**; **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
 annotate inside open Shadow DOM**; **v0.27.4 quote cap + honest coarse CSS fallback**; **v0.27.5 no
@@ -15,9 +15,10 @@ cases A2–A8 all closed)**; **v0.28.0 Chrome Web Store distribution packaging**
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v1.0.1 is on `main`** (Phases 1–5 + polish + hardening +
-  web-page annotation + Web Store packaging + submission prep). No unmerged work.
-- **Releases:** v1.0.1 failed-highlight toolbar fix; v1.0.0 ready for the Chrome Web Store;
+- **Branch state:** everything through **v1.1.0 is on `main`** (Phases 1–5 + polish + hardening +
+  web-page annotation + Web Store packaging + the metadata release). No unmerged work.
+- **Releases:** v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
+  v1.0.0 ready for the Chrome Web Store;
   v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
   feedback; v0.27.5 no dead "Jump to" on an unplaced note;
   v0.27.4 quote cap + honest coarse CSS
@@ -27,8 +28,38 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
   → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → format:check → unit → build, plus an E2E job
   (Playwright under xvfb).
-- **Tests:** 309 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
+- **Tests:** 359 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
   all green.
+
+### v1.1.0 — the metadata release (2026-08-04)
+
+Driven by a live audit against Google Scholar and real publisher pages (MDPI, Taylor & Francis,
+APS, IngentaConnect, arXiv), which showed every web capture producing a wrong or incomplete
+citation. The release, in fourteen commits, each gated on the full suite:
+
+- **Capture quality:** author names parse into CSL family/given (in-text shortens to the surname,
+  bibliographies invert and sort correctly); the citation_author/dc.creator double list folds to
+  one person each; volume/issue/pages are captured; years recover from online-date fallbacks;
+  arXiv captures as a preprint rather than journal "arXiv.org"; JSON-LD is a fallback source; and
+  a DOI-bearing capture auto-completes from the DOI registry (`documents/enrichFromDoi`).
+- **Guardrails and freshness:** search-results pages (Google Scholar and friends) refuse to file;
+  every successful write broadcasts `data/changed` so the side panel and dashboard stop going
+  stale across windows.
+- **Editing:** every Documents row has an Edit popover over the full bibliographic record, plus
+  "Refresh from DOI"; the style editor snapshots pristine styles and asks before discarding.
+- **New style:** Harvard (Solent University), vendored from the CSL styles repository.
+- **Hardening:** snapshot import validates anchors, metadata field types, and project-id
+  consistency; document DOI dedup normalises; KDF iterations are bounded; imports cannot
+  overwrite the local `me` identity; exports stop leaking other projects' users and now carry
+  referenced custom `.csl` bases; content scripts are limited to the two annotator messages;
+  document deletion cascades to anchored comment threads.
+- **Licensing (store-blocking):** LICENSE added; THIRD-PARTY-NOTICES corrected — citeproc-js is
+  CPAL-1.0 OR AGPL-1.0, redistributed under CPAL-1.0 with its attribution in the dashboard
+  footer; pdf.js Apache-2.0 and CSL CC BY-SA texts reproduced; PRIVACY now describes per-site
+  persistent injection after opt-in, with automatic cleanup on Site-access revocation.
+
+Verified hands-on in Playwright against the built extension on live pages before packaging;
+`release/context-notes-v1.1.0.zip` validates clean (45 files, 0 warnings).
 
 ### v1.0.1 — a failed highlight no longer sticks the toolbar open (2026-08-03)
 
