@@ -31,6 +31,16 @@ export interface RawPageMetadata {
   /** Author names already split out (e.g. from citation_author tags). */
   authors?: string[];
   canonicalUrl?: string;
+  /** schema.org Article/ScholarlyArticle primitives, used as last fallbacks
+   *  when the meta tags above are silent — many institutional and news pages
+   *  publish JSON-LD and nothing else. */
+  jsonLd?: {
+    title?: string;
+    authors?: string[];
+    date?: string;
+    journal?: string;
+    publisher?: string;
+  };
 }
 
 const META = {
@@ -174,18 +184,20 @@ export function buildDocumentMetadata(raw: RawPageMetadata): DocumentMetadata {
   const doi = findDoi([tags[META.doi[0]], tags[META.doi[1]], tags[META.doi[2]], raw.canonicalUrl]);
   const metadata: DocumentMetadata = {};
 
-  const title = pick(tags, META.title) ?? raw.title;
+  const ld = raw.jsonLd ?? {};
+  const title = pick(tags, META.title) ?? ld.title ?? raw.title;
   if (title) metadata.title = title;
-  if (raw.authors?.length) {
-    const authors = dedupeAuthors(raw.authors);
+  const authorSource = raw.authors?.length ? raw.authors : (ld.authors ?? []);
+  if (authorSource.length) {
+    const authors = dedupeAuthors(authorSource);
     if (authors.length) metadata.authors = authors;
   }
-  const year = parseYear(pick(tags, META.year));
+  const year = parseYear(pick(tags, META.year) ?? ld.date);
   if (year !== undefined) metadata.year = year;
   if (doi) metadata.doi = doi;
-  const journal = pick(tags, META.journal);
+  const journal = pick(tags, META.journal) ?? ld.journal;
   if (journal) metadata.journal = journal;
-  const publisher = pick(tags, META.publisher);
+  const publisher = pick(tags, META.publisher) ?? ld.publisher;
   if (publisher) metadata.publisher = publisher;
 
   const volume = pick(tags, META.volume);

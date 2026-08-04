@@ -38,6 +38,47 @@ describe('scanDocumentRaw', () => {
     const { raw } = scanDocumentRaw();
     expect(raw.authors).toEqual(['Nichol, Janet']);
   });
+
+  it('reads schema.org Article JSON-LD as a fallback source', () => {
+    document.head.innerHTML = `
+      <script type="application/ld+json">not even json</script>
+      <script type="application/ld+json">
+        {"@graph": [
+          {"@type": "WebSite", "name": "Ignore me"},
+          {"@type": "ScholarlyArticle",
+           "headline": "Heat and the city",
+           "author": [{"@type": "Person", "name": "Ada Byron"}, "Grace Hopper"],
+           "datePublished": "2019-04-01",
+           "isPartOf": {"@type": "Periodical", "name": "Urban Climate"},
+           "publisher": {"@type": "Organization", "name": "Elsevier"}}
+        ]}
+      </script>`;
+    const { raw } = scanDocumentRaw();
+    expect(raw.jsonLd).toEqual({
+      title: 'Heat and the city',
+      authors: ['Ada Byron', 'Grace Hopper'],
+      date: '2019-04-01',
+      journal: 'Urban Climate',
+      publisher: 'Elsevier',
+    });
+    // And the pure builder uses it when the meta tags are silent.
+    const input = buildCaptureInput(scanDocumentRaw(), 'p1');
+    expect(input.metadata.title).toBe('Heat and the city');
+    expect(input.metadata.authors).toEqual(['Ada Byron', 'Grace Hopper']);
+    expect(input.metadata.year).toBe(2019);
+    expect(input.metadata.journal).toBe('Urban Climate');
+    expect(input.type).toBe('article');
+  });
+
+  it('lets meta tags win over JSON-LD', () => {
+    document.head.innerHTML += `
+      <script type="application/ld+json">
+        {"@type": "Article", "headline": "The wrong title", "datePublished": "1999"}
+      </script>`;
+    const input = buildCaptureInput(scanDocumentRaw(), 'p1');
+    expect(input.metadata.title).toBe('Nocturnal UHI and mortality');
+    expect(input.metadata.year).toBe(2023);
+  });
 });
 
 describe('buildCaptureInput', () => {

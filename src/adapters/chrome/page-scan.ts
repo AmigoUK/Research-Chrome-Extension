@@ -43,11 +43,62 @@ export function scanDocumentRaw(): RawPageScan {
     document.querySelector('link[rel="canonical"]')?.getAttribute('href') ?? undefined;
   const url = canonical ?? document.location.href;
 
+  // schema.org Article/ScholarlyArticle JSON-LD — the standard fallback for
+  // pages (institutional repositories, news sites) that carry no Highwire or
+  // Dublin Core tags at all. Everything here is defensive: one broken script
+  // block must not cost the scan. (This function is injected whole, so the
+  // walk is inlined rather than imported.)
+  let jsonLd: RawPageMetadata['jsonLd'];
+  for (const script of Array.from(
+    document.querySelectorAll('script[type="application/ld+json"]'),
+  )) {
+    try {
+      const parsed: unknown = JSON.parse(script.textContent ?? '');
+      const nodes: unknown[] = Array.isArray(parsed)
+        ? parsed
+        : parsed &&
+            typeof parsed === 'object' &&
+            Array.isArray((parsed as { '@graph'?: unknown[] })['@graph'])
+          ? ((parsed as { '@graph': unknown[] })['@graph'] ?? [])
+          : [parsed];
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const item = node as Record<string, unknown>;
+        const type = ([] as unknown[]).concat(item['@type'] ?? []).map(String);
+        if (!type.some((t) => /Article$/i.test(t))) continue;
+        const name = (v: unknown): string | undefined =>
+          typeof v === 'string'
+            ? v
+            : v && typeof v === 'object' && typeof (v as { name?: unknown }).name === 'string'
+              ? ((v as { name: string }).name ?? undefined)
+              : undefined;
+        const ldAuthors = ([] as unknown[])
+          .concat(item['author'] ?? [])
+          .map(name)
+          .filter((a): a is string => !!a);
+        jsonLd = {};
+        const ldTitle = name(item['headline']) ?? name(item['name']);
+        if (ldTitle) jsonLd.title = ldTitle;
+        if (ldAuthors.length) jsonLd.authors = ldAuthors;
+        if (typeof item['datePublished'] === 'string') jsonLd.date = item['datePublished'];
+        const journal = name(item['isPartOf']);
+        if (journal) jsonLd.journal = journal;
+        const publisher = name(item['publisher']);
+        if (publisher) jsonLd.publisher = publisher;
+        break;
+      }
+    } catch {
+      // not JSON, or not ours — skip this block
+    }
+    if (jsonLd) break;
+  }
+
   const raw: RawPageMetadata = { metaTags };
   if (document.title) raw.title = document.title;
   if (authors.length) raw.authors = authors;
   else if (fallbackAuthors.length) raw.authors = fallbackAuthors;
   if (canonical) raw.canonicalUrl = canonical;
+  if (jsonLd) raw.jsonLd = jsonLd;
 
   return { url, raw };
 }
