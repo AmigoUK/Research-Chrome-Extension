@@ -823,3 +823,69 @@ test('the colour legend can be renamed and extended, and the popover survives it
   expect(palette).toEqual(['Key finding', 'Green', 'Blue', 'Pink', 'Disagree']);
   await page.close();
 });
+
+test('a source row opens its page, and an annotation card offers to show the highlight', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const projectId = projects.data[0]!.id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-nav-doc',
+        projectId,
+        url: 'https://example.org/e2e-nav',
+        type: 'article',
+        metadata: { title: 'Navigable source' },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-nav-anno',
+        projectId,
+        documentId: 'e2e-nav-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'a passage' }] },
+        color: 'green',
+        content: 'jump target',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  // Clicking the row opens the source — previously only a small icon did.
+  await page.locator('#nav .nav-item[data-route="documents"]').click();
+  const row = page.locator('.tbl tbody tr[data-id="e2e-nav-doc"]');
+  await expect(row).toHaveClass(/row-open/);
+  const openedPromise = context.waitForEvent('page');
+  await row.locator('.ttl').click();
+  const opened = await openedPromise;
+  expect(opened.url()).toBe('https://example.org/e2e-nav');
+  await opened.close();
+
+  // Clicking the annotation card asks the worker to open its page and scroll
+  // to the highlight; the request is parked for the annotator to collect.
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  const card = page.locator('.anno[data-id="e2e-nav-anno"]');
+  await expect(card).toHaveClass(/anno--clickable/);
+  const jumpPagePromise = context.waitForEvent('page');
+  await card.locator('.anno-body').click();
+  const jumpPage = await jumpPagePromise;
+  expect(jumpPage.url()).toBe('https://example.org/e2e-nav');
+  await jumpPage.close();
+  await page.close();
+});

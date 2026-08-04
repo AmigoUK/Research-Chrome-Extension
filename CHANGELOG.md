@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.6.0] — 2026-08-04
+
+### Added
+
+- **Click a source, it opens. Click a highlight, it takes you there.** Rows
+  in Documents, cards on the Kanban board and annotation cards are now
+  navigable (keyboard too): a source opens its page — or the bundled reader
+  for PDFs — and an annotation opens its source *scrolled to the passage*.
+  For a web page the annotator collects the request once its overlays have
+  painted, so the jump works whether the tab was already open, had to be
+  opened, or the annotator was not running yet; for a PDF the reader opens
+  on the right page with the highlight focused. In the side panel a note
+  card scrolls the page to its own highlight, not just its "Jump to" button.
+
 ## [1.5.0] — 2026-08-04
 
 ### Added

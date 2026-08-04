@@ -3,6 +3,7 @@
  * deliberately outside the pure router. Control messages carry a `control` field
  * so they never collide with the typed domain messages.
  */
+import { setPendingJump } from '../adapters/chrome/pending-jump';
 const ANNOTATOR_FILE = 'annotator.js';
 
 export interface ControlMessage {
@@ -12,6 +13,7 @@ export interface ControlMessage {
     | 'annotator/changed'
     | 'annotator/focus'
     | 'annotator/jump'
+    | 'annotator/openAndJump'
     | 'annotator/resolved';
   origin?: string;
   url?: string;
@@ -84,6 +86,59 @@ export async function unregisterRevokedOrigins(removedOrigins: string[]): Promis
   }
 }
 
+/**
+ * "Show me that highlight" from the dashboard: focus the page if it is
+ * already open (an exact-URL tab), else open it, then make sure the
+ * annotator runs there. The scroll itself is collected by the annotator from
+ * the parked request (see adapters/chrome/pending-jump.ts) once its overlays
+ * exist — the only moment at which scrolling to one is possible.
+ */
+export async function openAndJump(url: string, annotationId: string): Promise<{ ok: boolean }> {
+  try {
+    await setPendingJump(url, annotationId, Date.now());
+    const [existing] = await chrome.tabs.query({ url });
+    let tabId = existing?.id;
+    if (tabId != null) {
+      await chrome.tabs.update(tabId, { active: true });
+      if (existing?.windowId != null) {
+        await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
+      }
+    } else {
+      const created = await chrome.tabs.create({ url });
+      tabId = created.id;
+      // A fresh tab has to finish loading before anything can be injected.
+      if (tabId != null) await waitForTabLoad(tabId);
+    }
+    if (tabId == null) return { ok: false };
+    // Idempotent: an already-running annotator re-syncs and returns early.
+    await chrome.scripting.executeScript({ target: { tabId }, files: [ANNOTATOR_FILE] });
+    return { ok: true };
+  } catch {
+    // No host access for that origin (or an unscriptable page): the tab is
+    // open at the right URL, which is most of what the user asked for.
+    return { ok: false };
+  }
+}
+
+/** Resolve once the tab reports `complete` (or immediately, if it already has). */
+function waitForTabLoad(tabId: number, timeoutMs = 15_000): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (): void => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      clearTimeout(timer);
+      resolve();
+    };
+    const listener = (id: number, info: chrome.tabs.TabChangeInfo): void => {
+      if (id === tabId && info.status === 'complete') done();
+    };
+    const timer = setTimeout(done, timeoutMs);
+    chrome.tabs.onUpdated.addListener(listener);
+    void chrome.tabs.get(tabId).then((tab) => {
+      if (tab.status === 'complete') done();
+    });
+  });
+}
+
 /** Tell every context (side panel + the tab's content script) that a URL changed. */
 async function broadcast(url: string): Promise<void> {
   chrome.runtime.sendMessage({ control: 'annotator/changed', url }).catch(() => {});
@@ -126,6 +181,8 @@ export function registerAnnotatorControl(): void {
             .sendMessage(tabId, { control: 'annotator/jump', id: message.id })
             .catch(() => {});
         sendResponse({ ok: true });
+      } else if (message.control === 'annotator/openAndJump' && message.url && message.id) {
+        sendResponse(await openAndJump(message.url, message.id));
       } else if (message.control === 'annotator/resolved' && message.url) {
         // Content script reports which annotations it could place on the page →
         // forward to the side panel so it can flag the rest as unplaced.

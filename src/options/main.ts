@@ -606,6 +606,10 @@ function wireKanban(board: HTMLElement): void {
       const doc = docById(id);
       if (doc) openStatusPop(e.currentTarget as HTMLElement, doc);
     });
+    el.addEventListener('click', () => {
+      const doc = docById(id);
+      if (doc) openDocument(doc);
+    });
     el.addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Enter') return;
       e.preventDefault();
@@ -813,7 +817,7 @@ function drawDocuments(): void {
       const m = d.metadata;
       const sub = [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ');
       const notes = notesFor(d.id);
-      return `<tr data-id="${esc(d.id)}">
+      return `<tr data-id="${esc(d.id)}" class="row-open" tabindex="0" role="button" aria-label="Open ${esc(m.title ?? d.url)}">
         <td><div class="ttl">${esc(m.title ?? d.url)}</div><div class="sub">${esc(sub)}</div></td>
         <td>${d.section ? `<span class="chip chip--sec">${esc(d.section)}</span>` : '<span class="mono">—</span>'}</td>
         <td><button class="spill" aria-label="Change status"><span class="d" style="background:${statusDot(d.status)}"></span>${statusLabel(d.status)}</button></td>
@@ -849,6 +853,19 @@ function drawDocuments(): void {
       const id = b.closest('tr')?.getAttribute('data-id');
       const doc = id ? docById(id) : undefined;
       if (doc) void openInReader(doc);
+    });
+  });
+  $$('tbody tr', box).forEach((row) => {
+    const open = (): void => {
+      const doc = docById(row.getAttribute('data-id') ?? '');
+      if (doc) openDocument(doc);
+    };
+    row.addEventListener('click', open);
+    row.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        open();
+      }
     });
   });
   $$('[data-edit]', box).forEach((b) => {
@@ -1038,6 +1055,51 @@ function openEditDocPop(anchor: HTMLElement, doc: Document): void {
   $<HTMLInputElement>('#emTitle', pop).focus();
 }
 
+/**
+ * Open a source where it lives: the bundled reader for PDFs, its own page
+ * for everything else. This is what a click on a row, a Kanban card or an
+ * annotation's source line should do — "open it" was previously only
+ * available through a small icon button, if at all.
+ */
+function openDocument(doc: Document): void {
+  if (canOpenInReader(doc)) {
+    void openInReader(doc);
+    return;
+  }
+  if (/^https?:/i.test(doc.url)) {
+    void chrome.tabs.create({ url: doc.url });
+    return;
+  }
+  toast('This source has no page to open', ICON.warn, true);
+}
+
+/**
+ * Take the reader to a highlight: the PDF reader opens focused on it; a web
+ * page is opened (or brought forward) and the annotator scrolls to the
+ * overlay once it has painted — see adapters/chrome/pending-jump.ts.
+ */
+function jumpToAnnotation(a: Annotation): void {
+  const doc = docById(a.documentId);
+  if (!doc) {
+    toast('That source is no longer here', ICON.warn, true);
+    return;
+  }
+  if (a.anchor.kind === 'pdf' || canOpenInReader(doc)) {
+    openReader(doc.id, a.id);
+    return;
+  }
+  if (!/^https?:/i.test(doc.url)) {
+    toast('This source has no page to open', ICON.warn, true);
+    return;
+  }
+  chrome.runtime
+    .sendMessage({ control: 'annotator/openAndJump', url: doc.url, id: a.id })
+    .then((res: { ok?: boolean } | undefined) => {
+      if (!res?.ok) toast('Opened the page — allow this site to see the highlight', ICON.warn);
+    })
+    .catch(() => {});
+}
+
 /* ---- PDF ingestion ---- */
 function isPdfUrl(url: string): boolean {
   return /\.pdf($|\?|#)/i.test(url);
@@ -1045,9 +1107,11 @@ function isPdfUrl(url: string): boolean {
 function canOpenInReader(d: Document): boolean {
   return d.type === 'pdf' || Boolean(d.fileId) || isPdfUrl(d.url);
 }
-function openReader(documentId: Id): void {
+/** `focusId` opens the reader scrolled to that annotation, page and all. */
+function openReader(documentId: Id, focusId?: Id): void {
+  const focus = focusId ? `&focus=${encodeURIComponent(focusId)}` : '';
   window.open(
-    chrome.runtime.getURL(`src/pdfviewer/index.html?documentId=${documentId}`),
+    chrome.runtime.getURL(`src/pdfviewer/index.html?documentId=${documentId}${focus}`),
     '_blank',
     'noopener',
   );
@@ -1256,7 +1320,7 @@ function drawAnnotations(): void {
         ? [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ')
         : '';
       const st = ANNO_STATUS[a.status];
-      return `<article class="anno" data-id="${esc(a.id)}">
+      return `<article class="anno anno--clickable" data-id="${esc(a.id)}" tabindex="0" role="button" aria-label="Show this highlight on its source">
         <div class="anno-top">${paletteEntry(a.color) ? `<span class="cdot" style="background:${esc(paletteEntry(a.color)!.swatch)}" title="${esc(paletteEntry(a.color)!.label)}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
         <div class="anno-body">${esc(a.content)}</div>
         <div class="anno-foot">
@@ -1267,6 +1331,24 @@ function drawAnnotations(): void {
         </div></article>`;
     })
     .join('');
+  $$('.anno', box).forEach((card) => {
+    const jump = (): void => {
+      const anno = state.annotations.find((x) => x.id === card.getAttribute('data-id'));
+      if (anno) jumpToAnnotation(anno);
+    };
+    card.addEventListener('click', (e) => {
+      // Buttons inside the card own their own clicks (status, Discuss, Cite).
+      if ((e.target as HTMLElement).closest('button')) return;
+      jump();
+    });
+    card.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).closest('button')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        jump();
+      }
+    });
+  });
   $$('[data-status]', box).forEach((b) => {
     b.addEventListener('click', (e) => {
       e.stopPropagation();

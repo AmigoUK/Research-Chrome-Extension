@@ -2504,3 +2504,24 @@ button.stat-tag:hover {
   padding: 3px 10px;
   background: var(--surface);
 }
+
+/* Rows and cards that open their source on click. */
+.tbl tbody tr.row-open {
+  cursor: pointer;
+}
+.tbl tbody tr.row-open:hover {
+  background: var(--bg);
+}
+.kcard {
+  cursor: pointer;
+}
+.anno--clickable {
+  cursor: pointer;
+}
+.anno--clickable:hover {
+  border-color: var(--accent);
+}
+.anno--clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -90,6 +90,10 @@ interface ViewerState {
    *  the highlight is likely on the wrong content. Only current-page anchors
    *  are ever verified (the text layer for other pages isn't rendered). */
   movedIds: Set<Id>;
+  /** `?focus=<id>` — open scrolled to this annotation (a "show me that
+   *  highlight" click from the dashboard). Consumed once, after the first
+   *  render, then forgotten so later page turns are the user's own. */
+  focusId: Id | null;
 }
 const state: ViewerState = {
   documentId: null,
@@ -104,6 +108,7 @@ const state: ViewerState = {
   pending: null,
   activeId: null,
   movedIds: new Set(),
+  focusId: null,
 };
 
 function nowIso(): string {
@@ -131,6 +136,7 @@ async function loadDocument(): Promise<void> {
     return;
   }
   state.document = document_;
+  state.focusId = params.get('focus');
   await loadPalette(); // the legend colours everything painted below
   $('#docTitle').textContent = document_.metadata.title ?? 'Untitled PDF';
   const project = document_.section ? ` · ${document_.section}` : '';
@@ -157,6 +163,11 @@ async function loadDocument(): Promise<void> {
   });
   await renderPage();
   renderRail();
+  if (state.focusId) {
+    const target = state.focusId;
+    state.focusId = null;
+    await focusAnnotation(target);
+  }
 }
 
 async function renderPage(): Promise<void> {

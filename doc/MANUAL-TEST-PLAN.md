@@ -243,8 +243,16 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 - **S6.1 Szukajka**: filtruje po tytule/autorze/DOI na żywo.
 - **S6.2 Menu statusu**: otwórz z chipa; strzałki ↑↓ + Enter działają (pełna klawiatura);
   wybór wstecz (Analysed → To read) możliwy.
-- **S6.3 Wiersz otwiera źródło**: klik w wiersz = nowa karta z artykułem (dla PDF-ów bez URL —
-  kopiuje cytowanie); **Cite** to osobny przycisk.
+- **S6.3 Wiersz otwiera źródło**: klik w wiersz listy (panel) oraz w wiersz **Documents** i kartę
+  **Kanbana** (dashboard) = otwarcie artykułu w nowej karcie, a dla PDF-ów — wbudowanego czytnika;
+  **Cite** to osobny przycisk. Działa też z klawiatury (Tab + Enter).
+- **S6.6 Klik w podświetlenie prowadzi do fragmentu**: Dashboard → Annotations → klik w kartę
+  (poza przyciskami). *Oczekiwane*: strona źródła otwiera się (albo istniejąca karta wychodzi na
+  wierzch) i **sama przewija się do podświetlenia**, które błyska; dla adnotacji PDF czytnik
+  otwiera się na właściwej stronie z zaznaczoną kotwicą. W panelu klik w kartę notatki przewija
+  bieżącą stronę do jej podświetlenia. *Problemy*: bez zgody dla witryny strona otworzy się bez
+  przewinięcia (toast to mówi) — to zachowanie oczekiwane; żądanie skoku wygasa po 60 s, więc
+  długo ładująca się strona może się otworzyć bez skoku.
 - **S6.4 Kanban**: przeciągnij kartę między kolumnami; potem to samo klawiaturą (fokus na
   karcie, ← →). Licznik kolumn i pasek postępu aktualizują się.
 - **Debug**: rozjazd liczników między panelem a dashboardem → patrz S10.

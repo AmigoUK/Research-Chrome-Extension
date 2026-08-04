@@ -368,6 +368,29 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   card.dataset.id = a.id;
   card.dataset.odId = `onpage-note-${a.id}`;
 
+  // The card itself jumps to the passage — the "Jump to" button stays for
+  // discoverability, but a click anywhere sensible on the card does it too.
+  if (jumpable) {
+    card.classList.add('onpage-note--clickable');
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.setAttribute('aria-label', 'Scroll to this highlight on the page');
+    const jump = (e: Event): void => {
+      const el = e.target as HTMLElement;
+      // The note editor, the status select and the buttons own their clicks.
+      if (el.closest('button, select, textarea')) return;
+      chrome.runtime.sendMessage({ control: 'annotator/jump', id: a.id }).catch(() => {});
+    };
+    card.addEventListener('click', jump);
+    card.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).closest('button, select, textarea')) return;
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        jump(e);
+      }
+    });
+  }
+
   const quote = annotationQuote(a);
   if (quote) {
     const q = document.createElement('div');

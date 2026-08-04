@@ -8,6 +8,7 @@ import { createWebAnchor, resolveWebAnchor, webAnchorRoot, cssPath } from '../co
 import { scanDocumentRaw, buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId } from '../adapters/chrome/active-project';
 import { createUrlWatcher } from './url-watcher';
+import { takePendingJump } from '../adapters/chrome/pending-jump';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type { Annotation, HighlightColor, WebAnchor } from '../core/model/types';
 import annotatorCss from './annotator.css?inline';
@@ -384,6 +385,10 @@ async function loadExisting(): Promise<void> {
     chrome.runtime
       .sendMessage({ control: 'annotator/resolved', url: scan.url, resolvedIds })
       .catch(() => {});
+    // A "show me that highlight" click from the dashboard parks its request
+    // before opening the tab; overlays exist only now, so collect it here.
+    const jumpId = await takePendingJump(scan.url, Date.now());
+    if (jumpId) jumpTo(jumpId);
   } catch {
     // Called via `void loadExisting()` on injection and on annotator/changed;
     // a rejected sync (SW asleep, context invalidated) must not surface as an
