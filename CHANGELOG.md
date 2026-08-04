@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.7.0] — 2026-08-04
+
+### Changed
+
+- **Configuring highlight colours is now a real settings screen.** It lived
+  behind a button in one view, in a cramped popover, with an OS colour picker
+  and no explanation — findable only if you already knew it existed. There is
+  now a **Settings** entry in the workspace nav, where each colour shows a
+  **live preview of how a highlight will actually look**, a row of curated
+  swatches (no OS picker producing unreadable near-black "highlights"), a
+  label field that says what it is for, and **how many highlights use it**.
+  A colour in use cannot be deleted out from under its annotations; Cancel
+  and *Reset to defaults* exist; Save is disabled when nothing is pending.
+- **The legend filters.** The colour chips above the annotations list were
+  decoration that looked clickable; clicking one now shows only that colour's
+  highlights, with a count on each chip and an explicit *Edit colours…* link.
+
 ## [1.6.0] — 2026-08-04
 
 ### Added

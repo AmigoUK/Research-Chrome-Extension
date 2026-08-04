@@ -2525,3 +2525,106 @@ button.stat-tag:hover {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* --- Legend as a filter row -------------------------------------------- */
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 11px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.legend-chip:hover {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+.legend-chip.on {
+  border-color: var(--accent);
+  color: var(--fg);
+  background: var(--accent-soft);
+}
+.legend-n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  opacity: 0.7;
+}
+.legend-edit {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+.legend-edit:hover {
+  text-decoration: underline;
+}
+
+/* --- Settings: highlight colours --------------------------------------- */
+.palette-rows {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+.palette-row {
+  display: grid;
+  grid-template-columns: auto 200px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 18px);
+  gap: 4px;
+}
+.swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+}
+.swatch:hover {
+  transform: scale(1.15);
+}
+.swatch.on {
+  border-color: var(--fg);
+}
+.palette-preview {
+  font-size: 13px;
+  color: var(--fg);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.palette-preview span {
+  border-radius: 2px;
+  padding: 1px 0;
+}
+.palette-use {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 900px) {
+  .palette-row {
+    grid-template-columns: auto 1fr auto;
+  }
+  .palette-preview {
+    grid-column: 1 / -1;
+  }
+}

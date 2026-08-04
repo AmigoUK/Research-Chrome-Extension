@@ -266,6 +266,21 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 - **Debug**: `chrome.storage.local.get(null)` → klucz aktywnego projektu; rozjazd = jedna z
   powierzchni nie odczytała wartości po zmianie.
 
+### S6.7 Konfiguracja kolorów (Settings)
+- **Kroki**: Settings w nawigacji → zmień nazwę koloru, kliknij inną próbkę, **Add a colour**,
+  **Save colours**; potem **Cancel** po kolejnej zmianie i **Reset to defaults**.
+- **Oczekiwane**: podgląd w każdym wierszu pokazuje **realny wygląd podświetlenia**; licznik
+  („2 highlights" / „unused") zgadza się z danymi; kosz przy kolorze **w użyciu jest nieaktywny**
+  z wyjaśnieniem; Save nieaktywny, gdy nic nie zmieniono; po zapisie legenda i wszystkie
+  istniejące podświetlenia (także w PDF i na stronach) przyjmują nowy kolor/nazwę.
+- **Debug**: `chrome.runtime.sendMessage({type:'palette/get', projectId:'<ID>'})` zwraca zapisaną
+  paletę; IndexedDB → projects → `colorPalette`.
+
+### S6.8 Legenda filtruje
+- **Kroki**: Annotations → klik w chip koloru → klik w „All colours"; sprawdź licznik na chipach.
+- **Oczekiwane**: lista pokazuje tylko adnotacje w tym kolorze; liczniki zgadzają się z listą;
+  link „Edit colours…" prowadzi do Settings.
+
 ## S7. Cytowania i style
 
 ### S7.1 In-text / Bibliography po zapisie

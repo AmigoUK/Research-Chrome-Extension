@@ -169,6 +169,12 @@ const NAV: NavDef[] = [
     count: () => (state.members.length > 0 ? state.members.length : undefined),
     icon: '<circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2M17 11h6M20 8v6"/>',
   },
+  {
+    id: 'settings',
+    label: 'Settings',
+    count: () => undefined,
+    icon: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 5 8.9a1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  },
 ];
 
 /* ---- State ---- */
@@ -188,7 +194,7 @@ interface DashState {
   flash: Id | null;
   drag: Id | null;
   docFilter: ListFilter;
-  annoFilter: { search: string; status: AnnotationStatus | 'all' };
+  annoFilter: { search: string; status: AnnotationStatus | 'all'; color: Id | 'all' };
   selectedStyleId: Id | null;
   /** Pristine JSON of each style opened in the editor this session — the
    *  editor mutates live state, so leaving without saving must be able to
@@ -224,7 +230,7 @@ const state: DashState = {
   flash: null,
   drag: null,
   docFilter: { search: '', status: 'all' },
-  annoFilter: { search: '', status: 'all' },
+  annoFilter: { search: '', status: 'all', color: 'all' },
   selectedStyleId: null,
   editorBackups: new Map(),
   editorTab: 'preview',
@@ -445,7 +451,7 @@ async function switchProject(id: Id): Promise<void> {
   state.activeProjectId = id;
   void setActiveProjectId(id);
   state.docFilter = { search: '', status: 'all' };
-  state.annoFilter = { search: '', status: 'all' };
+  state.annoFilter = { search: '', status: 'all', color: 'all' };
   state.activityFilter = 'all';
   state.activityLimit = DEFAULT_ACTIVITY_LIMIT;
   await loadProjectData();
@@ -507,6 +513,7 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   styles: renderStyles,
   styleEditor: renderStyleEditor,
   team: renderTeam,
+  settings: renderSettings,
 };
 function render(): void {
   // Full-screen workspaces drop the app shell (sidebar + credit footer) — the
@@ -758,12 +765,24 @@ function renderDocuments(view: HTMLElement, actions: HTMLElement): void {
     );
     return;
   }
-  const legend = activePalette()
-    .map(
-      (c) =>
-        `<span class="legend-chip"><span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}</span>`,
-    )
-    .join('');
+  // The legend doubles as a filter: chips looked clickable and did nothing,
+  // and "show me only the disagreements" is the whole point of a taxonomy.
+  const counts = new Map<string, number>();
+  for (const a of state.annotations) {
+    if (a.color) counts.set(a.color, (counts.get(a.color) ?? 0) + 1);
+  }
+  const legend =
+    `<button class="legend-chip${state.annoFilter.color === 'all' ? ' on' : ''}" data-colf="all">All colours</button>` +
+    activePalette()
+      .map(
+        (c) =>
+          `<button class="legend-chip${state.annoFilter.color === c.id ? ' on' : ''}" data-colf="${esc(c.id)}">
+            <span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}
+            <span class="legend-n">${counts.get(c.id) ?? 0}</span>
+          </button>`,
+      )
+      .join('') +
+    `<button class="legend-edit" id="legendEdit">Edit colours…</button>`;
   view.innerHTML = `
     <div class="legend" aria-label="Highlight colour legend">${legend}</div>
     <div class="toolbar">
@@ -884,88 +903,167 @@ function drawDocuments(): void {
  * was a dead end. One field per line keeps the form honest about what is
  * stored; authors are one-per-line, "Family, Given".
  */
-/**
- * The legend editor. Defaults are recolourable and renameable but not
- * deletable (an empty palette would leave nothing to pick); custom colours
- * come and go freely. Saved onto the PROJECT, so the legend travels in
- * snapshots and a collaborator sees what each colour means here.
- */
-function openPalettePop(anchor: HTMLElement): void {
+/* ---- Settings ---- */
+
+/** Curated highlight swatches: light enough to read through, distinct from
+ *  each other, and guaranteed valid hex — an OS colour picker happily
+ *  produces near-black "highlights" nobody can read text through. */
+const SWATCHES = [
+  '#facc15',
+  '#fb923c',
+  '#4ade80',
+  '#34d399',
+  '#60a5fa',
+  '#818cf8',
+  '#f472b6',
+  '#f87171',
+  '#a78bfa',
+  '#22d3ee',
+  '#a3e635',
+  '#cbd5e1',
+];
+
+/** Working copy while the Settings view is open, so edits are cancellable. */
+let paletteDraft: HighlightColor[] | null = null;
+
+function annotationsUsing(colorId: Id): number {
+  return state.annotations.filter((a) => a.color === colorId).length;
+}
+
+function renderSettings(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML = '';
+  const project = activeProject();
+  if (!project) {
+    view.innerHTML = emptyState('No project', 'Create a project to configure it.');
+    return;
+  }
+  paletteDraft ??= activePalette().map((c) => ({ ...c }));
+  drawPaletteSettings(view);
+}
+
+function drawPaletteSettings(view: HTMLElement): void {
+  const entries = paletteDraft ?? [];
+  const dirty = JSON.stringify(entries) !== JSON.stringify(activePalette());
+  const SAMPLE = 'The urban heat island effect raises night-time temperatures.';
+
+  view.innerHTML = `
+    <div class="sec-h"><h2>Highlight colours</h2><span class="ln"></span></div>
+    <p class="panel-note" style="max-width:70ch">
+      A colour is <b>your own code for what a passage means</b> — “method”, “key finding”,
+      “disagree”. It is not the review status, which keeps changing as you work. Name them here:
+      the names appear when you pick a colour, above your annotations, and
+      <b>travel with a shared snapshot</b>, so a collaborator sees what your green means.
+    </p>
+    <div class="palette-rows">
+      ${entries
+        .map((c, i) => {
+          const used = annotationsUsing(c.id);
+          return `<div class="palette-row" data-row="${i}">
+            <div class="swatches" role="group" aria-label="Colour for ${esc(c.label || 'this entry')}">
+              ${SWATCHES.map(
+                (sw) =>
+                  `<button class="swatch${sw.toLowerCase() === c.swatch.toLowerCase() ? ' on' : ''}" style="background:${sw}" data-sw="${i}" data-hex="${sw}" aria-label="Use ${sw}"${sw.toLowerCase() === c.swatch.toLowerCase() ? ' aria-pressed="true"' : ''}></button>`,
+              ).join('')}
+            </div>
+            <input class="sel palette-label" data-lb="${i}" value="${esc(c.label)}"
+              placeholder="e.g. Key finding" aria-label="What this colour means" maxlength="64">
+            <div class="palette-preview" aria-hidden="true">
+              <span style="background:${esc(c.swatch)}66;box-shadow:inset 0 -2px 0 ${esc(c.swatch)}">${esc(SAMPLE)}</span>
+            </div>
+            <div class="palette-use">${used > 0 ? `${used} highlight${used === 1 ? '' : 's'}` : 'unused'}</div>
+            <button class="btn btn--ghost btn--sm" data-del="${i}"
+              ${used > 0 ? 'disabled title="Recolour those highlights first — deleting would leave them without a meaning"' : 'title="Remove this colour"'}
+              aria-label="Remove colour">${ICON.trash}</button>
+          </div>`;
+        })
+        .join('')}
+    </div>
+    <div class="row" style="margin-top:14px">
+      <button class="btn btn--sm" id="palAdd">${ICON.plus} Add a colour</button>
+      <button class="btn btn--sm" id="palReset">Reset to defaults</button>
+      <span class="ln"></span>
+      <button class="btn btn--sm" id="palCancel"${dirty ? '' : ' disabled'}>Cancel</button>
+      <button class="btn btn--primary btn--sm" id="palSave"${dirty ? '' : ' disabled'}>${ICON.check} Save colours</button>
+    </div>`;
+
+  const sync = (): void => {
+    entries.forEach((c, i) => {
+      const label = $$(`[data-lb="${i}"]`, view)[0] as HTMLInputElement | undefined;
+      if (label) c.label = label.value.slice(0, 64);
+    });
+  };
+
+  $$('.swatch', view).forEach((b) => {
+    b.onclick = () => {
+      sync();
+      const row = entries[Number(b.dataset['sw'])];
+      if (row) row.swatch = b.dataset['hex'] ?? row.swatch;
+      drawPaletteSettings(view);
+    };
+  });
+  $$('.palette-label', view).forEach((input) => {
+    // Live preview of the legend as it is typed, without a full redraw
+    // (which would steal the caret mid-word).
+    input.addEventListener('input', () => {
+      sync();
+      const save = view.querySelector<HTMLButtonElement>('#palSave');
+      const cancel = view.querySelector<HTMLButtonElement>('#palCancel');
+      if (save) save.disabled = false;
+      if (cancel) cancel.disabled = false;
+    });
+  });
+  $$('[data-del]', view).forEach((b) => {
+    b.onclick = () => {
+      sync();
+      entries.splice(Number(b.dataset['del']), 1);
+      drawPaletteSettings(view);
+    };
+  });
+  $('#palAdd', view).onclick = () => {
+    sync();
+    const used = new Set(entries.map((c) => c.swatch.toLowerCase()));
+    const free = SWATCHES.find((sw) => !used.has(sw.toLowerCase())) ?? SWATCHES[0]!;
+    entries.push({ id: `c-${crypto.randomUUID().slice(0, 8)}`, swatch: free, label: '' });
+    drawPaletteSettings(view);
+  };
+  $('#palReset', view).onclick = () => {
+    paletteDraft = DEFAULT_HIGHLIGHT_COLORS.map((c) => ({ ...c }));
+    drawPaletteSettings(view);
+  };
+  $('#palCancel', view).onclick = () => {
+    paletteDraft = activePalette().map((c) => ({ ...c }));
+    drawPaletteSettings(view);
+  };
+  $('#palSave', view).onclick = () => {
+    sync();
+    void savePalette(entries);
+  };
+}
+
+async function savePalette(entries: HighlightColor[]): Promise<void> {
   const project = activeProject();
   if (!project) return;
-  const entries: HighlightColor[] = activePalette().map((c) => ({ ...c }));
-  const pop = $('#pop');
-  const DEFAULT_IDS = new Set(DEFAULT_HIGHLIGHT_COLORS.map((c) => c.id));
-
-  const draw = (): void => {
-    pop.innerHTML =
-      `<div class="pl">Highlight colours — the legend</div>` +
-      entries
-        .map(
-          (c, i) => `<div class="pop-form" data-row="${i}">
-            <input type="color" value="${esc(c.swatch)}" data-sw="${i}" aria-label="Colour swatch" style="width:34px;height:28px;padding:0;border:1px solid var(--border);border-radius:6px">
-            <input class="sel" value="${esc(c.label)}" data-lb="${i}" aria-label="What this colour means" placeholder="What does this colour mean?" style="width:190px">
-            ${DEFAULT_IDS.has(c.id) ? '' : `<button class="btn btn--ghost btn--sm" data-del="${i}" aria-label="Remove colour">✕</button>`}
-          </div>`,
-        )
-        .join('') +
-      `<div class="pop-form" style="margin-top:8px">
-        <button class="btn btn--sm" id="palAdd">+ Add colour</button>
-        <button class="btn btn--primary btn--sm" id="palSave">${ICON.check} Save</button>
-      </div>`;
-
-    const sync = (): void => {
-      entries.forEach((c, i) => {
-        c.swatch = pop.querySelector<HTMLInputElement>(`[data-sw="${i}"]`)?.value ?? c.swatch;
-        c.label = (pop.querySelector<HTMLInputElement>(`[data-lb="${i}"]`)?.value ?? c.label).slice(
-          0,
-          64,
-        );
-      });
-    };
-    pop.querySelectorAll<HTMLButtonElement>('[data-del]').forEach((b) => {
-      b.onclick = () => {
-        sync();
-        entries.splice(Number(b.dataset['del']), 1);
-        draw();
-      };
+  const cleaned = entries.map((c, i) => ({
+    ...c,
+    // An unnamed colour is legal but useless as a legend — say something
+    // rather than leaking an internal id into the UI.
+    label: c.label.trim() || `Colour ${i + 1}`,
+    swatch: /^#[0-9a-fA-F]{6}$/.test(c.swatch) ? c.swatch : '#facc15',
+  }));
+  try {
+    await sendRequest({
+      type: 'projects/put',
+      project: { ...project, colorPalette: cleaned, updatedAt: nowIso() },
     });
-    const add = pop.querySelector<HTMLButtonElement>('#palAdd');
-    if (add)
-      add.onclick = () => {
-        sync();
-        entries.push({ id: `c-${crypto.randomUUID().slice(0, 8)}`, swatch: '#a78bfa', label: '' });
-        draw();
-      };
-    const save = pop.querySelector<HTMLButtonElement>('#palSave');
-    if (save)
-      save.onclick = () => {
-        void (async () => {
-          sync();
-          const cleaned = entries.map((c) => ({
-            ...c,
-            label: c.label.trim() || c.id,
-            swatch: /^#[0-9a-fA-F]{6}$/.test(c.swatch) ? c.swatch : '#facc15',
-          }));
-          try {
-            await sendRequest({
-              type: 'projects/put',
-              project: { ...project, colorPalette: cleaned, updatedAt: nowIso() },
-            });
-            state.projects = state.projects.map((pr) =>
-              pr.id === project.id ? { ...pr, colorPalette: cleaned, updatedAt: nowIso() } : pr,
-            );
-            closePop();
-            render();
-            toast('Legend saved', ICON.check);
-          } catch (err) {
-            toast(err instanceof Error ? err.message : 'Couldn’t save the legend', ICON.warn, true);
-          }
-        })();
-      };
-    placePop(anchor);
-  };
-  draw();
+    state.projects = state.projects.map((pr) =>
+      pr.id === project.id ? { ...pr, colorPalette: cleaned, updatedAt: nowIso() } : pr,
+    );
+    paletteDraft = cleaned.map((c) => ({ ...c }));
+    render();
+    toast('Highlight colours saved', ICON.check);
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t save the colours', ICON.warn, true);
+  }
 }
 
 function openEditDocPop(anchor: HTMLElement, doc: Document): void {
@@ -1235,8 +1333,8 @@ function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
 }
 
 function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
-  actions.innerHTML = `<button class="btn btn--sm" id="aColours">Colours</button>`;
-  $('#aColours', actions).onclick = (e) => openPalettePop(e.currentTarget as HTMLElement);
+  actions.innerHTML = `<button class="btn btn--sm" id="aColours">Edit colours</button>`;
+  $('#aColours', actions).onclick = () => go('settings');
   if (state.annotations.length === 0) {
     view.innerHTML = emptyState(
       'No annotations yet',
@@ -1244,12 +1342,24 @@ function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
     );
     return;
   }
-  const legend = activePalette()
-    .map(
-      (c) =>
-        `<span class="legend-chip"><span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}</span>`,
-    )
-    .join('');
+  // The legend doubles as a filter: chips looked clickable and did nothing,
+  // and "show me only the disagreements" is the whole point of a taxonomy.
+  const counts = new Map<string, number>();
+  for (const a of state.annotations) {
+    if (a.color) counts.set(a.color, (counts.get(a.color) ?? 0) + 1);
+  }
+  const legend =
+    `<button class="legend-chip${state.annoFilter.color === 'all' ? ' on' : ''}" data-colf="all">All colours</button>` +
+    activePalette()
+      .map(
+        (c) =>
+          `<button class="legend-chip${state.annoFilter.color === c.id ? ' on' : ''}" data-colf="${esc(c.id)}">
+            <span class="cdot" style="background:${esc(c.swatch)}"></span>${esc(c.label)}
+            <span class="legend-n">${counts.get(c.id) ?? 0}</span>
+          </button>`,
+      )
+      .join('') +
+    `<button class="legend-edit" id="legendEdit">Edit colours…</button>`;
   view.innerHTML = `
     <div class="legend" aria-label="Highlight colour legend">${legend}</div>
     <div class="toolbar">
@@ -1260,6 +1370,14 @@ function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
       <div class="filters" id="afilters"></div>
     </div>
     <div id="alist"></div>`;
+  $$('[data-colf]', view).forEach((b) => {
+    b.onclick = () => {
+      const value = b.dataset['colf'] ?? 'all';
+      state.annoFilter = { ...state.annoFilter, color: value === 'all' ? 'all' : value };
+      render();
+    };
+  });
+  $('#legendEdit', view).onclick = () => go('settings');
   $<HTMLInputElement>('#qa', view).addEventListener('input', (e) => {
     state.annoFilter = { ...state.annoFilter, search: (e.target as HTMLInputElement).value };
     drawAnnotations();
@@ -1300,6 +1418,7 @@ function filterAnnotations(): Annotation[] {
   const q = state.annoFilter.search.trim().toLowerCase();
   return state.annotations.filter((a) => {
     if (state.annoFilter.status !== 'all' && a.status !== state.annoFilter.status) return false;
+    if (state.annoFilter.color !== 'all' && a.color !== state.annoFilter.color) return false;
     if (q && !(a.content + ' ' + a.tags.join(' ')).toLowerCase().includes(q)) return false;
     return true;
   });

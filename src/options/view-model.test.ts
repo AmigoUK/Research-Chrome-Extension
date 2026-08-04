@@ -28,6 +28,7 @@ describe('dashboard view-model', () => {
       'references',
       'styles',
       'team',
+      'settings',
     ]);
   });
 

@@ -19,6 +19,7 @@ export const NAV_ROUTES = [
   'references',
   'styles',
   'team',
+  'settings',
 ] as const;
 export type NavRoute = (typeof NAV_ROUTES)[number];
 
@@ -49,6 +50,7 @@ export const ROUTE_TITLES: Record<Route, readonly [string, string]> = {
   styles: ['Citation styles', 'Style profiles & rules'],
   styleEditor: ['Style editor', 'Rules compile to CSL overrides'],
   team: ['Team', 'Collaboration & sync'],
+  settings: ['Settings', 'How this project behaves'],
 };
 
 /** CSS custom-property carrying each status colour in `dashboard.css`. */

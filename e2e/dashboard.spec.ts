@@ -40,8 +40,8 @@ test('dashboard shell renders: wordmark, project switcher, nav and credit footer
   await expect(page.locator('#pName')).not.toHaveText('—');
   await expect(page.locator('#pName')).not.toHaveText('Loading…');
 
-  // Six nav items: the five Phase 2 views plus Team (Phase 5).
-  await expect(page.locator('#nav .nav-item')).toHaveCount(6);
+  // Seven nav items: the five Phase 2 views, Team (Phase 5) and Settings.
+  await expect(page.locator('#nav .nav-item')).toHaveCount(7);
 
   // Credit footer (dashboard only) with attribution and version.
   await expect(page.locator('.credit')).toContainText('dev@attv.uk');
@@ -769,7 +769,7 @@ test('Kanban advances a card status with the arrow keys and persists it', async 
   await page.close();
 });
 
-test('the colour legend can be renamed and extended, and the popover survives its own rebuild', async () => {
+test('the colour legend lives in Settings, previews itself, filters, and guards used colours', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
   await expect(page.locator('#pName')).not.toHaveText('—');
@@ -790,37 +790,50 @@ test('the colour legend can be renamed and extended, and the popover survives it
     });
   });
   await page.reload();
-  await page.locator('#nav .nav-item[data-route="annotations"]').click();
-  // Defaults render as the legend.
-  await expect(page.locator('.legend-chip')).toHaveCount(4);
 
-  await page.locator('#aColours').click();
-  // The popover must be VISIBLE, not merely present: a document-level
-  // click-away handler used to close it with the very click that opened it.
-  await expect(page.locator('#pop #palAdd')).toBeVisible();
-  await page.locator('[data-lb="0"]').fill('Key finding');
-  // Adding a colour rebuilds the popover's DOM inside the click handler,
-  // which detaches the clicked node — the click-away check must still see
-  // the popover in the event's composed path.
+  // Discoverable in the nav, not hidden behind a button in one view.
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await expect(page.locator('#viewTitle')).toHaveText('Settings');
+  await expect(page.locator('.palette-row')).toHaveCount(4);
+  // Each row shows the colour as it will actually look on a page.
+  await expect(page.locator('.palette-row').first().locator('.palette-preview span')).toBeVisible();
+
+  // A colour in use cannot be deleted out from under its highlights.
+  const greenRow = page.locator('.palette-row').nth(1);
+  await expect(greenRow.locator('.palette-use')).toHaveText('1 highlight');
+  await expect(greenRow.locator('[data-del]')).toBeDisabled();
+  await expect(page.locator('.palette-row').nth(2).locator('[data-del]')).toBeEnabled();
+
+  // Name it, recolour it, add one, save.
+  await page.locator('[data-lb="1"]').fill('Method');
+  await greenRow.locator('.swatch').nth(4).click();
   await page.locator('#palAdd').click();
-  await expect(page.locator('[data-lb="4"]')).toBeVisible();
+  await expect(page.locator('.palette-row')).toHaveCount(5);
   await page.locator('[data-lb="4"]').fill('Disagree');
   await page.locator('#palSave').click();
+  await expect(page.locator('#palSave')).toBeDisabled(); // saved → nothing pending
 
-  await expect(page.locator('.legend-chip')).toHaveCount(5);
-  await expect(page.locator('.legend-chip').first()).toContainText('Key finding');
-  // Stored on the project, so the annotator and a shared snapshot see it.
-  const palette = await page.evaluate(async () => {
+  // The legend now filters the annotations list.
+  await page.locator('#nav .nav-item[data-route="annotations"]').click();
+  await expect(page.locator('.legend-chip')).toHaveCount(6); // All + 5
+  await expect(page.locator('.legend-chip', { hasText: 'Method' })).toContainText('1');
+  await page.locator('.legend-chip', { hasText: 'Disagree' }).click();
+  await expect(page.locator('.anno')).toHaveCount(0); // nothing is "Disagree" yet
+  await page.locator('.legend-chip', { hasText: 'Method' }).click();
+  await expect(page.locator('.anno')).toHaveCount(1);
+
+  // And the legend travels: palette/get is what the annotator paints from.
+  const labels = await page.evaluate(async () => {
     const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
       data: Array<{ id: string }>;
     };
     const res = (await chrome.runtime.sendMessage({
       type: 'palette/get',
       projectId: projects.data[0]!.id,
-    })) as { data: Array<{ id: string; label: string }> };
+    })) as { data: Array<{ label: string }> };
     return res.data.map((c) => c.label);
   });
-  expect(palette).toEqual(['Key finding', 'Green', 'Blue', 'Pink', 'Disagree']);
+  expect(labels).toEqual(['Yellow', 'Method', 'Blue', 'Pink', 'Disagree']);
   await page.close();
 });
 
