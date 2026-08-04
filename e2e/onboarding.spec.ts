@@ -61,6 +61,20 @@ test('the panel header reaches the guide and the dashboard', async () => {
   await page.close();
 });
 
+test('an unscriptable tab shows the honest no-access state, not "no page metadata"', async () => {
+  // The panel-as-a-tab harness IS the field failure mode: Chrome refuses to
+  // inject into this tab (extension page here; a spent activeTab grant in
+  // real use), which used to render as "No page metadata / Open an article
+  // to capture it" while the user was staring at an open article.
+  const page = await context.newPage();
+  await page.goto(url('src', 'sidepanel', 'index.html'));
+  await expect(page.locator('#capType')).toHaveText('No access to this tab yet');
+  const fileBtn = page.locator('#fileBtn');
+  await expect(fileBtn).toHaveText('Allow reading pages');
+  await expect(fileBtn).toBeEnabled();
+  await page.close();
+});
+
 test('the checklist starts unchecked, checks off a filed source, and hides once dismissed', async () => {
   const page = await context.newPage();
   await page.goto(url('src', 'sidepanel', 'index.html'));

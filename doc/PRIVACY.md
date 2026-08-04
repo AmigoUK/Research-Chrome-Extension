@@ -30,10 +30,15 @@ browser's IndexedDB**. It stays on your device.
 - **`activeTab` / `scripting`** — to inject the annotator into the page you are actively viewing,
   on demand, when you choose to annotate it.
 - **`sidePanel`** — the extension's main workspace surface.
-- **Optional host permissions (`*://*/*`)** — requested **per site, only when you choose to annotate
-  there**, so the extension can read the text on that page to anchor your highlights. It is never
-  granted up front, and the page content is only read locally to create your annotation — it is
-  never transmitted.
+- **Optional host permissions (`*://*/*`)** — never granted up front, and page content is only ever
+  read locally; nothing is transmitted. Two user-initiated grants exist:
+  - **per site, when you choose to annotate there**, so the extension can read the text on that
+    page to anchor your highlights;
+  - **optionally for pages you open**, if you press _Allow reading pages_ in the side panel's
+    capture card. Chrome's one-time `activeTab` access covers only the tab where you clicked the
+    toolbar icon and expires on navigation, so without this grant the panel cannot preview the
+    next page you browse to. The grant only feeds the on-device capture preview, and you can
+    revoke it — wholesale or per site — in `chrome://extensions` → *Site access* at any time.
 
 After you opt in on a site, the annotator is registered to load automatically **on that site only**,
 so your highlights repaint on your next visit without another prompt. You can revoke a site at any

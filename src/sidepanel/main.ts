@@ -4,7 +4,12 @@
  */
 import './panel.css';
 import { sendRequest } from '../adapters/chrome/messaging';
-import { scanActiveTab, captureActiveTab } from '../adapters/chrome/capture';
+import {
+  scanActiveTab,
+  captureActiveTab,
+  requestStandingPageAccess,
+  ScanAccessError,
+} from '../adapters/chrome/capture';
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
 import { isSearchPage } from '../core/extract/metadata';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
@@ -48,6 +53,9 @@ interface State {
    *  the query string as a "source". The File button is disabled with an
    *  explanation instead. */
   previewIsSearchPage: boolean;
+  /** Chrome refused to read the active tab (activeTab grant spent or never
+   *  given). Shown as its own honest state — NOT "no page metadata". */
+  previewBlocked: boolean;
   /** Id of the most recently filed reference — drives the cite buttons. */
   filedReferenceId: string | null;
   /** URL of the most recently filed page — so "Filed ✓" tracks the *page*, not
@@ -76,6 +84,7 @@ const state: State = {
   filter: { search: '', status: 'all' },
   preview: null,
   previewIsSearchPage: false,
+  previewBlocked: false,
   filedReferenceId: null,
   filedUrl: null,
   pageAnnotations: [],
@@ -188,9 +197,11 @@ async function loadPreview(): Promise<void> {
     const scan = await scanActiveTab();
     state.preview = buildCaptureInput(scan, state.activeProjectId);
     state.previewIsSearchPage = isSearchPage(scan.url, scan.raw.metaTags ?? {});
-  } catch {
+    state.previewBlocked = false;
+  } catch (err) {
     state.preview = null;
     state.previewIsSearchPage = false;
+    state.previewBlocked = err instanceof ScanAccessError;
   }
 }
 
@@ -249,11 +260,31 @@ function renderCaptureCard(): void {
   const meta = $('capMeta');
   const fileBtn = $<HTMLButtonElement>('fileBtn');
 
+  if (!state.preview && state.previewBlocked) {
+    // The article IS open — Chrome just hasn't let us read the tab: the
+    // activeTab grant is spent by navigation. Saying "no page metadata" here
+    // sent users hunting for a problem the page doesn't have. Offer the
+    // standing grant; the click below is the user gesture the request needs.
+    type.textContent = 'No access to this tab yet';
+    title.textContent = 'Let Context Notes read pages you open';
+    meta.textContent =
+      'Chrome grants one-time access only to the tab where you clicked the toolbar icon. ' +
+      'Allow reading pages to preview and file any tab — revocable per site in Site access.';
+    fileBtn.disabled = false;
+    fileBtn.textContent = 'Allow reading pages';
+    fileBtn.dataset['mode'] = 'grant';
+    $<HTMLButtonElement>('copyInText').disabled = true;
+    $<HTMLButtonElement>('copyBiblio').disabled = true;
+    return;
+  }
+  fileBtn.dataset['mode'] = 'file';
+
   if (!state.preview) {
     type.textContent = 'No page metadata';
     title.textContent = 'Open an article to capture it';
     meta.textContent = '';
     fileBtn.disabled = true;
+    fileBtn.textContent = 'File into project';
     return;
   }
 
@@ -1066,7 +1097,21 @@ async function init(): Promise<void> {
     state.filter.search = (e.target as HTMLInputElement).value;
     renderList();
   });
-  $('fileBtn').addEventListener('click', () => void fileCurrentPage());
+  $('fileBtn').addEventListener('click', () => {
+    if ($<HTMLButtonElement>('fileBtn').dataset['mode'] === 'grant') {
+      void (async () => {
+        const granted = await requestStandingPageAccess();
+        if (granted) {
+          toast('Pages you open can now be previewed and filed');
+          await refreshPreview();
+        } else {
+          toast('Not granted — reopen the panel from the toolbar icon on the page you want', true);
+        }
+      })();
+      return;
+    }
+    void fileCurrentPage();
+  });
   $('copyInText').addEventListener('click', () => void copyCaptureInText());
   $('copyBiblio').addEventListener('click', () => void copyCaptureBiblio());
   $('bibBtn').addEventListener('click', () => void copyProjectBibliography());
