@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { activate, registerOrigin } from './annotator-control';
+import { activate, registerOrigin, unregisterRevokedOrigins } from './annotator-control';
 
 /**
  * Minimal, configurable chrome.* fake. The behaviours under test are the error
@@ -93,5 +93,49 @@ describe('registerOrigin', () => {
   it('reports not-registered (does not throw) when registerContentScripts rejects', async () => {
     installChrome({ permissionGranted: true, registerThrows: true });
     await expect(registerOrigin('https://ex.com')).resolves.toEqual({ registered: false });
+  });
+});
+
+describe('unregisterRevokedOrigins', () => {
+  /** Extends the fake with registered-scripts listing and unregister capture. */
+  function installWithRegistered(
+    registered: Array<{ id: string; matches: string[]; js: string[] }>,
+  ): { unregistered: string[][] } {
+    const calls: { unregistered: string[][] } = { unregistered: [] };
+    installChrome();
+    const scripting = (globalThis.chrome as unknown as { scripting: Record<string, unknown> })
+      .scripting;
+    scripting['getRegisteredContentScripts'] = async () => registered;
+    scripting['unregisterContentScripts'] = async ({ ids }: { ids: string[] }) => {
+      calls.unregistered.push(ids);
+    };
+    return calls;
+  }
+
+  it('unregisters the annotator script for a revoked origin', async () => {
+    const calls = installWithRegistered([
+      { id: 'annotator-https---ex-com', matches: ['https://ex.com/*'], js: ['annotator.js'] },
+      { id: 'annotator-https---keep-org', matches: ['https://keep.org/*'], js: ['annotator.js'] },
+    ]);
+    await unregisterRevokedOrigins(['https://ex.com/*']);
+    expect(calls.unregistered).toEqual([['annotator-https---ex-com']]);
+  });
+
+  it('does nothing when no origins were removed', async () => {
+    const calls = installWithRegistered([
+      { id: 'annotator-https---ex-com', matches: ['https://ex.com/*'], js: ['annotator.js'] },
+    ]);
+    await unregisterRevokedOrigins([]);
+    expect(calls.unregistered).toEqual([]);
+  });
+
+  it('swallows a failing scripting API rather than throwing', async () => {
+    installChrome();
+    (globalThis.chrome as unknown as { scripting: Record<string, unknown> }).scripting[
+      'getRegisteredContentScripts'
+    ] = async () => {
+      throw new Error('unavailable');
+    };
+    await expect(unregisterRevokedOrigins(['https://ex.com/*'])).resolves.toBeUndefined();
   });
 });

@@ -61,6 +61,29 @@ export async function registerOrigin(origin: string): Promise<{ registered: bool
   }
 }
 
+/**
+ * When the user revokes a site's access in chrome://extensions, the registered
+ * content script for that origin would otherwise stay behind as an orphan —
+ * still listed, silently failing to inject. Mirror the revocation by
+ * unregistering every registration whose matches fall inside a removed origin,
+ * so Site access in Chrome's UI remains the single source of truth.
+ */
+export async function unregisterRevokedOrigins(removedOrigins: string[]): Promise<void> {
+  if (removedOrigins.length === 0) return;
+  try {
+    const scripts = await chrome.scripting.getRegisteredContentScripts();
+    const removed = removedOrigins.map((pattern) => pattern.replace(/\/\*$/, ''));
+    const ids = scripts
+      .filter((s) => s.js?.includes(ANNOTATOR_FILE))
+      .filter((s) => (s.matches ?? []).every((m) => removed.some((o) => m.startsWith(o))))
+      .map((s) => s.id);
+    if (ids.length > 0) await chrome.scripting.unregisterContentScripts({ ids });
+  } catch {
+    // Best-effort cleanup; an orphaned registration fails closed (no permission,
+    // no injection), so a cleanup failure is cosmetic rather than a leak.
+  }
+}
+
 /** Tell every context (side panel + the tab's content script) that a URL changed. */
 async function broadcast(url: string): Promise<void> {
   chrome.runtime.sendMessage({ control: 'annotator/changed', url }).catch(() => {});
@@ -71,6 +94,9 @@ async function broadcast(url: string): Promise<void> {
 
 /** Wire the control listener. Returns synchronously; replies are async. */
 export function registerAnnotatorControl(): void {
+  chrome.permissions.onRemoved.addListener((permissions) => {
+    void unregisterRevokedOrigins(permissions.origins ?? []);
+  });
   chrome.runtime.onMessage.addListener((message: ControlMessage, _sender, sendResponse) => {
     if (!message || typeof message.control !== 'string') return; // not ours — let the router handle it
     void (async () => {

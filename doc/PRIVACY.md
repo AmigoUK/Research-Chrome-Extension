@@ -35,6 +35,11 @@ browser's IndexedDB**. It stays on your device.
   granted up front, and the page content is only read locally to create your annotation — it is
   never transmitted.
 
+After you opt in on a site, the annotator is registered to load automatically **on that site only**,
+so your highlights repaint on your next visit without another prompt. You can revoke a site at any
+time in `chrome://extensions` → Scientific Context Notes → *Details* → *Site access*; the extension
+listens for that revocation and removes its auto-loading registration for the site immediately.
+
 ## Network requests you initiate
 
 Two optional features make a network request **only when you ask for one**, and only to the service

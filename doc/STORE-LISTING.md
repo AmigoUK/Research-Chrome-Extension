@@ -37,7 +37,7 @@ File the page you are reading into a project, and it arrives with its title, aut
 WHAT YOU GET
 
 • Capture — file any page or PDF into a project, with metadata extracted for you and duplicates caught by DOI.
-• Web annotation — select text on a live page, choose Highlight or Note, and see it painted back on your next visit. Access is opt-in per site; there is no standing content script watching your browsing.
+• Web annotation — select text on a live page, choose Highlight or Note, and see it painted back on your next visit. Access is opt-in per site: nothing is injected anywhere until you choose to annotate a site, and after you opt in, the annotator loads only on that site (revocable any time in the extension's Site access settings).
 • A bundled PDF reader — text highlights and drag-a-rectangle region anchors, stored as fractions of the page box so they survive zoom, reload and a different screen.
 • Real citations — citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date and notes). Copy an in-text citation or a bibliography entry wherever you are working.
 • A citation-style editor — turn plain rules (maximum authors, et al. thresholds, DOI and URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live preview that formats through the real engine. Import a journal's own .csl as a base style, or export the compiled one.
@@ -53,7 +53,7 @@ Two features touch the network, and only when you ask: importing a DOI contacts 
 
 Because there is no server, collaboration travels as a file rather than through an account, and roles are advisory: every collaborator holds a full copy of the project, so nothing can enforce a role — and the Team view says so in plain words rather than pretending otherwise.
 
-Open source (MIT): https://github.com/AmigoUK/Research-Chrome-Extension
+Open source: https://github.com/AmigoUK/Research-Chrome-Extension — the extension's own code is MIT; it bundles citeproc-js (CPAL-1.0), pdf.js (Apache-2.0) and CSL styles (CC BY-SA 3.0), see THIRD-PARTY-NOTICES.md.
 ```
 
 **Homepage URL:** `https://amigouk.github.io/Research-Chrome-Extension/`
@@ -169,7 +169,7 @@ Host access is optional and per-origin. The extension holds no host permission a
 
 Two network requests exist, both user-initiated and both to a service the user named: importing a DOI fetches metadata from doi.org, and "open PDF by URL" fetches the PDF at a URL the user pasted.
 
-Source: https://github.com/AmigoUK/Research-Chrome-Extension (MIT).
+Source: https://github.com/AmigoUK/Research-Chrome-Extension (own code MIT; bundled citeproc-js CPAL-1.0, pdf.js Apache-2.0 — see THIRD-PARTY-NOTICES.md).
 ```
 
 ---

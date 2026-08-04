@@ -18,10 +18,19 @@ so the OFL's reserved-font-name clause is not engaged.
 
 `src/assets/csl/*.csl` are unmodified styles from the [Citation Style Language styles
 repository](https://github.com/citation-style-language/styles), licensed
-**CC BY-SA 3.0**. They are data read by citeproc, not code.
+**CC BY-SA 3.0** — [`doc/licenses/CC-BY-SA-3.0-csl-styles.txt`](doc/licenses/CC-BY-SA-3.0-csl-styles.txt).
+They are data read by citeproc, not code.
 
 ## Libraries
 
-Runtime dependencies and their licences are declared in `package.json` / `package-lock.json`:
-citeproc-js via `@citation-js/*` (MIT), `pdfjs-dist` (Apache-2.0), `idb` (ISC),
-`dom-anchor-text-quote` / `dom-anchor-text-position` (MIT).
+| Library                                                                   | Licence                                                                     | Notes                                                                                                                                                                                                             |
+| ------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **citeproc-js** (the citation engine, bundled into the service worker)    | **CPAL-1.0 OR AGPL-1.0** — this project redistributes it under **CPAL-1.0** | © 2009–2019 Frank Bennett — [`doc/licenses/citeproc-CPAL-AGPL.txt`](doc/licenses/citeproc-CPAL-AGPL.txt). The CPAL attribution ("Citations by citeproc-js © Frank Bennett") is displayed in the dashboard footer. |
+| `@citation-js/core`, `@citation-js/plugin-csl` (wrappers around citeproc) | MIT                                                                         |                                                                                                                                                                                                                   |
+| `pdfjs-dist` (pdf.js)                                                     | Apache-2.0                                                                  | © Mozilla — [`doc/licenses/Apache-2.0-pdfjs-dist.txt`](doc/licenses/Apache-2.0-pdfjs-dist.txt)                                                                                                                    |
+| `idb`                                                                     | ISC                                                                         |                                                                                                                                                                                                                   |
+| `dom-anchor-text-quote`, `dom-anchor-text-position`                       | MIT                                                                         |                                                                                                                                                                                                                   |
+
+The extension's **own** code is MIT — see [`LICENSE`](LICENSE). Because citeproc-js is not
+MIT, the shipped package as a whole is **not** "MIT-only"; store listings and docs must not
+describe it that way.

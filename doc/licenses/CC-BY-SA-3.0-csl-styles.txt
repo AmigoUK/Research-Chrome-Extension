@@ -1,0 +1,15 @@
+The bundled citation styles in src/assets/csl/ (APA 7th, Harvard, Vancouver,
+MLA, Chicago author-date, Chicago notes) are unmodified works from the
+Citation Style Language styles repository:
+
+    https://github.com/citation-style-language/styles
+
+Each style names its authors in its own <info> header. All are licensed under
+the Creative Commons Attribution-ShareAlike 3.0 Unported licence:
+
+    https://creativecommons.org/licenses/by-sa/3.0/
+    https://creativecommons.org/licenses/by-sa/3.0/legalcode
+
+They are distributed here unchanged, as data read by the citation engine.
+Compiled style overrides produced by this extension's style editor are
+derivative works of these styles and are therefore also CC BY-SA 3.0.
