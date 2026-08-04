@@ -526,6 +526,20 @@ function makeDocRow(doc: Document): HTMLElement {
   });
   foot.append(statusBtn);
 
+  // Copying used to be the whole row's invisible click action — an unlabeled
+  // clipboard write where a user expects "open". Now the row opens the
+  // source and the copy is a named button.
+  const citeBtn = document.createElement('button');
+  citeBtn.className = 'status-btn doc__cite';
+  citeBtn.textContent = 'Cite';
+  citeBtn.title = 'Copy in-text citation';
+  citeBtn.dataset.odId = `cite-${doc.id}`;
+  citeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    void copyDocCitation(doc);
+  });
+  foot.append(citeBtn);
+
   if (doc.section) {
     const chip = document.createElement('span');
     chip.className = 'chip';
@@ -533,12 +547,20 @@ function makeDocRow(doc: Document): HTMLElement {
     foot.append(chip);
   }
 
+  const openDoc = (): void => {
+    if (/^https?:/i.test(doc.url)) {
+      chrome.tabs.create({ url: doc.url }).catch(() => {});
+    } else {
+      void copyDocCitation(doc); // a PDF upload has no web address to open
+    }
+  };
+  row.setAttribute('aria-label', `Open ${m.title ?? doc.url}`);
   row.append(title, metaEl, foot);
-  row.addEventListener('click', () => void copyDocCitation(doc));
+  row.addEventListener('click', openDoc);
   row.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      void copyDocCitation(doc);
+      openDoc();
     }
   });
   return row;
@@ -942,7 +964,15 @@ async function init(): Promise<void> {
   $('copyBiblio').addEventListener('click', () => void copyCaptureBiblio());
   $('bibBtn').addEventListener('click', () => void copyProjectBibliography());
   $('annotateBtn').addEventListener('click', () => {
-    chrome.runtime.sendMessage({ control: 'annotator/activate' }).catch(() => {});
+    // The worker reports {ok:false} for pages Chrome refuses to script
+    // (chrome://, the Web Store, PDF tabs, a missing grant). Throwing that
+    // result away made the button a silent no-op — say why nothing happened.
+    chrome.runtime
+      .sendMessage({ control: 'annotator/activate' })
+      .then((res: { ok?: boolean } | undefined) => {
+        if (!res?.ok) toast('Chrome doesn’t allow annotating this page', true);
+      })
+      .catch(() => toast('Chrome doesn’t allow annotating this page', true));
   });
   $('switchBtn').addEventListener('click', (e) => {
     e.stopPropagation();

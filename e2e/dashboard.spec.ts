@@ -181,13 +181,11 @@ test('References view lists stored references and offers a DOI import form', asy
     'Reference under test',
   );
 
-  // Import popover: DOI is actionable, BibTeX/RIS/Zotero are disabled "Soon".
+  // Import opens the DOI form directly — the only source that exists. The
+  // popover used to advertise Zotero/BibTeX/RIS as disabled "Soon" stubs.
   await page.locator('#rImport').click();
-  await expect(page.locator('#pop .imp-src[data-doi]')).toBeVisible();
-  await expect(page.locator('#pop .imp-src[disabled]').first()).toBeVisible();
-
-  await page.locator('#pop .imp-src[data-doi]').click();
   await expect(page.locator('#pop #doiInput')).toBeVisible();
+  await expect(page.locator('#pop .imp-src[disabled]')).toHaveCount(0);
 
   await page.close();
 });

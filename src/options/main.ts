@@ -1183,22 +1183,12 @@ function renderReferences(view: HTMLElement, actions: HTMLElement): void {
   });
 }
 
-const IMPORT_SOURCES: Array<{ label: string; doi?: boolean }> = [
-  { label: 'DOI / identifier', doi: true },
-  { label: 'Zotero library' },
-  { label: 'BibTeX (.bib) file' },
-  { label: 'RIS (.ris) file' },
-];
+// DOI is the one import source that exists. The popover used to advertise
+// Zotero / BibTeX / RIS as disabled "Soon" buttons — three dead entries a
+// user meets on their first import. Until those parsers ship, go straight to
+// the form that works.
 function openImportPopover(anchor: HTMLElement): void {
-  const pop = $('#pop');
-  pop.innerHTML =
-    `<div class="pl">Import from</div>` +
-    IMPORT_SOURCES.map((s) =>
-      s.doi
-        ? `<button class="pi imp-src" data-doi="1"><span>${esc(s.label)}</span></button>`
-        : `<button class="pi imp-src" disabled><span>${esc(s.label)}</span><span class="soon">Soon</span></button>`,
-    ).join('');
-  $('[data-doi]', pop).onclick = () => showDoiForm();
+  showDoiForm();
   placePop(anchor);
 }
 function showDoiForm(): void {
