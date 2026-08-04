@@ -197,6 +197,29 @@ describe('handleRequest', () => {
     expect(notes.ok && (notes.data as unknown[])).toHaveLength(0);
   });
 
+  it('cascades a document delete to the comment threads anchored to it', async () => {
+    await handleRequest(repos, { type: 'documents/put', document: makeDocument('d1', 'p1') });
+    await handleRequest(repos, { type: 'documents/put', document: makeDocument('d2', 'p1') });
+    const thread = (documentId: string, id: string) => ({
+      id,
+      projectId: 'p1',
+      documentId,
+      anchorLabel: 'p. 1',
+      resolved: false,
+      comments: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    await repos.commentThreads.put(thread('d1', 't-doomed'));
+    await repos.commentThreads.put(thread('d2', 't-survives'));
+
+    await handleRequest(repos, { type: 'documents/delete', id: 'd1' });
+
+    const threads = await repos.commentThreads.listByProject('p1');
+    // The thread on the deleted document is gone; the other one is untouched.
+    expect(threads.map((t) => t.id)).toEqual(['t-survives']);
+  });
+
   it('deletes a reference', async () => {
     await handleRequest(repos, {
       type: 'references/put',

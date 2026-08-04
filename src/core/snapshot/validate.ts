@@ -363,6 +363,25 @@ export function validateSnapshotData(value: unknown): SnapshotData {
     }),
   };
 
+  if (data['customBaseStyles'] !== undefined) {
+    out.customBaseStyles = list(data['customBaseStyles'], 'the base style list').map((b, i) => {
+      const base = record(b, `base style ${i + 1}`);
+      return {
+        id: id(base['id'], `base style ${i + 1}'s id`),
+        name: text(base['name'], `base style ${i + 1}'s name`, 512),
+        // A vendored .csl runs to hundreds of kB; 2 MB is comfortably above
+        // any real style and comfortably below a storage-bomb.
+        xml: text(base['xml'], `base style ${i + 1}'s CSL`, 2_000_000),
+        system: oneOf(
+          base['system'],
+          ['authorDate', 'footnote', 'numeric'] as const,
+          `base style ${i + 1}'s system`,
+        ),
+        createdAt: timestamp(base['createdAt'], `base style ${i + 1}'s date`),
+      };
+    });
+  }
+
   if (data['files'] !== undefined) {
     out.files = list(data['files'], 'the file list').map((f, i) => {
       const file = record(f, `file ${i + 1}`);

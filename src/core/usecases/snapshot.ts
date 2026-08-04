@@ -19,6 +19,7 @@ import type {
   Annotation,
   CitationStyle,
   CommentThread,
+  CustomBaseStyle,
   Document,
   Id,
   Project,
@@ -27,6 +28,7 @@ import type {
 } from '../model/types';
 import { bytesToBase64, base64ToBytes } from '../files/base64';
 import { SELF_USER_ID } from '../model/identity';
+import { isCustomBaseStyleId } from '../citation/parse';
 import type { CaptureDeps } from './capture';
 import { recordActivity } from './activity';
 import { validateSnapshotData } from '../snapshot/validate';
@@ -49,6 +51,9 @@ export interface SnapshotData {
   users: User[];
   activity: ActivityEvent[];
   commentThreads: CommentThread[];
+  /** Imported .csl bases that exported style profiles compile on top of —
+   *  without them the other machine silently falls back to plain APA. */
+  customBaseStyles?: CustomBaseStyle[];
   /** Present only when the export opted into PDF bytes. */
   files?: SnapshotFile[];
 }
@@ -61,6 +66,7 @@ export interface MergeReport {
   annotations: number;
   references: number;
   citationStyles: number;
+  customBaseStyles: number;
   users: number;
   activity: number;
   commentThreads: number;
@@ -89,7 +95,7 @@ export async function buildSnapshot(
   const project = await repos.projects.get(projectId);
   if (!project) throw new Error(`Project not found: ${projectId}`);
 
-  const [documents, annotations, references, citationStyles, users, activity, commentThreads] =
+  const [documents, annotations, references, citationStyles, allUsers, activity, commentThreads] =
     await Promise.all([
       repos.documents.listByProject(projectId),
       repos.annotations.listByProject(projectId),
@@ -100,6 +106,26 @@ export async function buildSnapshot(
       repos.commentThreads.listByProject(projectId),
     ]);
 
+  // Only the people this project involves. The user store is global, so an
+  // unfiltered export leaked the names and emails of collaborators from every
+  // OTHER project into every shared file.
+  const involved = new Set<Id>(project.members.map((m) => m.userId));
+  for (const a of annotations) involved.add(a.author);
+  for (const e of activity) involved.add(e.actorUserId);
+  for (const t of commentThreads) for (const c of t.comments) involved.add(c.authorId);
+  involved.add(SELF_USER_ID);
+  const users = allUsers.filter((u) => involved.has(u.id));
+
+  // Imported .csl bases referenced by the exported style profiles must travel
+  // too: without the base, the other machine resolves the style to nothing
+  // and silently falls back to plain APA.
+  const customBaseStyles: CustomBaseStyle[] = [];
+  for (const style of citationStyles) {
+    if (!isCustomBaseStyleId(style.baseStyleId)) continue;
+    const base = await repos.customBaseStyles.get(style.baseStyleId);
+    if (base && !customBaseStyles.some((b) => b.id === base.id)) customBaseStyles.push(base);
+  }
+
   const data: SnapshotData = {
     project,
     documents,
@@ -109,6 +135,7 @@ export async function buildSnapshot(
     users,
     activity,
     commentThreads,
+    ...(customBaseStyles.length ? { customBaseStyles } : {}),
   };
 
   if (options.includeFiles) {
@@ -167,6 +194,7 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
     annotations: 0,
     references: 0,
     citationStyles: 0,
+    customBaseStyles: 0,
     users: 0,
     activity: 0,
     commentThreads: 0,
@@ -275,6 +303,16 @@ export async function planMerge(repos: RepositorySet, raw: SnapshotData): Promis
     if (!(await repos.citationStyles.get(style.id))) {
       writes.push(() => repos.citationStyles.put(style));
       report.citationStyles++;
+    }
+  }
+
+  // Insert-only, like the style profiles that reference them: a base .csl is
+  // immutable data imported from a file, so an id that is already here IS the
+  // same style.
+  for (const base of data.customBaseStyles ?? []) {
+    if (!(await repos.customBaseStyles.get(base.id))) {
+      writes.push(() => repos.customBaseStyles.put(base));
+      report.customBaseStyles++;
     }
   }
 

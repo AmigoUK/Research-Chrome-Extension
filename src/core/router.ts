@@ -112,13 +112,24 @@ export async function handleRequest(
         return ok(null) as Result;
       }
       case 'documents/delete': {
-        // Cascade: a document owns its stored PDF bytes and its annotations, so
-        // deleting the document without them would leak orphaned rows. References
-        // are left intact — a bibliography entry can outlive its reading-list
-        // source, and the References view deletes those on its own.
+        // Cascade: a document owns its stored PDF bytes, its annotations, and
+        // the comment threads anchored to it or to those annotations — leaving
+        // the threads behind stranded them on notes that no longer exist.
+        // References are left intact — a bibliography entry can outlive its
+        // reading-list source, and the References view deletes those on its own.
         const previous = await repos.documents.get(request.id);
         const annotations = await repos.annotations.listByDocument(request.id);
+        const annotationIds = new Set(annotations.map((a) => a.id));
         for (const annotation of annotations) await repos.annotations.delete(annotation.id);
+        if (previous) {
+          const threads = await repos.commentThreads.listByProject(previous.projectId);
+          for (const thread of threads) {
+            const anchoredHere =
+              thread.documentId === request.id ||
+              (thread.annotationId !== undefined && annotationIds.has(thread.annotationId));
+            if (anchoredHere) await repos.commentThreads.delete(thread.id);
+          }
+        }
         if (previous?.fileId) await repos.files.delete(previous.fileId);
         await repos.documents.delete(request.id);
         if (previous) await recordDocumentDelete(repos, capture, previous);

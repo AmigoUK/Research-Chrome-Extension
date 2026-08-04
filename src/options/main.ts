@@ -2421,6 +2421,7 @@ function importPlanHtml(pending: NonNullable<DashState['pendingImport']>): strin
     ['References', r.references],
     ['Comment threads', r.commentThreads],
     ['Citation styles', r.citationStyles],
+    ['Imported style bases', r.customBaseStyles],
     ['People', r.users],
     ['History events', r.activity],
     ['PDF files', r.files],

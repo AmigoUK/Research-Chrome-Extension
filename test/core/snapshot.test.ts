@@ -178,6 +178,58 @@ describe('mergeSnapshot onto another machine', () => {
   });
 });
 
+describe('export scope', () => {
+  it("exports only the people this project involves — not every project's collaborators", async () => {
+    await repos.users.put({
+      id: 'stranger@other.lab',
+      name: 'Someone Else',
+      rolesPerProject: { 'other-project': 'owner' },
+    });
+    const data = await buildSnapshot(repos, 'p1');
+    expect(data.users.map((u) => u.id)).toContain('me');
+    expect(data.users.map((u) => u.id)).not.toContain('stranger@other.lab');
+  });
+
+  it('bundles referenced imported style bases, and the merge installs them', async () => {
+    await repos.customBaseStyles.put({
+      id: 'custom-base:nature-ish',
+      name: 'Nature-ish',
+      xml: '<style xmlns="http://purl.org/net/xbiblio/csl"/>',
+      system: 'authorDate',
+      createdAt: NOW,
+    });
+    await repos.citationStyles.put({
+      id: 's-nature',
+      name: 'Nature profile',
+      baseStyleId: 'custom-base:nature-ish',
+      userRules: {
+        system: 'authorDate',
+        maxAuthors: 3,
+        etAlUseFirst: 1,
+        nameAnd: 'symbol',
+        includeDoi: true,
+        doiAsUri: true,
+        includeUrl: false,
+        includeIssue: true,
+        pagePrefix: false,
+        foiTemplate: false,
+        legalTemplate: false,
+      },
+    });
+
+    const data = await buildSnapshot(repos, 'p1');
+    expect(data.customBaseStyles?.map((b) => b.id)).toEqual(['custom-base:nature-ish']);
+
+    const target = await otherMachine();
+    const report = await mergeSnapshot(target, deps, data);
+    expect(report.customBaseStyles).toBe(1);
+    expect(await target.customBaseStyles.get('custom-base:nature-ish')).toBeTruthy();
+    // The style profile that references it arrived too, so citations will
+    // not silently fall back to APA on the other machine.
+    expect(await target.citationStyles.get('s-nature')).toBeTruthy();
+  });
+});
+
 describe('merge rules', () => {
   it('dedups a source and a reference by DOI, and remaps what pointed at them', async () => {
     const data = await buildSnapshot(repos, 'p1');

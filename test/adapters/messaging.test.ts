@@ -7,6 +7,7 @@ import {
   mutatesData,
   registerMessageRouter,
   sendRequest,
+  senderMayRequest,
 } from '../../src/adapters/chrome/messaging';
 import type { Document } from '../../src/core/model/types';
 
@@ -137,6 +138,47 @@ describe('control-message channel ownership', () => {
 
     const response = await runtime.sendMessage({ control: 'annotator/activate' });
     expect(response).toEqual({ handledBy: 'control' });
+  });
+});
+
+describe('sender gating', () => {
+  const EXT = 'chrome-extension://abc';
+
+  it('lets extension pages issue anything and content scripts only the annotator pair', () => {
+    expect(senderMayRequest('snapshot/import', { origin: EXT }, EXT)).toBe(true);
+    expect(senderMayRequest('documents/delete', undefined, EXT)).toBe(true); // worker-internal
+    expect(senderMayRequest('web/annotate', { origin: 'https://ex.org' }, EXT)).toBe(true);
+    expect(senderMayRequest('web/annotationsForUrl', { origin: 'https://ex.org' }, EXT)).toBe(true);
+    for (const type of ['documents/delete', 'snapshot/import', 'files/get', 'members/remove']) {
+      expect(senderMayRequest(type, { origin: 'https://ex.org' }, EXT), type).toBe(false);
+    }
+  });
+
+  it('refuses a privileged message from a web-page sender over the wire', async () => {
+    // Re-register with a mock that lets the test choose the sender.
+    let listener: Listener | undefined;
+    globalThis.chrome = {
+      runtime: {
+        id: 'abc',
+        onMessage: {
+          addListener(fn: Listener) {
+            listener = fn;
+          },
+        },
+        sendMessage: () => Promise.resolve(undefined),
+      },
+    } as unknown as typeof chrome;
+    const repos = createRepositories(await openContextNotesDB(`msg-sender-${counter++}`));
+    registerMessageRouter(() => Promise.resolve(repos));
+
+    const ask = (sender: unknown): Promise<unknown> =>
+      new Promise((resolve) => listener!({ type: 'documents/delete', id: 'd1' }, sender, resolve));
+
+    expect(await ask({ origin: 'https://opted-in.example' })).toEqual({
+      ok: false,
+      error: 'Not available from this context',
+    });
+    expect(await ask({ origin: 'chrome-extension://abc' })).toMatchObject({ ok: true });
   });
 });
 
