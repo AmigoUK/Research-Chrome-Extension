@@ -2807,6 +2807,24 @@ async function init(): Promise<void> {
     }
   });
 
+  // Writes from any other surface (side panel captures, PDF-reader
+  // annotations, another window) are broadcast by the service worker;
+  // re-read so the badges and views stay truthful. Debounced against write
+  // bursts, and never while the style editor is open or an import preview is
+  // pending — a full re-render there would discard work in progress.
+  let dataChangedTimer: ReturnType<typeof setTimeout> | undefined;
+  chrome.runtime.onMessage.addListener((message: { control?: string }) => {
+    if (message?.control !== 'data/changed') return;
+    clearTimeout(dataChangedTimer);
+    dataChangedTimer = setTimeout(() => {
+      if (state.route === 'styleEditor' || state.pendingImport) return;
+      void (async () => {
+        await loadProjectData();
+        render();
+      })();
+    }, 400);
+  });
+
   try {
     await loadProjects();
     await ensureSelfUser();

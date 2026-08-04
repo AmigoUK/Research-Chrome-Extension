@@ -976,9 +976,28 @@ async function init(): Promise<void> {
   // these are `control` messages, not the typed request/response pairs
   // `sendRequest` uses, so they're handled directly here rather than through
   // the router.
+  // Any surface (dashboard, PDF reader, another window) writing data makes
+  // this list stale; the service worker broadcasts after every successful
+  // mutation. Debounced: an import fires dozens of writes in a burst.
+  let dataChangedTimer: ReturnType<typeof setTimeout> | undefined;
+  const onDataChanged = (): void => {
+    clearTimeout(dataChangedTimer);
+    dataChangedTimer = setTimeout(() => {
+      void (async () => {
+        state.projects = await sendRequest({ type: 'projects/list' });
+        await loadStyles();
+        await loadDocuments();
+        await loadPageAnnotations();
+        render();
+      })();
+    }, 400);
+  };
+
   chrome.runtime.onMessage.addListener(
     (message: { control?: string; id?: string; url?: string; resolvedIds?: string[] }) => {
-      if (message?.control === 'annotator/changed') {
+      if (message?.control === 'data/changed') {
+        onDataChanged();
+      } else if (message?.control === 'annotator/changed') {
         void (async () => {
           await loadPageAnnotations();
           renderOnPageCard();

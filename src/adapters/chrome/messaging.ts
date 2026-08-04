@@ -21,6 +21,26 @@ export async function sendRequest<T extends MessageType>(
 }
 
 /**
+ * Message types whose success means stored data changed. Every UI surface
+ * renders from its own in-memory copy, so without a signal the side panel
+ * showed "0 sources" while the dashboard filed pages, and the dashboard's
+ * Annotations view stayed empty while the PDF reader saved highlights —
+ * each stale until a full reload.
+ */
+const MUTATING =
+  /\/(put|delete|import|importByDoi|enrichFromDoi|invite|setRole|remove|start|reply|setResolved)$|^capture\/page$|^web\/annotate$/;
+
+/** True when a successful request of this type should broadcast a change. */
+export function mutatesData(type: string): boolean {
+  return MUTATING.test(type);
+}
+
+/** Fire-and-forget "stored data changed" signal to every extension page. */
+function broadcastDataChanged(type: string): void {
+  chrome.runtime.sendMessage({ control: 'data/changed', changedBy: type }).catch(() => {});
+}
+
+/**
  * Register the router on `chrome.runtime.onMessage`. `getRepos` is awaited on
  * each message (typically returning a cached open-DB promise).
  */
@@ -37,7 +57,12 @@ export function registerMessageRouter(
     void (async () => {
       try {
         const repos = await getRepos();
-        sendResponse(await handleRequest(repos, message, deps));
+        const result = await handleRequest(repos, message, deps);
+        sendResponse(result);
+        const type = (message as { type?: unknown })?.type;
+        if (result.ok && typeof type === 'string' && mutatesData(type)) {
+          broadcastDataChanged(type);
+        }
       } catch (error) {
         sendResponse({
           ok: false,

@@ -3,7 +3,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
-import { registerMessageRouter, sendRequest } from '../../src/adapters/chrome/messaging';
+import {
+  mutatesData,
+  registerMessageRouter,
+  sendRequest,
+} from '../../src/adapters/chrome/messaging';
 import type { Document } from '../../src/core/model/types';
 
 type Listener = (
@@ -12,9 +16,13 @@ type Listener = (
   sendResponse: (response: unknown) => void,
 ) => boolean;
 
+/** Every message that crossed the mock wire — lets tests assert broadcasts. */
+let sentMessages: unknown[] = [];
+
 /** Minimal in-memory chrome.runtime that connects sendMessage to a listener. */
 function installChromeMock(): void {
   let listener: Listener | undefined;
+  sentMessages = [];
   const runtime = {
     onMessage: {
       addListener(fn: Listener) {
@@ -22,6 +30,12 @@ function installChromeMock(): void {
       },
     },
     sendMessage(message: unknown): Promise<unknown> {
+      sentMessages.push(message);
+      // Control broadcasts have no responder in this harness; resolve them so
+      // the worker's fire-and-forget send settles.
+      if (message && typeof (message as { control?: unknown }).control === 'string') {
+        return Promise.resolve(undefined);
+      }
       return new Promise((resolve) => {
         if (!listener) throw new Error('no listener registered');
         listener(message, {}, resolve);
@@ -123,5 +137,70 @@ describe('control-message channel ownership', () => {
 
     const response = await runtime.sendMessage({ control: 'annotator/activate' });
     expect(response).toEqual({ handledBy: 'control' });
+  });
+});
+
+describe('data-changed broadcast', () => {
+  const doc: Document = {
+    id: 'bd1',
+    projectId: 'p1',
+    url: 'https://example.org/b',
+    type: 'article',
+    metadata: { title: 'Broadcast me' },
+    status: 'toRead',
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+
+  const broadcasts = (): unknown[] =>
+    sentMessages.filter((m) => (m as { control?: string })?.control === 'data/changed');
+
+  it('announces a successful write so other surfaces can refresh', async () => {
+    await sendRequest({ type: 'documents/put', document: doc });
+    // The broadcast is fire-and-forget after sendResponse; give it a tick.
+    await new Promise((r) => setTimeout(r, 0));
+    expect(broadcasts()).toHaveLength(1);
+    expect((broadcasts()[0] as { changedBy?: string }).changedBy).toBe('documents/put');
+  });
+
+  it('stays silent for reads', async () => {
+    await sendRequest({ type: 'documents/listByProject', projectId: 'p1' });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(broadcasts()).toHaveLength(0);
+  });
+
+  it('stays silent for a failed write', async () => {
+    await expect(sendRequest({ type: 'snapshot/import', content: 'not json' })).rejects.toThrow();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(broadcasts()).toHaveLength(0);
+  });
+
+  it('classifies the message families, not a hand-kept list', () => {
+    for (const type of [
+      'documents/put',
+      'documents/delete',
+      'annotations/put',
+      'capture/page',
+      'web/annotate',
+      'snapshot/import',
+      'references/importByDoi',
+      'documents/enrichFromDoi',
+      'members/invite',
+      'comments/reply',
+      'comments/setResolved',
+    ]) {
+      expect(mutatesData(type), type).toBe(true);
+    }
+    for (const type of [
+      'ping',
+      'projects/list',
+      'documents/listByProject',
+      'files/get',
+      'snapshot/preview',
+      'snapshot/export',
+      'citations/bibliography',
+    ]) {
+      expect(mutatesData(type), type).toBe(false);
+    }
   });
 });
