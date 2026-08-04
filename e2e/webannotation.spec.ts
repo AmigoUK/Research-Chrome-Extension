@@ -126,6 +126,21 @@ async function paintedRect(
   return rect;
 }
 
+test('a selection made BEFORE activation shows the toolbar at injection time', async () => {
+  // The natural order in the field: the user selects the passage first, THEN
+  // presses "Annotate this page". The annotator used to arm only on the next
+  // mouseup, so the deliberate selection read as "it doesn't work".
+  const page = await context.newPage();
+  await page.goto(fixtureUrl());
+  await page.locator('p', { hasText: targetSentence }).selectText();
+
+  await page.addScriptTag({ url: annotatorUrl() });
+  await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
+  // Nothing was committed — closing the page leaves storage untouched for
+  // the specs that follow.
+  await page.close();
+});
+
 test('highlighting a selection paints an overlay that repaints after reload, and persists', async () => {
   const page = await context.newPage();
   await page.goto(fixtureUrl());

@@ -407,3 +407,12 @@ if (w.__contextNotesAnnotator) {
 
   void loadExisting();
 }
+
+// Honour a selection that already existed before this injection. The natural
+// order is select-first, activate-second — and demanding a fresh selection
+// right after the user deliberately made one reads as "it doesn't work".
+// Dispatching a real mouseup routes through whichever instance owns the
+// listeners (first injection or a re-activation), keeping one code path.
+if (!window.getSelection()?.isCollapsed) {
+  document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+}

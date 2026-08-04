@@ -7,6 +7,7 @@ import { sendRequest } from '../adapters/chrome/messaging';
 import {
   scanActiveTab,
   captureActiveTab,
+  hasStandingPageAccess,
   requestStandingPageAccess,
   ScanAccessError,
 } from '../adapters/chrome/capture';
@@ -56,6 +57,9 @@ interface State {
   /** Chrome refused to read the active tab (activeTab grant spent or never
    *  given). Shown as its own honest state — NOT "no page metadata". */
   previewBlocked: boolean;
+  /** The user granted the standing read-pages permission — the annotator can
+   *  auto-activate and "select text to highlight" is literally true. */
+  standingAccess: boolean;
   /** Id of the most recently filed reference — drives the cite buttons. */
   filedReferenceId: string | null;
   /** URL of the most recently filed page — so "Filed ✓" tracks the *page*, not
@@ -85,6 +89,7 @@ const state: State = {
   preview: null,
   previewIsSearchPage: false,
   previewBlocked: false,
+  standingAccess: false,
   filedReferenceId: null,
   filedUrl: null,
   pageAnnotations: [],
@@ -242,6 +247,14 @@ async function refreshPreview(): Promise<void> {
   renderCaptureCard();
   renderOnPageCard();
   renderGettingStarted(); // its first step tracks the previewed tab
+  // With the standing grant, "select text to highlight" must be literally
+  // true — inject the annotator on the page being previewed, silently.
+  // Re-injection is idempotent (the annotator guards itself) and failures
+  // (chrome:// pages, the Web Store) are simply pages that cannot be
+  // annotated, so auto mode never toasts.
+  if (state.standingAccess && isCapturablePreview() && !state.previewIsSearchPage) {
+    chrome.runtime.sendMessage({ control: 'annotator/activate' }).catch(() => {});
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -446,7 +459,12 @@ function renderOnPageCard(): void {
   if (annotations.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'onpage-empty';
-    empty.textContent = 'No notes on this page yet — select text to highlight or annotate it.';
+    // Only promise "select text" when it is literally true (annotator
+    // auto-activates under the standing grant); otherwise say the real
+    // first step, or selecting does nothing and reads as broken.
+    empty.textContent = state.standingAccess
+      ? 'No notes on this page yet — select text on the page, then choose Highlight or Note.'
+      : 'No notes yet — press “Annotate this page”, allow the site once, then select text.';
     list.replaceChildren(empty);
     return;
   }
@@ -1102,6 +1120,7 @@ async function init(): Promise<void> {
       void (async () => {
         const granted = await requestStandingPageAccess();
         if (granted) {
+          state.standingAccess = true;
           toast('Pages you open can now be previewed and filed');
           await refreshPreview();
         } else {
@@ -1221,6 +1240,7 @@ async function init(): Promise<void> {
   const onboarding = await getOnboardingState();
   state.gettingStartedDismissed = onboarding.dismissed;
   state.copiedCitation = onboarding.copiedCitation;
+  state.standingAccess = await hasStandingPageAccess();
 
   await ensureSeedProject();
   await restoreActiveProject();
