@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-08-04 — **v1.1.0, the metadata release — the build to submit to the Chrome
+_Last updated: 2026-08-04 — **v1.2.0, the onboarding release — the build to submit to the Chrome
 Web Store**; **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
@@ -15,9 +15,10 @@ cases A2–A8 all closed)**; **v0.28.0 Chrome Web Store distribution packaging**
 out of scope by an explicit decision, and the UI shows it as unavailable rather than pretending.
 
 - **Repo:** https://github.com/AmigoUK/Research-Chrome-Extension
-- **Branch state:** everything through **v1.1.0 is on `main`** (Phases 1–5 + polish + hardening +
-  web-page annotation + Web Store packaging + the metadata release). No unmerged work.
-- **Releases:** v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
+- **Branch state:** everything through **v1.2.0 is on `main`** (Phases 1–5 + polish + hardening +
+  web-page annotation + Web Store packaging + the metadata and onboarding releases). No unmerged
+  work.
+- **Releases:** v1.2.0 the onboarding release (see below); v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
   v1.0.0 ready for the Chrome Web Store;
   v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
   feedback; v0.27.5 no dead "Jump to" on an unplaced note;
@@ -28,8 +29,20 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
   → v0.14.0 Phase 4; v0.8.0 → v0.12.0 Phase 3; v0.2.0 → v0.7.0 Phase 2; v0.0.1 → v0.1.1 Phase 1.
 - **CI:** GitHub Actions — typecheck → lint → format:check → unit → build, plus an E2E job
   (Playwright under xvfb).
-- **Tests:** 359 unit + 28 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation),
-  all green.
+- **Tests:** 363 unit + 31 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation +
+  3 onboarding), all green.
+
+### v1.2.0 — the onboarding release (2026-08-04)
+
+The workflow now teaches itself. A five-step **guide page** opens once on first install (never on
+updates) and stays reachable from the panel's Guide button, the dashboard footer and the
+empty-Overview callout; its buttons open the side panel, the dashboard and Chrome's Site access
+settings directly. The side panel gains a **getting-started checklist** — the same five steps
+checked off from real project data, with a one-line hint on the current step, dismissable and
+self-retiring — plus **journey nudges**: each completed action suggests the natural next one
+(filed → annotate, first highlight → set a status, status moved → cite, first citation →
+bibliography/sync), once per session and never after the checklist was dismissed. The panel header
+finally links the **Dashboard**, which was previously unreachable from the panel.
 
 ### v1.1.0 — the metadata release (2026-08-04)
 

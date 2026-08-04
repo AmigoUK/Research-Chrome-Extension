@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.2.0] — 2026-08-04
+
+The onboarding release: the workflow now teaches itself.
+
+### Added
+
+- **First-run guide** — a five-step tour (file → highlight → PDFs → track →
+  cite, plus sharing) that opens once on install and stays reachable from the
+  panel's Guide button, the dashboard footer, and the empty-Overview callout.
+  Its buttons open the side panel, the dashboard, and Chrome's Site access
+  settings directly.
+- **Getting-started checklist** in the side panel — the same five steps,
+  checked off from real project data as you do them, with a one-line hint on
+  the current step. Dismissable; disappears for good once complete.
+- **Journey nudges** — after each action the panel suggests the natural next
+  one: filed → annotate, first highlight → set a status, status moved → cite,
+  first citation → bibliography/sync. Once per session, never after the
+  checklist is dismissed.
+- **Guide and Dashboard buttons** in the panel header — the dashboard was
+  previously unreachable from the panel at all.
+- An empty dashboard Overview now points back to the side panel, Add PDF and
+  the guide instead of showing bare columns.
+
 ## [1.1.0] — 2026-08-04
 
 The metadata release, driven by a live audit against Google Scholar and real

@@ -4,16 +4,20 @@ A Chrome (Manifest V3) research companion: contextual annotations on web pages *
 project-based organisation of sources, citations and bibliographies via real CSL, a rule-driven
 citation-style editor, and local-first collaboration.
 
-> **Status:** **all five roadmap phases delivered.** Current release: **v1.1.0** — the build to
+> **Status:** **all five roadmap phases delivered.** Current release: **v1.2.0** — the build to
 > submit to the Chrome Web Store. See [`CHANGELOG.md`](CHANGELOG.md) and
 > [`doc/STATUS.md`](doc/STATUS.md).
 
 ## Quick start
 
+A built-in **guide opens on first install** (and stays behind the panel's **Guide** button), and a
+**getting-started checklist** in the side panel checks the steps below off as you actually do them
+— each completed action suggests the natural next one.
+
 1. **Install**: from the Chrome Web Store, or unpacked — `npm ci && npm run build`, then
    `chrome://extensions` → Developer mode → _Load unpacked_ → the `dist/` folder.
 2. **Open the side panel** with the toolbar icon. A default project ("My Research") is created for
-   you; the header switches or creates projects.
+   you; the header switches projects, and its **Dashboard** button opens the full workspace.
 3. **File a source**: open the **article page itself** (not a search-results page — the panel will
    tell you if you try) and press **File into project**. If the page carries a DOI, the record is
    auto-completed from the DOI registry: structured authors, year, journal, volume, issue, pages.
