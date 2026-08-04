@@ -58,6 +58,10 @@ export interface MessageMap {
   'references/put': { req: { reference: Reference }; res: null };
   'references/delete': { req: { id: Id }; res: null };
   'references/importByDoi': { req: { projectId: Id; doi: string }; res: Reference };
+  'documents/enrichFromDoi': {
+    req: { documentId: Id };
+    res: { document: Document; reference: Reference };
+  };
   'citationStyles/list': { req: Record<never, never>; res: CitationStyle[] };
   'citationStyles/put': { req: { style: CitationStyle }; res: null };
   'citationStyles/delete': { req: { id: Id }; res: null };

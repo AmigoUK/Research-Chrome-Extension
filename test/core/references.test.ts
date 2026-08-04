@@ -4,11 +4,14 @@ import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import {
+  cslToDocumentMetadata,
+  enrichDocumentFromDoi,
   importReferenceByDoi,
   normaliseDoi,
   type ImportDeps,
 } from '../../src/core/usecases/references';
 import type { RepositorySet } from '../../src/core/ports/repositories';
+import type { Document } from '../../src/core/model/types';
 
 let repos: RepositorySet;
 let counter = 0;
@@ -96,5 +99,86 @@ describe('importReferenceByDoi', () => {
     await expect(
       importReferenceByDoi(repos, { projectId: 'p1', doi: '   ' }, deps(SAMPLE)),
     ).rejects.toThrow();
+  });
+});
+
+describe('cslToDocumentMetadata', () => {
+  it('maps the registry record onto our metadata shape', () => {
+    const meta = cslToDocumentMetadata({
+      ...SAMPLE,
+      volume: '108',
+      issue: '455',
+      page: '1-24',
+      publisher: 'RMetS',
+    });
+    expect(meta).toEqual({
+      title: 'The energetic basis of the urban heat island',
+      authors: ['Oke, T. R.'],
+      year: 1982,
+      journal: 'Quarterly Journal of the Royal Meteorological Society',
+      publisher: 'RMetS',
+      volume: '108',
+      issue: '455',
+      pages: '1-24',
+    });
+  });
+
+  it('keeps literal names and skips what the registry does not carry', () => {
+    const meta = cslToDocumentMetadata({ author: [{ literal: 'Defra' }] });
+    expect(meta).toEqual({ authors: ['Defra'] });
+  });
+});
+
+describe('enrichDocumentFromDoi', () => {
+  const captured: Document = {
+    id: 'd1',
+    projectId: 'p1',
+    url: 'https://example.org/paper',
+    type: 'webPage',
+    // What a patchy publisher page yields: right DOI, thin everything else.
+    metadata: { title: 'Page title', doi: '10.1002/qj.49710845502' },
+    status: 'toRead',
+    createdAt: '2026-07-23T00:00:00.000Z',
+    updatedAt: '2026-07-23T00:00:00.000Z',
+  };
+
+  it('completes the document from the registry and links a full reference', async () => {
+    await repos.documents.put(captured);
+    const { document, reference } = await enrichDocumentFromDoi(repos, 'd1', deps(SAMPLE));
+    expect(document.metadata.title).toBe('The energetic basis of the urban heat island');
+    expect(document.metadata.authors).toEqual(['Oke, T. R.']);
+    expect(document.metadata.year).toBe(1982);
+    expect(document.type).toBe('article');
+    expect(reference.documentId).toBe('d1');
+    expect((reference.cslData as { title?: string }).title).toBe(SAMPLE.title);
+    // Persisted, not just returned.
+    expect((await repos.documents.get('d1'))?.metadata.year).toBe(1982);
+  });
+
+  it('keeps captured values the registry does not carry', async () => {
+    await repos.documents.put({
+      ...captured,
+      metadata: { ...captured.metadata, publisher: 'Captured Publisher' },
+    });
+    const { document } = await enrichDocumentFromDoi(repos, 'd1', deps({ title: 'T' }));
+    expect(document.metadata.publisher).toBe('Captured Publisher');
+  });
+
+  it('updates the existing reference with the same DOI instead of duplicating', async () => {
+    await repos.documents.put(captured);
+    await importReferenceByDoi(
+      repos,
+      { projectId: 'p1', doi: '10.1002/qj.49710845502' },
+      deps(SAMPLE),
+    );
+    await enrichDocumentFromDoi(repos, 'd1', deps(SAMPLE));
+    const refs = await repos.references.listByProject('p1');
+    expect(refs).toHaveLength(1);
+    expect(refs[0]?.documentId).toBe('d1');
+  });
+
+  it('refuses a document with no DOI', async () => {
+    await repos.documents.put({ ...captured, metadata: { title: 'No DOI here' } });
+    await expect(enrichDocumentFromDoi(repos, 'd1', deps(SAMPLE))).rejects.toThrow(/no DOI/);
   });
 });

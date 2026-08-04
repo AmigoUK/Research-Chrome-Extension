@@ -7,7 +7,7 @@
  * real content-negotiation request from the service worker.
  */
 import type { RepositorySet } from '../ports/repositories';
-import type { Reference, Id } from '../model/types';
+import type { Document, DocumentMetadata, Reference, Id } from '../model/types';
 
 /** Strip a URL/`doi:` prefix and normalise a DOI for lookup. */
 export function normaliseDoi(input: string): string {
@@ -112,4 +112,107 @@ export async function importReferenceByDoi(
       };
   await repos.references.put(reference);
   return reference;
+}
+
+/** One CSL name → the display string our DocumentMetadata stores. */
+function cslNameToString(name: unknown): string | undefined {
+  if (!name || typeof name !== 'object') return undefined;
+  const n = name as { family?: unknown; given?: unknown; literal?: unknown };
+  if (typeof n.literal === 'string' && n.literal.trim()) return n.literal.trim();
+  const family = typeof n.family === 'string' ? n.family.trim() : '';
+  const given = typeof n.given === 'string' ? n.given.trim() : '';
+  if (family && given) return `${family}, ${given}`;
+  return family || given || undefined;
+}
+
+/** Map registry CSL-JSON onto our metadata shape. Only fields the registry
+ *  actually carries are returned — the caller merges over what capture found. */
+export function cslToDocumentMetadata(csl: Record<string, unknown>): Partial<DocumentMetadata> {
+  const out: Partial<DocumentMetadata> = {};
+  const title = Array.isArray(csl['title']) ? csl['title'][0] : csl['title'];
+  if (typeof title === 'string' && title.trim()) out.title = title.trim();
+  if (Array.isArray(csl['author'])) {
+    const authors = csl['author'].map(cslNameToString).filter((a): a is string => !!a);
+    if (authors.length) out.authors = authors;
+  }
+  const issued = csl['issued'] as { 'date-parts'?: unknown } | undefined;
+  const year = Array.isArray(issued?.['date-parts'])
+    ? (issued['date-parts'] as unknown[][])[0]?.[0]
+    : undefined;
+  if (typeof year === 'number' && Number.isFinite(year)) out.year = year;
+  const container = Array.isArray(csl['container-title'])
+    ? csl['container-title'][0]
+    : csl['container-title'];
+  if (typeof container === 'string' && container.trim()) out.journal = container.trim();
+  if (typeof csl['publisher'] === 'string' && csl['publisher'].trim()) {
+    out.publisher = csl['publisher'].trim();
+  }
+  if (typeof csl['volume'] === 'string' || typeof csl['volume'] === 'number') {
+    out.volume = String(csl['volume']);
+  }
+  if (typeof csl['issue'] === 'string' || typeof csl['issue'] === 'number') {
+    out.issue = String(csl['issue']);
+  }
+  if (typeof csl['page'] === 'string' || typeof csl['page'] === 'number') {
+    out.pages = String(csl['page']);
+  }
+  return out;
+}
+
+export interface EnrichResult {
+  document: Document;
+  reference: Reference;
+}
+
+/**
+ * Upgrade a captured document's metadata from the DOI registry.
+ *
+ * Page capture gets the DOI right on essentially every publisher, but the
+ * rest of the page's tags are patchy (missing years, no volume/pages,
+ * inconsistent author forms). The registry record behind that same DOI is
+ * authoritative and complete — so where both exist, the registry wins, and
+ * whatever the registry does not carry keeps the captured value. The linked
+ * Reference gets the full CSL record, which the citation engine prefers.
+ */
+export async function enrichDocumentFromDoi(
+  repos: RepositorySet,
+  documentId: Id,
+  deps: ImportDeps = defaultDeps,
+): Promise<EnrichResult> {
+  const document = await repos.documents.get(documentId);
+  if (!document) throw new Error('That source is no longer here');
+  const doi = normaliseDoi(document.metadata.doi ?? '');
+  if (!doi) throw new Error('This source has no DOI to look up');
+
+  const fetched = await deps.fetchCsl(doi);
+  const csl = (Array.isArray(fetched) ? fetched[0] : fetched) as
+    Record<string, unknown> | undefined;
+  if (!csl || typeof csl !== 'object') throw new Error('No metadata found for that DOI');
+  const cslData: Record<string, unknown> = { ...csl, DOI: (csl.DOI as string | undefined) ?? doi };
+
+  const now = deps.now();
+  const enriched: Document = {
+    ...document,
+    metadata: { ...document.metadata, ...cslToDocumentMetadata(cslData), doi },
+    type: 'article',
+    updatedAt: now,
+  };
+  await repos.documents.put(enriched);
+
+  const existing = await repos.references.findByDoi(document.projectId, doi);
+  const reference: Reference = existing
+    ? { ...existing, cslData, documentId: existing.documentId ?? document.id, updatedAt: now }
+    : {
+        id: deps.newId(),
+        projectId: document.projectId,
+        documentId: document.id,
+        cslData,
+        source: 'importedByDoi',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+  await repos.references.put(reference);
+
+  return { document: enriched, reference };
 }

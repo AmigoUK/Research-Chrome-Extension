@@ -15,7 +15,7 @@ import {
   formatDocumentCitation,
   formatPreview,
 } from './usecases/citations';
-import { importReferenceByDoi } from './usecases/references';
+import { importReferenceByDoi, enrichDocumentFromDoi } from './usecases/references';
 import { listMembers, inviteMember, setMemberRole, removeMember } from './usecases/members';
 import {
   listActivity,
@@ -215,6 +215,10 @@ export async function handleRequest(
         });
         await recordReferenceAdded(repos, capture, reference, 'imported');
         return ok(reference) as Result;
+      }
+      case 'documents/enrichFromDoi': {
+        const enriched = await enrichDocumentFromDoi(repos, request.documentId);
+        return ok(enriched) as Result;
       }
       case 'citationStyles/list':
         return ok(await repos.citationStyles.list()) as Result;

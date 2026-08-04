@@ -623,6 +623,24 @@ async function fileCurrentPage(): Promise<void> {
     await loadDocuments();
     render();
     toast(result.deduped ? 'Already filed — reused existing source' : 'Filed into project');
+    // Page tags are patchy (missing years, no volume/pages, inconsistent
+    // author forms); the registry record behind the same DOI is complete.
+    // Best-effort: the capture already succeeded, so a failed lookup (offline,
+    // stale DOI) costs nothing and says nothing.
+    if (result.document.metadata.doi && !result.deduped) {
+      try {
+        const enriched = await sendRequest({
+          type: 'documents/enrichFromDoi',
+          documentId: result.document.id,
+        });
+        state.filedReferenceId = enriched.reference.id;
+        await loadDocuments();
+        render();
+        toast('Metadata completed from the DOI registry');
+      } catch {
+        // keep the captured metadata
+      }
+    }
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Capture failed', true);
   }
