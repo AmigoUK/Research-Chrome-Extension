@@ -13,6 +13,7 @@
  */
 import apaUrl from '../../assets/csl/apa.csl?url';
 import harvardUrl from '../../assets/csl/harvard1.csl?url';
+import harvardSolentUrl from '../../assets/csl/solent-university-harvard.csl?url';
 import vancouverUrl from '../../assets/csl/vancouver.csl?url';
 import chicagoAuthorDateUrl from '../../assets/csl/chicago-author-date.csl?url';
 import chicagoNotesUrl from '../../assets/csl/chicago-notes-bibliography.csl?url';
@@ -23,6 +24,7 @@ import type { CslLoader } from './citejs';
 export const CSL_URLS: Record<string, string> = {
   apa: apaUrl,
   harvard1: harvardUrl,
+  'solent-university-harvard': harvardSolentUrl,
   vancouver: vancouverUrl,
   'chicago-author-date': chicagoAuthorDateUrl,
   'chicago-notes-bibliography': chicagoNotesUrl,

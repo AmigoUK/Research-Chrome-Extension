@@ -9,6 +9,7 @@ import { isCustomBaseStyleId } from './parse';
 export const BASE_STYLE_TEMPLATES = {
   apa: 'apa',
   harvard: 'harvard1',
+  'harvard-solent': 'solent-university-harvard',
   chicago: 'chicago-author-date',
   'chicago-note': 'chicago-notes-bibliography',
   mla: 'modern-language-association',
@@ -43,6 +44,7 @@ export interface BaseStyleInfo {
 export const BASE_STYLES: readonly BaseStyleInfo[] = [
   { id: 'apa', label: 'APA 7th edition', system: 'authorDate' },
   { id: 'harvard', label: 'Harvard — Cite Them Right', system: 'authorDate' },
+  { id: 'harvard-solent', label: 'Harvard — Solent University', system: 'authorDate' },
   { id: 'chicago', label: 'Chicago (author–date)', system: 'authorDate' },
   { id: 'chicago-note', label: 'Chicago (notes & bibliography)', system: 'footnote' },
   { id: 'mla', label: 'MLA 9th edition', system: 'authorDate' },

@@ -180,6 +180,20 @@ describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
   });
 });
 
+describe('Harvard (Solent University) renders through real citeproc', () => {
+  it('produces an author–date in-text citation and a bibliography entry', async () => {
+    const inText = await formatter.inText([ITEM], templateFor('harvard-solent'));
+    expect(inText).toMatch(/Gasparrini/i);
+    expect(inText).toContain('2015');
+    const bib = await formatter.bibliography([ITEM], templateFor('harvard-solent'));
+    // Solent's house style prints family names in capitals:
+    // "GASPARRINI, A. et al., 2015. … The Lancet, 386(9991), 369–375".
+    expect(bib).toContain('GASPARRINI, A.');
+    expect(bib).toContain('The Lancet');
+    expect(bib).toContain('386(9991)');
+  });
+});
+
 describe('BASE_STYLES matches the vendored CSL files', () => {
   const DECLARED: Record<string, 'authorDate' | 'footnote' | 'numeric'> = {
     'author-date': 'authorDate',

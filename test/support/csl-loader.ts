@@ -15,6 +15,7 @@ const CSL_DIR = fileURLToPath(new URL('../../src/assets/csl/', import.meta.url))
 export const TEST_CSL_TEMPLATES = [
   'apa',
   'harvard1',
+  'solent-university-harvard',
   'vancouver',
   'chicago-author-date',
   'chicago-notes-bibliography',
