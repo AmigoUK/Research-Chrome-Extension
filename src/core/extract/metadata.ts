@@ -36,9 +36,26 @@ export interface RawPageMetadata {
 const META = {
   title: ['citation_title', 'dc.title', 'og:title'],
   doi: ['citation_doi', 'dc.identifier', 'prism.doi'],
-  year: ['citation_publication_date', 'citation_date', 'dc.date', 'prism.publicationdate'],
-  journal: ['citation_journal_title', 'prism.publicationname', 'og:site_name'],
+  // Ordered best-first; the tail entries are fallbacks for publishers
+  // (IngentaConnect, some society presses) that skip the Highwire dates and
+  // would otherwise cite as "(n.d.)".
+  year: [
+    'citation_publication_date',
+    'citation_date',
+    'citation_online_date',
+    'dc.date',
+    'dc.date.issued',
+    'prism.publicationdate',
+    'prism.coverdate',
+  ],
+  // og:site_name is NOT here: it names the website, not the container —
+  // mapping it to journal made arXiv captures cite "arXiv.org" as a journal.
+  journal: ['citation_journal_title', 'prism.publicationname'],
   publisher: ['citation_publisher', 'dc.publisher'],
+  volume: ['citation_volume', 'prism.volume'],
+  issue: ['citation_issue', 'prism.number'],
+  firstPage: ['citation_firstpage', 'prism.startingpage'],
+  lastPage: ['citation_lastpage', 'prism.endingpage'],
 } as const;
 
 function pick(tags: Record<string, string>, keys: readonly string[]): string | undefined {
@@ -110,18 +127,37 @@ export function buildDocumentMetadata(raw: RawPageMetadata): DocumentMetadata {
   const publisher = pick(tags, META.publisher);
   if (publisher) metadata.publisher = publisher;
 
+  const volume = pick(tags, META.volume);
+  if (volume) metadata.volume = volume;
+  const issue = pick(tags, META.issue);
+  if (issue) metadata.issue = issue;
+  const firstPage = pick(tags, META.firstPage);
+  const lastPage = pick(tags, META.lastPage);
+  // "369–375" when both ends exist, the lone value otherwise — Physical
+  // Review-style article numbers arrive as a firstpage with no lastpage.
+  const pages =
+    firstPage && lastPage && firstPage !== lastPage ? `${firstPage}–${lastPage}` : firstPage;
+  if (pages) metadata.pages = pages;
+
+  const arxivId = tags['citation_arxiv_id']?.trim();
+  if (arxivId) metadata.identifiers = { ...metadata.identifiers, arxiv: arxivId };
+
   return metadata;
 }
 
 /** Guess a document type from available signals (defaults to webPage). */
 export function inferDocumentType(metadata: DocumentMetadata): DocumentType {
-  if (metadata.doi || metadata.journal) return 'article';
+  if (metadata.doi || metadata.journal || metadata.identifiers?.['arxiv']) return 'article';
   return 'webPage';
 }
 
 /** Build minimal CSL JSON from extracted metadata, for a Reference. */
 export function toCslData(metadata: DocumentMetadata, url: string): Record<string, unknown> {
-  const csl: Record<string, unknown> = { type: metadata.journal ? 'article-journal' : 'webpage' };
+  const arxivId = metadata.identifiers?.['arxiv'];
+  // A preprint with no journal is a generic 'article' (CSL's preprint-ish
+  // type), not an 'article-journal' — and never a journal called "arXiv.org".
+  const type = metadata.journal ? 'article-journal' : arxivId ? 'article' : 'webpage';
+  const csl: Record<string, unknown> = { type };
   if (metadata.title) csl['title'] = metadata.title;
   if (metadata.authors?.length) {
     csl['author'] = metadata.authors.map((name) => ({ literal: name }));
@@ -129,6 +165,14 @@ export function toCslData(metadata: DocumentMetadata, url: string): Record<strin
   if (metadata.year !== undefined) csl['issued'] = { 'date-parts': [[metadata.year]] };
   if (metadata.journal) csl['container-title'] = metadata.journal;
   if (metadata.publisher) csl['publisher'] = metadata.publisher;
+  if (metadata.volume) csl['volume'] = metadata.volume;
+  if (metadata.issue) csl['issue'] = metadata.issue;
+  if (metadata.pages) csl['page'] = metadata.pages;
+  if (arxivId && !metadata.journal) {
+    csl['genre'] = 'preprint';
+    csl['archive'] = 'arXiv';
+    csl['number'] = arxivId;
+  }
   if (metadata.doi) csl['DOI'] = metadata.doi;
   csl['URL'] = url;
   return csl;

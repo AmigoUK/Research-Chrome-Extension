@@ -123,6 +123,11 @@ export interface DocumentMetadata {
   doi?: string;
   journal?: string;
   publisher?: string;
+  /** Journal volume, kept as text — publishers emit values like "8" and "S1". */
+  volume?: string;
+  issue?: string;
+  /** Page range ("369–375") or an article number ("108701"). */
+  pages?: string;
   identifiers?: Record<string, string>;
 }
 

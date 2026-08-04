@@ -43,6 +43,53 @@ describe('buildDocumentMetadata', () => {
   it('falls back to the document title when no citation_title', () => {
     expect(buildDocumentMetadata({ title: 'Plain page' }).title).toBe('Plain page');
   });
+
+  // The tag set an APS / Physical Review-style page actually serves — the
+  // volume/issue/pages were present on every publisher tested live and were
+  // silently dropped, leaving bibliographies without them.
+  it('captures volume, issue and a page range', () => {
+    const meta = buildDocumentMetadata({
+      metaTags: {
+        citation_title: 'Role of City Texture in Urban Heat Islands at Nighttime',
+        citation_journal_title: 'Physical Review Letters',
+        citation_volume: '120',
+        citation_issue: '10',
+        citation_firstpage: '108701',
+        citation_publication_date: '2018/03/09',
+      },
+    });
+    expect(meta.volume).toBe('120');
+    expect(meta.issue).toBe('10');
+    expect(meta.pages).toBe('108701'); // article number: firstpage, no lastpage
+  });
+
+  it('joins first and last page into a range', () => {
+    const meta = buildDocumentMetadata({
+      metaTags: { citation_firstpage: '369', citation_lastpage: '375' },
+    });
+    expect(meta.pages).toBe('369–375');
+  });
+
+  it('does not mistake og:site_name for a journal — the arXiv trap', () => {
+    const meta = buildDocumentMetadata({
+      metaTags: {
+        citation_title: 'Role of Structural Morphology in Urban Heat Islands',
+        'og:site_name': 'arXiv.org',
+        citation_arxiv_id: '1705.00504',
+        citation_date: '2017/05/01',
+      },
+    });
+    expect(meta.journal).toBeUndefined();
+    expect(meta.identifiers).toEqual({ arxiv: '1705.00504' });
+    expect(inferDocumentType(meta)).toBe('article');
+  });
+
+  it('recovers a year from the online-date fallbacks', () => {
+    expect(buildDocumentMetadata({ metaTags: { citation_online_date: '2005-05-01' } }).year).toBe(
+      2005,
+    );
+    expect(buildDocumentMetadata({ metaTags: { 'dc.date.issued': '2005' } }).year).toBe(2005);
+  });
 });
 
 describe('inferDocumentType', () => {
@@ -96,5 +143,26 @@ describe('toCslData', () => {
     expect(csl['DOI']).toBe('10.1/x');
     expect(csl['URL']).toBe('https://example.org/a');
     expect(csl['issued']).toEqual({ 'date-parts': [[1982]] });
+  });
+
+  it('carries volume, issue and pages into CSL', () => {
+    const csl = toCslData(
+      { title: 'T', journal: 'PRL', volume: '120', issue: '10', pages: '108701' },
+      'https://example.org/a',
+    );
+    expect(csl['volume']).toBe('120');
+    expect(csl['issue']).toBe('10');
+    expect(csl['page']).toBe('108701');
+  });
+
+  it('types a journal-less arXiv record as a preprint, not a webpage', () => {
+    const csl = toCslData(
+      { title: 'T', identifiers: { arxiv: '1705.00504' } },
+      'https://arxiv.org/abs/1705.00504',
+    );
+    expect(csl['type']).toBe('article');
+    expect(csl['genre']).toBe('preprint');
+    expect(csl['archive']).toBe('arXiv');
+    expect(csl['container-title']).toBeUndefined();
   });
 });

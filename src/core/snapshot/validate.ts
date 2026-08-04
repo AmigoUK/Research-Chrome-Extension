@@ -138,6 +138,9 @@ function documentMetadata(value: unknown, what: string): DocumentMetadata {
   if (raw['publisher'] !== undefined) {
     out.publisher = text(raw['publisher'], `${what}'s publisher`, 1024);
   }
+  if (raw['volume'] !== undefined) out.volume = text(raw['volume'], `${what}'s volume`, 128);
+  if (raw['issue'] !== undefined) out.issue = text(raw['issue'], `${what}'s issue`, 128);
+  if (raw['pages'] !== undefined) out.pages = text(raw['pages'], `${what}'s pages`, 128);
   if (raw['identifiers'] !== undefined) {
     const ids = record(raw['identifiers'], `${what}'s identifiers`);
     const clean: Record<string, string> = {};
