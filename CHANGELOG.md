@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.2.2] — 2026-08-04
+
+### Fixed
+
+- **Selecting text now behaves the way the panel says it does.** A selection
+  made before pressing "Annotate this page" was thrown away (the toolbar
+  armed only on the next mouseup); it now appears immediately at activation.
+  And under the standing read-pages grant the annotator auto-activates on
+  the page being previewed, so "select text to highlight" is literally true;
+  without the grant, the empty-state copy now names the real first step
+  instead of promising one that could not work.
+
 ## [1.2.1] — 2026-08-04
 
 ### Fixed
