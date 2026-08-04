@@ -14,6 +14,7 @@ import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/activ
 import type {
   Project,
   Document,
+  DocumentMetadata,
   Annotation,
   AnnotationStatus,
   ActivityEvent,
@@ -187,6 +188,10 @@ interface DashState {
   docFilter: ListFilter;
   annoFilter: { search: string; status: AnnotationStatus | 'all' };
   selectedStyleId: Id | null;
+  /** Pristine JSON of each style opened in the editor this session — the
+   *  editor mutates live state, so leaving without saving must be able to
+   *  put things back. */
+  editorBackups: Map<Id, string>;
   /** Right-hand panel tab in the full-screen style editor. */
   editorTab: 'preview' | 'csl';
   /** A snapshot chosen for import, held until the user confirms the plan. */
@@ -219,6 +224,7 @@ const state: DashState = {
   docFilter: { search: '', status: 'all' },
   annoFilter: { search: '', status: 'all' },
   selectedStyleId: null,
+  editorBackups: new Map(),
   editorTab: 'preview',
   pendingImport: null,
   teamTab: 'activity',
@@ -461,7 +467,32 @@ function toggleProjMenu(on?: boolean): void {
 }
 
 /* ---- Router ---- */
+function editorDirtyStyles(): CitationStyle[] {
+  const dirty: CitationStyle[] = [];
+  for (const [id, pristine] of state.editorBackups) {
+    const current = state.styles.find((s) => s.id === id);
+    if (current && JSON.stringify(current) !== pristine) dirty.push(current);
+  }
+  return dirty;
+}
+
 function go(route: Route): void {
+  // The editor edits the live style objects; leaving without saving used to
+  // keep the mutations in memory silently (until a reload dropped them).
+  // Ask, and on discard actually put the pristine copies back.
+  if (state.route === 'styleEditor' && route !== 'styleEditor') {
+    const dirty = editorDirtyStyles();
+    if (dirty.length > 0) {
+      if (!confirm('Discard unsaved changes to this citation style?')) return;
+      state.styles = state.styles.map((s) => {
+        const pristine = state.editorBackups.get(s.id);
+        return pristine && dirty.some((d) => d.id === s.id)
+          ? (JSON.parse(pristine) as CitationStyle)
+          : s;
+      });
+    }
+    state.editorBackups.clear();
+  }
   state.route = route;
   render();
   $('#view').scrollTop = 0;
@@ -748,6 +779,7 @@ function drawDocuments(): void {
         <td style="white-space:nowrap">
           ${canOpenInReader(d) ? `<button class="btn btn--ghost btn--sm" data-open title="Open in reader" aria-label="Open in reader">${ICON.open}</button>` : ''}
           ${m.doi ? `<a href="https://doi.org/${encodeURIComponent(m.doi)}" target="_blank" rel="noopener" title="Open source" aria-label="Open source">${ICON.ext}</a>` : ''}
+          <button class="btn btn--ghost btn--sm" data-edit title="Edit metadata" aria-label="Edit metadata">Edit</button>
           <button class="btn btn--ghost btn--sm" data-del title="Delete source" aria-label="Delete source">${ICON.trash}</button>
         </td>
       </tr>`;
@@ -777,6 +809,107 @@ function drawDocuments(): void {
       if (doc) void openInReader(doc);
     });
   });
+  $$('[data-edit]', box).forEach((b) => {
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const id = b.closest('tr')?.getAttribute('data-id');
+      const doc = id ? docById(id) : undefined;
+      if (doc) openEditDocPop(e.currentTarget as HTMLElement, doc);
+    });
+  });
+}
+
+/**
+ * Edit a source's bibliographic fields in place. When extraction gets a page
+ * wrong there was previously NO way to correct it — every remaining failure
+ * was a dead end. One field per line keeps the form honest about what is
+ * stored; authors are one-per-line, "Family, Given".
+ */
+function openEditDocPop(anchor: HTMLElement, doc: Document): void {
+  const m = doc.metadata;
+  const pop = $('#pop');
+  const field = (id: string, label: string, value: string, width = 260): string =>
+    `<label class="pl" for="${id}" style="display:block;margin-top:6px">${esc(label)}</label>
+     <input id="${id}" class="sel" style="width:${width}px" value="${esc(value)}">`;
+  pop.innerHTML = `<div class="pl">Edit metadata</div>
+    ${field('emTitle', 'Title', m.title ?? '')}
+    <label class="pl" for="emAuthors" style="display:block;margin-top:6px">Authors — one per line, “Family, Given”</label>
+    <textarea id="emAuthors" class="sel" rows="3" style="width:260px">${esc((m.authors ?? []).join('\n'))}</textarea>
+    <div class="row">
+      ${field('emYear', 'Year', m.year === undefined ? '' : String(m.year), 70)}
+      ${field('emVolume', 'Volume', m.volume ?? '', 70)}
+      ${field('emIssue', 'Issue', m.issue ?? '', 60)}
+      ${field('emPages', 'Pages', m.pages ?? '', 90)}
+    </div>
+    ${field('emJournal', 'Journal', m.journal ?? '')}
+    ${field('emDoi', 'DOI', m.doi ?? '')}
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn--primary btn--sm" id="emSave">${ICON.check} Save</button>
+      ${m.doi ? `<button class="btn btn--sm" id="emRefresh" title="Re-fetch from the DOI registry">Refresh from DOI</button>` : ''}
+    </div>`;
+
+  const val = (id: string): string => $<HTMLInputElement>(`#${id}`, pop).value.trim();
+  $('#emSave', pop).onclick = () => {
+    void (async () => {
+      const metadata: DocumentMetadata = {};
+      const title = val('emTitle');
+      if (title) metadata.title = title;
+      const authors = $<HTMLTextAreaElement>('#emAuthors', pop)
+        .value.split('\n')
+        .map((a) => a.trim())
+        .filter(Boolean);
+      if (authors.length) metadata.authors = authors;
+      const year = Number(val('emYear'));
+      if (val('emYear') && Number.isFinite(year)) metadata.year = year;
+      const volume = val('emVolume');
+      if (volume) metadata.volume = volume;
+      const issue = val('emIssue');
+      if (issue) metadata.issue = issue;
+      const pages = val('emPages');
+      if (pages) metadata.pages = pages;
+      const journal = val('emJournal');
+      if (journal) metadata.journal = journal;
+      const doi = val('emDoi');
+      if (doi) metadata.doi = doi;
+      if (m.identifiers) metadata.identifiers = m.identifiers;
+      try {
+        await sendRequest({
+          type: 'documents/put',
+          document: { ...doc, metadata, updatedAt: nowIso() },
+        });
+        closePop();
+        state.documents = await sendRequest({
+          type: 'documents/listByProject',
+          projectId: doc.projectId,
+        });
+        render();
+        toast('Metadata saved', ICON.check);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Couldn’t save the metadata', ICON.warn, true);
+      }
+    })();
+  };
+  const refresh = pop.querySelector<HTMLButtonElement>('#emRefresh');
+  if (refresh) {
+    refresh.onclick = () => {
+      void (async () => {
+        try {
+          await sendRequest({ type: 'documents/enrichFromDoi', documentId: doc.id });
+          closePop();
+          state.documents = await sendRequest({
+            type: 'documents/listByProject',
+            projectId: doc.projectId,
+          });
+          render();
+          toast('Metadata refreshed from the DOI registry', ICON.check);
+        } catch (err) {
+          toast(err instanceof Error ? err.message : 'DOI lookup failed', ICON.warn, true);
+        }
+      })();
+    };
+  }
+  placePop(anchor);
+  $<HTMLInputElement>('#emTitle', pop).focus();
 }
 
 /* ---- PDF ingestion ---- */
@@ -1613,6 +1746,7 @@ async function saveStyle(): Promise<void> {
       type: 'citationStyles/put',
       style: { ...style, userRules: { ...style.userRules } },
     });
+    state.editorBackups.set(style.id, JSON.stringify(style));
     toast(`Saved · ${style.name}`, ICON.check);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t save style', ICON.warn, true);
@@ -1717,6 +1851,13 @@ function renderStyleEditor(view: HTMLElement, actions: HTMLElement): void {
     return;
   }
   if (!state.selectedStyleId) state.selectedStyleId = state.styles[0]?.id ?? null;
+  // First render of a style in this editor session captures its pristine
+  // form — later re-renders (every rule tweak re-renders) must not overwrite
+  // it, or "discard" would restore the already-edited state.
+  const editing = state.styles.find((s) => s.id === state.selectedStyleId);
+  if (editing && !state.editorBackups.has(editing.id)) {
+    state.editorBackups.set(editing.id, JSON.stringify(editing));
+  }
 
   view.innerHTML = `<div class="sed">
     <aside class="sed-side" aria-label="Style profiles">
