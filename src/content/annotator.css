@@ -58,28 +58,36 @@
   background: rgba(244, 114, 182, 0.55);
 }
 
-.toolbar .dot {
+/* `.toolbar button` below sets `background: none` at specificity (0,1,1),
+   which out-ranks a bare `.dot--*` class (0,1,0) — that painted every dot as
+   a hole in the dark toolbar. The colour rules must carry the button in the
+   selector, hover included, or the picker shows four black circles. */
+.toolbar button.dot {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 0, 0, 0.25);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   padding: 0;
   cursor: pointer;
 }
-.toolbar .dot:hover {
+.toolbar button.dot:hover {
   transform: scale(1.15);
-  border-color: rgba(0, 0, 0, 0.5);
+  border-color: rgba(255, 255, 255, 0.85);
 }
-.dot--yellow {
+.toolbar button.dot--yellow,
+.toolbar button.dot--yellow:hover {
   background: #facc15;
 }
-.dot--green {
+.toolbar button.dot--green,
+.toolbar button.dot--green:hover {
   background: #4ade80;
 }
-.dot--blue {
+.toolbar button.dot--blue,
+.toolbar button.dot--blue:hover {
   background: #60a5fa;
 }
-.dot--pink {
+.toolbar button.dot--pink,
+.toolbar button.dot--pink:hover {
   background: #f472b6;
 }
 .toolbar {

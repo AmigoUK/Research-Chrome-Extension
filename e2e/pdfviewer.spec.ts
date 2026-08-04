@@ -178,6 +178,10 @@ test('selecting text and clicking Highlight creates a persisted anchor', async (
   await page.evaluate(() => document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })));
 
   await expect(page.locator('#seltool.on')).toBeVisible();
+  const dotBg = await page
+    .locator('#seltool button[data-color="yellow"] .dot')
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(dotBg).toBe('rgb(250, 204, 21)');
   await page.locator('#seltool button[data-color="yellow"]').click();
 
   await expect(page.locator('.anno-layer .ov.text')).toBeVisible();

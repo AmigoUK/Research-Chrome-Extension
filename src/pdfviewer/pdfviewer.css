@@ -857,16 +857,16 @@ body {
   transform: scale(1.15);
   border-color: rgba(0, 0, 0, 0.5);
 }
-.dot--yellow {
+#seltool .dot--yellow {
   background: #facc15;
 }
-.dot--green {
+#seltool .dot--green {
   background: #4ade80;
 }
-.dot--blue {
+#seltool .dot--blue {
   background: #60a5fa;
 }
-.dot--pink {
+#seltool .dot--pink {
   background: #f472b6;
 }
 

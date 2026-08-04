@@ -14,6 +14,11 @@ całej podróży._
 2. Zbuduj i załaduj: `npm ci && npm run build`, potem `chrome://extensions` → Developer mode →
    _Load unpacked_ → `dist/`. Alternatywnie zip z release'a.
 3. Przypnij ikonę (puzzle → pin), będzie potrzebna do testów `activeTab`.
+4. **Pułapka przy aktualizacji unpacked**: po `npm run build` Chrome potrafi dalej wykonywać
+   **stary, zbuforowany service worker** — objaw: nowa logika „nie działa", choć pliki w
+   `dist/` są świeże. Zawsze klikaj ⟳ (Reload) przy rozszerzeniu po przebudowie; przy dziwnych
+   wynikach porównaj hash chunków z `dist/assets/` z tym, co widzi konsola SW (zakładka
+   Sources).
 
 ### Konsole DevTools — gdzie co widać
 

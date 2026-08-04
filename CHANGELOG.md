@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.4.1] — 2026-08-04
+
+### Fixed
+
+- **The colour picker shows its colours.** `.toolbar button { background:
+  none }` out-ranked the bare `.dot--*` colour classes, painting all four
+  dots as black holes in the dark toolbar. The colour rules now carry the
+  button in the selector (and the PDF seltool's are anchored to #seltool);
+  new e2e assertions check the dots' computed background colours, so a
+  specificity regression can never ship silently again.
+
 ## [1.4.0] — 2026-08-04
 
 ### Changed

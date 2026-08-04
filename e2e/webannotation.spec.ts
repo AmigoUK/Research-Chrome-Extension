@@ -160,6 +160,14 @@ test('highlighting a selection paints an overlay that repaints after reload, and
   await selectTargetSentence(page);
   await expect(page.locator('#context-notes-annotator .toolbar')).toBeVisible();
 
+  // The dots must actually SHOW their colours — a higher-specificity
+  // `.toolbar button { background: none }` once painted all four as black
+  // holes in the dark toolbar, and only a human noticed.
+  const yellowBg = await page
+    .locator('#context-notes-annotator .toolbar button[data-color="yellow"]')
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(yellowBg).toBe('rgb(250, 204, 21)');
+
   // The selection's own client rect — the ground truth the overlay must
   // match. Captured before commit() clears the selection.
   const expectedRect = await page.evaluate(() => {
