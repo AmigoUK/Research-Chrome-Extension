@@ -84,7 +84,10 @@ const GOLDEN: Record<string, Record<'one' | 'three' | 'four', string>> = {
 describe('citation golden output (4 base styles × author counts)', () => {
   for (const [template, cases] of Object.entries(GOLDEN)) {
     for (const count of ['one', 'three', 'four'] as const) {
-      it(`${template} — ${count} author(s)`, async () => {
+      // 20s, not the 5s default: the first case pays citeproc's lazy CSL load
+      // (~2s idle, far more on a loaded machine), which made this suite the
+      // repo's flakiest under parallel load.
+      it(`${template} — ${count} author(s)`, { timeout: 20_000 }, async () => {
         expect(await formatter.bibliography([ITEMS[count]], template)).toBe(cases[count]);
       });
     }

@@ -511,7 +511,10 @@ describe('activity recording (Phase 5, M2)', () => {
     expect(res).toMatchObject({ ok: false });
   });
 
-  it('exports an encrypted snapshot and imports it back', async () => {
+  // 30s, not the 5s default: this test runs PBKDF2 at 600k iterations three
+  // times (seal + wrong-password open + right-password open), which blows the
+  // default budget whenever the machine is otherwise busy.
+  it('exports an encrypted snapshot and imports it back', { timeout: 30_000 }, async () => {
     await repos.projects.put({
       id: 'p1',
       name: 'Urban Heat',

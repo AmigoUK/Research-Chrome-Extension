@@ -32,7 +32,9 @@ describe('plain snapshots', () => {
   });
 });
 
-describe('encrypted snapshots', () => {
+// 30s, not the 5s default: every test here pays PBKDF2 at 600k iterations at
+// least once (some twice), which flakes under parallel machine load.
+describe('encrypted snapshots', { timeout: 30_000 }, () => {
   it('round-trips with the right password and hides the payload', async () => {
     const text = await sealSnapshot(PAYLOAD, META, 'correct horse');
 
