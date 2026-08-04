@@ -45,7 +45,7 @@ export interface MessageMap {
   'annotations/put': { req: { annotation: Annotation }; res: null };
   'annotations/delete': { req: { id: Id }; res: null };
   'web/annotate': {
-    req: { input: CaptureInput; anchor: WebAnchor; withNote: boolean };
+    req: { input: CaptureInput; anchor: WebAnchor };
     res: { documentId: Id; annotationId: Id };
   };
   'web/annotationsForUrl': {

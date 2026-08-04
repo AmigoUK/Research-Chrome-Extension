@@ -142,7 +142,6 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
       type: 'web/annotate',
       input,
       anchor,
-      withNote,
     })) as
       | { ok: true; data: { documentId: string; annotationId: string } }
       | { ok: false; error: string };
@@ -156,7 +155,16 @@ async function commit(target: SelectionTarget, withNote: boolean): Promise<void>
     window.getSelection()?.removeAllRanges();
     hideToolbar();
     // Let the service worker open the side panel + broadcast the change.
-    chrome.runtime.sendMessage({ control: 'annotator/changed', url: scan.url }).catch(() => {});
+    // "Note" means "I want to write NOW": carry the new annotation's id so
+    // the panel puts the caret straight into its textarea — the same
+    // zero-hunting flow the PDF reader has always had.
+    chrome.runtime
+      .sendMessage({
+        control: 'annotator/changed',
+        url: scan.url,
+        ...(withNote ? { focusId: res.data.annotationId } : {}),
+      })
+      .catch(() => {});
     // Opt this origin in for future page loads (needs a host-permission grant).
     // Once per origin per session, and only after a real result — see optInOrigin.
     if (!registeredOrigins.has(location.origin)) void optInOrigin();

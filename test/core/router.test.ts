@@ -289,7 +289,7 @@ describe('handleRequest', () => {
       metadata: { title: 'A' },
     };
 
-    const res = await handleRequest(repos, { type: 'web/annotate', input, anchor, withNote: true });
+    const res = await handleRequest(repos, { type: 'web/annotate', input, anchor });
     expect(res.ok).toBe(true);
     const ids = res.ok ? (res.data as { documentId: string; annotationId: string }) : null;
     expect(ids?.documentId).toBeTruthy();
@@ -338,7 +338,6 @@ describe('handleRequest', () => {
       type: 'web/annotate',
       input,
       anchor,
-      withNote: true,
     });
     const ids = annotated.ok ? (annotated.data as { documentId: string }) : null;
 

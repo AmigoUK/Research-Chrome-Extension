@@ -548,6 +548,19 @@ function focusOnPageCard(id: string): void {
   setTimeout(() => card.classList.remove('flash'), 1200);
 }
 
+/** "Note" on the page toolbar means "I want to write NOW": scroll the fresh
+ *  card into view and put the caret in its textarea, exactly as the PDF
+ *  reader does — no hunting for the input after the click. */
+function focusNoteEditor(id: string): void {
+  focusOnPageCard(id);
+  const ta = document.querySelector<HTMLTextAreaElement>(
+    `.onpage-note[data-id="${CSS.escape(id)}"] .onpage-note__ta`,
+  );
+  if (!ta) return;
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+
 function statusColor(status: DocumentStatus): string {
   return `var(--s-${status})`;
 }
@@ -1209,7 +1222,13 @@ async function init(): Promise<void> {
   };
 
   chrome.runtime.onMessage.addListener(
-    (message: { control?: string; id?: string; url?: string; resolvedIds?: string[] }) => {
+    (message: {
+      control?: string;
+      id?: string;
+      url?: string;
+      focusId?: string;
+      resolvedIds?: string[];
+    }) => {
       if (message?.control === 'data/changed') {
         onDataChanged();
       } else if (message?.control === 'annotator/changed') {
@@ -1219,6 +1238,7 @@ async function init(): Promise<void> {
           await loadAnnotationCount();
           renderOnPageCard();
           renderGettingStarted();
+          if (message.focusId) focusNoteEditor(message.focusId);
           if (hadNone && state.annotationCount > 0) {
             nudgeNext(
               'after-annotate',

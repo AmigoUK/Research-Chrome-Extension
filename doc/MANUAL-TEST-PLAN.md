@@ -204,8 +204,9 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 ### S4.4 Note, edycja, status, Jump to, usuwanie
 - **Kroki**: Note na innym zdaniu → w panelu wpisz treść (autozapis) → zmień status na
   Accepted → **Jump to** → ✕.
-- **Oczekiwane**: treść przeżywa przeładowanie panelu; Jump przewija stronę i błyska
-  podświetleniem; ✕ usuwa overlay natychmiast.
+- **Oczekiwane**: po **Note** kursor ląduje **od razu** w polu tekstowym świeżej karty w panelu
+  (bez klikania — jak w czytniku PDF); treść przeżywa przeładowanie panelu; Jump przewija
+  stronę i błyska podświetleniem; ✕ usuwa overlay natychmiast.
 - **Debug**: autozapis jest debounced 500 ms — zamknięcie panelu w < 0,5 s od wpisania może
   zgubić ostatnie znaki (znany kompromis).
 
