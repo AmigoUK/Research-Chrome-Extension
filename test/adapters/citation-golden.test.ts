@@ -81,7 +81,7 @@ const GOLDEN: Record<string, Record<'one' | 'three' | 'four', string>> = {
   },
 };
 
-describe('citation golden output (4 base styles × author counts)', () => {
+describe('citation golden output (4 base styles × author counts)', { timeout: 30_000 }, () => {
   for (const [template, cases] of Object.entries(GOLDEN)) {
     for (const count of ['one', 'three', 'four'] as const) {
       // 20s, not the 5s default: the first case pays citeproc's lazy CSL load

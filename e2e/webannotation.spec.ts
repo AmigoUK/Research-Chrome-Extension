@@ -8,7 +8,7 @@ import {
   type Page,
 } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
-import { copyFileSync, rmSync } from 'node:fs';
+import { copyFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 /**
@@ -44,6 +44,22 @@ import path from 'node:path';
 const distPath = fileURLToPath(new URL('../dist', import.meta.url));
 const fixtureSrc = fileURLToPath(new URL('./fixtures/article.html', import.meta.url));
 const fixtureDest = path.join(distPath, 'e2e-article.html');
+/** A page taller than any viewport — the only way to prove a jump SCROLLED.
+ *  The short fixture cannot scroll at all, which silently passed a jump that
+ *  did nothing (overlays live in a fixed layer, so scrollIntoView on one is a
+ *  no-op — the bug this fixture exists to catch). */
+const tallDest = path.join(distPath, 'e2e-tall-article.html');
+const TALL_TARGET = 'The urban heat island effect raises night-time temperatures.';
+function tallArticleHtml(): string {
+  const filler = Array.from(
+    { length: 60 },
+    (_, i) => `<p>Paragraph ${i + 1}: cities absorb and re-radiate heat through the night.</p>`,
+  ).join('\n');
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tall</title>
+    <style>body{font:16px/1.7 system-ui;max-width:720px;margin:0 auto;padding:24px}</style>
+    </head><body><h1>Tall article</h1>${filler}
+    <p id="target">${TALL_TARGET}</p>${filler}</body></html>`;
+}
 const targetSentence = 'The urban heat island effect raises night-time temperatures.';
 
 let context: BrowserContext;
@@ -57,6 +73,7 @@ test.beforeAll(async () => {
     fileURLToPath(new URL('./fixtures/shadow-article.html', import.meta.url)),
     path.join(distPath, 'shadow-article.html'),
   );
+  writeFileSync(tallDest, tallArticleHtml());
 
   context = await chromium.launchPersistentContext('', {
     headless: false,
@@ -76,6 +93,7 @@ test.afterAll(async () => {
   await context.close();
   rmSync(fixtureDest, { force: true });
   rmSync(path.join(distPath, 'shadow-article.html'), { force: true });
+  rmSync(tallDest, { force: true });
 });
 
 function fixtureUrl(): string {
@@ -379,5 +397,63 @@ test('anchors a selection made inside an open shadow root, and repaints after re
   });
   expect(stored.data.annotations).toHaveLength(1);
   expect(stored.data.annotations[0]?.anchor.shadowHost).toBeTruthy();
+  await page.close();
+});
+
+test('"show me that highlight" scrolls the open page to it, without opening a duplicate tab', async () => {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 900, height: 500 });
+  await page.goto(`chrome-extension://${extensionId}/e2e-tall-article.html`);
+  await page.addScriptTag({ url: annotatorUrl() });
+
+  // Highlight a passage far down the page.
+  await page.evaluate((quote) => {
+    const p = [...document.querySelectorAll('p')].find((el) => el.textContent === quote)!;
+    p.scrollIntoView({ block: 'center' });
+    const range = document.createRange();
+    range.selectNodeContents(p);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  }, TALL_TARGET);
+  await page.locator('#context-notes-annotator .toolbar button[data-color="blue"]').click();
+  await expect(page.locator('#context-notes-annotator .ov')).not.toHaveCount(0);
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+
+  const target = await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const annos = (await chrome.runtime.sendMessage({
+      type: 'annotations/listByProject',
+      projectId: projects.data[0]!.id,
+    })) as { data: Array<{ id: string; documentId: string }> };
+    const docs = (await chrome.runtime.sendMessage({
+      type: 'documents/listByProject',
+      projectId: projects.data[0]!.id,
+    })) as { data: Array<{ id: string; url: string }> };
+    const anno = annos.data.find((a) =>
+      docs.data.some((d) => d.id === a.documentId && d.url.includes('tall')),
+    )!;
+    return { id: anno.id, url: docs.data.find((d) => d.id === anno.documentId)!.url };
+  });
+
+  // Ask from another extension page, exactly as the dashboard does.
+  const asker = await context.newPage();
+  await asker.goto(`chrome-extension://${extensionId}/src/options/index.html`);
+  const result = await asker.evaluate(
+    async (t) =>
+      chrome.runtime.sendMessage({ control: 'annotator/openAndJump', url: t.url, id: t.id }),
+    target,
+  );
+  expect(result).toEqual({ ok: true });
+
+  // It scrolled the page that was already open — no duplicate tab.
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  expect(context.pages().filter((p) => p.url().includes('e2e-tall-article')).length).toBe(1);
+  await asker.close();
   await page.close();
 });

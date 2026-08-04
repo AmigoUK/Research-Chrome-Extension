@@ -8,7 +8,7 @@ import { createWebAnchor, resolveWebAnchor, webAnchorRoot, cssPath } from '../co
 import { scanDocumentRaw, buildCaptureInput } from '../adapters/chrome/page-scan';
 import { getActiveProjectId } from '../adapters/chrome/active-project';
 import { createUrlWatcher } from './url-watcher';
-import { takePendingJump } from '../adapters/chrome/pending-jump';
+import { sameDocumentUrl, takePendingJump } from '../adapters/chrome/pending-jump';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type { Annotation, HighlightColor, WebAnchor } from '../core/model/types';
 import annotatorCss from './annotator.css?inline';
@@ -108,10 +108,12 @@ function paintOne(id: string, rects: DOMRect[], color?: string): void {
     // No colour (legacy annotations, or an entry deleted from the legend)
     // keeps the original accent.
     ov.className = 'ov';
+    const flashing = flashId === id;
+    if (flashing) ov.classList.add('flash');
     if (entry) {
       ov.dataset['color'] = entry.id;
-      ov.style.background = rgba(entry.swatch, 0.32);
-      ov.style.boxShadow = `inset 0 -2px 0 ${rgba(entry.swatch, 0.6)}`;
+      ov.style.background = rgba(entry.swatch, flashing ? 0.62 : 0.32);
+      ov.style.boxShadow = `inset 0 -2px 0 ${rgba(entry.swatch, flashing ? 1 : 0.6)}`;
     }
     ov.dataset.id = id;
     ov.style.left = `${r.left}px`;
@@ -156,25 +158,33 @@ function repositionAll(): void {
   repositionToolbar();
 }
 
-function jumpTo(id: string): void {
-  const overlays = shadowRoot().querySelectorAll<HTMLElement>(`.ov[data-id="${CSS.escape(id)}"]`);
-  const first = overlays[0];
-  if (!first) return;
-  first.scrollIntoView({ block: 'center' });
-  overlays.forEach((ov) => {
-    ov.classList.add('flash');
-    const entry = paletteEntry(ov.dataset['color']);
-    if (entry) ov.style.background = rgba(entry.swatch, 0.6);
-  });
-  setTimeout(
-    () =>
-      overlays.forEach((ov) => {
-        ov.classList.remove('flash');
-        const entry = paletteEntry(ov.dataset['color']);
-        if (entry) ov.style.background = rgba(entry.swatch, 0.32);
-      }),
-    1200,
-  );
+/** The annotation currently flashing, so a repaint (scrolling repositions
+ *  every overlay) keeps the emphasis instead of dropping it. */
+let flashId: string | null = null;
+
+/**
+ * Scroll the page to an annotation and flash it.
+ *
+ * The overlays live in a `position: fixed` layer — deliberately, so no
+ * transformed ancestor can shift them — which means `scrollIntoView()` on an
+ * overlay is a NO-OP: a fixed element is always already in the viewport.
+ * That is why "Jump to" appeared to do nothing. Scroll the page to the
+ * ANCHOR's own rect instead, converting viewport coordinates to document
+ * ones, and let the scroll handler reposition the overlays as it goes.
+ */
+function jumpTo(id: string): boolean {
+  const entry = painted.find((p) => p.annotation.id === id);
+  const rect = entry?.range ? pageRects(entry.range)[0] : undefined;
+  if (!rect) return false; // never placed on this load — nothing to scroll to
+  const top = rect.top + window.scrollY - window.innerHeight / 2 + rect.height / 2;
+  window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+  flashId = id;
+  repositionAll();
+  setTimeout(() => {
+    flashId = null;
+    repositionAll();
+  }, 1600);
+  return true;
 }
 
 async function commit(target: SelectionTarget, color: string): Promise<void> {
@@ -387,7 +397,12 @@ async function loadExisting(): Promise<void> {
       .catch(() => {});
     // A "show me that highlight" click from the dashboard parks its request
     // before opening the tab; overlays exist only now, so collect it here.
-    const jumpId = await takePendingJump(scan.url, Date.now());
+    // Try the canonical URL the capture stored AND the address actually in
+    // the bar: a page can be reached by either, and a missed match means a
+    // silent no-jump.
+    const jumpId =
+      (await takePendingJump(scan.url, Date.now())) ??
+      (scan.url === location.href ? undefined : await takePendingJump(location.href, Date.now()));
     if (jumpId) jumpTo(jumpId);
   } catch {
     // Called via `void loadExisting()` on injection and on annotator/changed;
@@ -437,11 +452,26 @@ if (w.__contextNotesAnnotator) {
   });
   window.addEventListener('scroll', scheduleReposition, { passive: true });
   window.addEventListener('resize', scheduleReposition);
-  chrome.runtime.onMessage.addListener((m: { control?: string; id?: string }) => {
-    if (m?.control === 'annotator/changed') {
-      void loadPalette().then(() => loadExisting());
-    } else if (m?.control === 'annotator/jump' && m.id) jumpTo(m.id);
-  });
+  chrome.runtime.onMessage.addListener(
+    (m: { control?: string; id?: string; url?: string }, _sender, sendResponse) => {
+      if (m?.control === 'annotator/changed') {
+        void loadPalette().then(() => loadExisting());
+      } else if (m?.control === 'annotator/jump' && m.id) {
+        jumpTo(m.id);
+      } else if (m?.control === 'annotator/jumpIfUrl' && m.id && m.url) {
+        // "Show me that highlight" asks every tab. Answer for our own page
+        // only — and say whether the highlight could actually be shown, so
+        // the caller neither opens a duplicate tab nor claims success when
+        // the anchor no longer resolves on this page.
+        const mine =
+          sameDocumentUrl(m.url, location.href) || sameDocumentUrl(m.url, scanDocumentRaw().url);
+        const jumped = mine && jumpTo(m.id);
+        sendResponse({ mine, jumped });
+        return true;
+      }
+      return undefined;
+    },
+  );
 
   // Re-anchor after a client-side (SPA) navigation: the document persists but
   // the URL and its content change, so the new URL's annotations must load and

@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.7.1] — 2026-08-04
+
+### Added
+
+- **Settings gains the project itself**: its name, a description, and the
+  **default citation style** used by the side panel, the Cite buttons and
+  Copy bibliography — settings people looked for in a Settings screen and
+  had to hunt for in the header menu or the Citation styles view.
+
+### Fixed
+
+- **"Show me that highlight" actually scrolls now.** Three faults stacked:
+  the overlays live in a `position: fixed` layer, so `scrollIntoView()` on
+  one was a **no-op** (a fixed element is always "in view") — the page never
+  moved, which is why *Jump to* seemed dead everywhere; without host
+  permission for a site Chrome reports an **empty tab URL**, so the already-
+  open article was never found and the parked scroll request sat unclaimed;
+  and a stored canonical URL rarely matches the address bar exactly. Now the
+  page is scrolled by the anchor's own rect, open tabs are found by **asking
+  each annotator "is this your page?"** (tab ids need no permission), and
+  URLs are compared ignoring fragments, tracking parameters and trailing
+  slashes. A highlight that no longer anchors reports that instead of
+  pretending to jump.
+- The citeproc-backed test suites declare an honest time budget at the suite
+  level, so a loaded machine no longer turns a 243 kB CSL parse into a
+  flaky failure.
+
 ## [1.7.0] — 2026-08-04
 
 ### Changed

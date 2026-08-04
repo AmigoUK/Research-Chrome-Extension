@@ -938,7 +938,62 @@ function renderSettings(view: HTMLElement, actions: HTMLElement): void {
     return;
   }
   paletteDraft ??= activePalette().map((c) => ({ ...c }));
-  drawPaletteSettings(view);
+  view.innerHTML = `<div id="setProject"></div><div id="setPalette"></div>`;
+  drawProjectSettings($('#setProject', view), project);
+  drawPaletteSettings($('#setPalette', view));
+}
+
+/** Project identity and the style it cites with — the two settings people
+ *  looked for in a Settings screen and had to find in the header menu or
+ *  the Citation styles view instead. */
+function drawProjectSettings(host: HTMLElement, project: Project): void {
+  const styles = state.styles;
+  const activeId = project.defaultCitationStyleId ?? styles[0]?.id ?? '';
+  host.innerHTML = `
+    <div class="sec-h"><h2>Project</h2><span class="ln"></span></div>
+    <div class="palette-row" style="grid-template-columns:130px 1fr">
+      <label class="palette-use" for="setName" style="font-family:var(--font-body);font-size:13px">Name</label>
+      <input class="sel" id="setName" value="${esc(project.name)}" maxlength="120" aria-label="Project name">
+      <label class="palette-use" for="setDesc" style="font-family:var(--font-body);font-size:13px">Description</label>
+      <input class="sel" id="setDesc" value="${esc(project.description ?? '')}" maxlength="240"
+        placeholder="What this project is about" aria-label="Project description">
+      <label class="palette-use" for="setStyle" style="font-family:var(--font-body);font-size:13px">Citation style</label>
+      <div class="row">
+        <select class="sel" id="setStyle" aria-label="Default citation style"${styles.length === 0 ? ' disabled' : ''}>
+          ${styles.map((st) => `<option value="${esc(st.id)}"${st.id === activeId ? ' selected' : ''}>${esc(st.name)}</option>`).join('')}
+        </select>
+        <span class="palette-use">Used by the side panel, the Cite buttons and Copy bibliography.</span>
+      </div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn btn--primary btn--sm" id="setSave">${ICON.check} Save project</button>
+    </div>`;
+  $('#setSave', host).onclick = () => {
+    void (async () => {
+      const name = $<HTMLInputElement>('#setName', host).value.trim();
+      if (!name) {
+        toast('A project needs a name', ICON.warn, true);
+        return;
+      }
+      const description = $<HTMLInputElement>('#setDesc', host).value.trim();
+      const styleId = $<HTMLSelectElement>('#setStyle', host).value;
+      const updated: Project = {
+        ...project,
+        name,
+        ...(description ? { description } : {}),
+        ...(styleId ? { defaultCitationStyleId: styleId } : {}),
+        updatedAt: nowIso(),
+      };
+      try {
+        await sendRequest({ type: 'projects/put', project: updated });
+        state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
+        render();
+        toast('Project saved', ICON.check);
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Couldn’t save the project', ICON.warn, true);
+      }
+    })();
+  };
 }
 
 function drawPaletteSettings(view: HTMLElement): void {

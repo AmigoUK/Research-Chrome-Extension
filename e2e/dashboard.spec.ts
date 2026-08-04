@@ -794,21 +794,23 @@ test('the colour legend lives in Settings, previews itself, filters, and guards 
   // Discoverable in the nav, not hidden behind a button in one view.
   await page.locator('#nav .nav-item[data-route="settings"]').click();
   await expect(page.locator('#viewTitle')).toHaveText('Settings');
-  await expect(page.locator('.palette-row')).toHaveCount(4);
+  await expect(page.locator('#setPalette .palette-row')).toHaveCount(4);
   // Each row shows the colour as it will actually look on a page.
-  await expect(page.locator('.palette-row').first().locator('.palette-preview span')).toBeVisible();
+  await expect(
+    page.locator('#setPalette .palette-row').first().locator('.palette-preview span'),
+  ).toBeVisible();
 
   // A colour in use cannot be deleted out from under its highlights.
-  const greenRow = page.locator('.palette-row').nth(1);
+  const greenRow = page.locator('#setPalette .palette-row').nth(1);
   await expect(greenRow.locator('.palette-use')).toHaveText('1 highlight');
   await expect(greenRow.locator('[data-del]')).toBeDisabled();
-  await expect(page.locator('.palette-row').nth(2).locator('[data-del]')).toBeEnabled();
+  await expect(page.locator('#setPalette .palette-row').nth(2).locator('[data-del]')).toBeEnabled();
 
   // Name it, recolour it, add one, save.
   await page.locator('[data-lb="1"]').fill('Method');
   await greenRow.locator('.swatch').nth(4).click();
   await page.locator('#palAdd').click();
-  await expect(page.locator('.palette-row')).toHaveCount(5);
+  await expect(page.locator('#setPalette .palette-row')).toHaveCount(5);
   await page.locator('[data-lb="4"]').fill('Disagree');
   await page.locator('#palSave').click();
   await expect(page.locator('#palSave')).toBeDisabled(); // saved → nothing pending

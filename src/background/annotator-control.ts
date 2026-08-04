@@ -13,6 +13,7 @@ export interface ControlMessage {
     | 'annotator/changed'
     | 'annotator/focus'
     | 'annotator/jump'
+    | 'annotator/jumpIfUrl'
     | 'annotator/openAndJump'
     | 'annotator/resolved';
   origin?: string;
@@ -94,30 +95,73 @@ export async function unregisterRevokedOrigins(removedOrigins: string[]): Promis
  * exist — the only moment at which scrolling to one is possible.
  */
 export async function openAndJump(url: string, annotationId: string): Promise<{ ok: boolean }> {
+  // 1. Ask every tab "is this your page?" and let the annotator there jump.
+  //
+  // Finding the tab by URL is not an option: without host permission for a
+  // site, `tab.url` comes back EMPTY and `tabs.query({url})` matches nothing —
+  // so the previously-open article was never found and the parked request sat
+  // unclaimed while its annotator, having painted long ago, never looked
+  // again. Tab *ids* are visible without any permission, and a tab that has
+  // an annotator has one because the user already opted that site in.
+  if (await jumpInOpenTab(url, annotationId)) return { ok: true };
+
+  // 2. Nobody had it open (or nobody could answer): park the request for
+  //    whichever annotator paints next, and open the page.
+  await setPendingJump(url, annotationId, Date.now());
+  let tabId: number | undefined;
   try {
-    await setPendingJump(url, annotationId, Date.now());
-    const [existing] = await chrome.tabs.query({ url });
-    let tabId = existing?.id;
-    if (tabId != null) {
-      await chrome.tabs.update(tabId, { active: true });
-      if (existing?.windowId != null) {
-        await chrome.windows.update(existing.windowId, { focused: true }).catch(() => {});
-      }
-    } else {
-      const created = await chrome.tabs.create({ url });
-      tabId = created.id;
-      // A fresh tab has to finish loading before anything can be injected.
-      if (tabId != null) await waitForTabLoad(tabId);
-    }
-    if (tabId == null) return { ok: false };
-    // Idempotent: an already-running annotator re-syncs and returns early.
-    await chrome.scripting.executeScript({ target: { tabId }, files: [ANNOTATOR_FILE] });
-    return { ok: true };
+    const created = await chrome.tabs.create({ url });
+    tabId = created.id;
+    if (tabId != null) await waitForTabLoad(tabId);
   } catch {
-    // No host access for that origin (or an unscriptable page): the tab is
-    // open at the right URL, which is most of what the user asked for.
     return { ok: false };
   }
+  if (tabId == null) return { ok: false };
+
+  try {
+    // Idempotent: an already-running annotator re-syncs and returns early.
+    await chrome.scripting.executeScript({ target: { tabId }, files: [ANNOTATOR_FILE] });
+  } catch {
+    // No host access for this origin. The tab IS open at the right URL, and
+    // if the site was opted in its registered content script still collects
+    // the parked request — so this is not a failure, just not a certainty.
+    return { ok: false };
+  }
+  return { ok: true };
+}
+
+/** Ask each open tab's annotator to jump if it is showing that page. */
+async function jumpInOpenTab(url: string, annotationId: string): Promise<boolean> {
+  let tabs: chrome.tabs.Tab[];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return false;
+  }
+  // Newest-active first is a decent proxy for "the one the user means".
+  const ordered = [...tabs].sort((a, b) => Number(b.active) - Number(a.active));
+  for (const tab of ordered) {
+    if (tab.id == null) continue;
+    try {
+      const res = (await chrome.tabs.sendMessage(tab.id, {
+        control: 'annotator/jumpIfUrl',
+        url,
+        id: annotationId,
+      })) as { mine?: boolean; jumped?: boolean } | undefined;
+      // Owning the page is enough to stop looking: opening a second copy
+      // would not place an anchor this one could not place either.
+      if (res?.mine) {
+        await chrome.tabs.update(tab.id, { active: true }).catch(() => {});
+        if (tab.windowId != null) {
+          await chrome.windows.update(tab.windowId, { focused: true }).catch(() => {});
+        }
+        return res.jumped === true;
+      }
+    } catch {
+      // No annotator in that tab — normal for most tabs.
+    }
+  }
+  return false;
 }
 
 /** Resolve once the tab reports `complete` (or immediately, if it already has). */

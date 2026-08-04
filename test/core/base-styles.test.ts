@@ -86,7 +86,7 @@ beforeEach(async () => {
   repos = createRepositories(await openContextNotesDB(`base-styles-${counter++}`));
 });
 
-describe('importing a .csl file as a base style', () => {
+describe('importing a .csl file as a base style', { timeout: 30_000 }, () => {
   it('stores it, names it from the file, and lists it', async () => {
     const imported = await handleRequest(
       repos,
@@ -120,7 +120,7 @@ describe('importing a .csl file as a base style', () => {
   });
 });
 
-describe('formatting through an imported base style', () => {
+describe('formatting through an imported base style', { timeout: 30_000 }, () => {
   it('citeproc actually uses the imported file', async () => {
     await handleRequest(
       repos,

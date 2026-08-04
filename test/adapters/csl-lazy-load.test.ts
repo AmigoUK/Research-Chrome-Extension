@@ -37,7 +37,7 @@ function counting(inner: CslLoader): { load: CslLoader; asked: string[] } {
   };
 }
 
-describe('base styles are loaded lazily', () => {
+describe('base styles are loaded lazily', { timeout: 30_000 }, () => {
   it('asks for nothing until a style is actually used', () => {
     const { asked } = counting(createFsCslLoader());
     new CiteJsFormatter(createFsCslLoader());

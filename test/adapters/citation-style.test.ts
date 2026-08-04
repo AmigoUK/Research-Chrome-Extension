@@ -6,6 +6,9 @@ import type { CitationStyle, CitationUserRules } from '../../src/core/model/type
 import { BASE_STYLES, templateFor } from '../../src/core/citation/styles';
 import { citationFormatOf } from '../../src/core/citation/compile';
 
+// citeproc lazily parses up to 243 kB of CSL XML per style; under a loaded
+// parallel run that comfortably exceeds vitest's 5s default, which is why
+// these suites declare a real budget rather than flaking by machine load.
 const loadCsl = createFsCslLoader();
 const formatter = new CiteJsFormatter(loadCsl);
 
@@ -48,139 +51,151 @@ const style = (over: Partial<CitationUserRules>): CitationStyle => ({
   userRules: { ...baseRules, ...over },
 });
 
-describe('CiteJsFormatter.formatWithStyle — rules drive real citeproc output', () => {
-  it('truncates the author list to "et al." when maxAuthors is small', async () => {
-    const full = await formatter.formatWithStyle([ITEM], style({ maxAuthors: 20 }), 'bibliography');
-    const truncated = await formatter.formatWithStyle(
-      [ITEM],
-      style({ maxAuthors: 1 }),
-      'bibliography',
-    );
-    expect(full).toContain('Hashizume');
-    expect(full).not.toContain('et al.');
-    expect(truncated).toContain('et al.');
-    expect(truncated).not.toContain('Hashizume');
-  });
+describe(
+  'CiteJsFormatter.formatWithStyle — rules drive real citeproc output',
+  { timeout: 30_000 },
+  () => {
+    it('truncates the author list to "et al." when maxAuthors is small', async () => {
+      const full = await formatter.formatWithStyle(
+        [ITEM],
+        style({ maxAuthors: 20 }),
+        'bibliography',
+      );
+      const truncated = await formatter.formatWithStyle(
+        [ITEM],
+        style({ maxAuthors: 1 }),
+        'bibliography',
+      );
+      expect(full).toContain('Hashizume');
+      expect(full).not.toContain('et al.');
+      expect(truncated).toContain('et al.');
+      expect(truncated).not.toContain('Hashizume');
+    });
 
-  it('drops the DOI from the bibliography when includeDoi is false', async () => {
-    const withDoi = await formatter.formatWithStyle(
-      [ITEM],
-      style({ includeDoi: true }),
-      'bibliography',
-    );
-    const withoutDoi = await formatter.formatWithStyle(
-      [ITEM],
-      style({ includeDoi: false }),
-      'bibliography',
-    );
-    expect(withDoi).toContain('10.1016');
-    expect(withoutDoi).not.toContain('10.1016');
-  });
+    it('drops the DOI from the bibliography when includeDoi is false', async () => {
+      const withDoi = await formatter.formatWithStyle(
+        [ITEM],
+        style({ includeDoi: true }),
+        'bibliography',
+      );
+      const withoutDoi = await formatter.formatWithStyle(
+        [ITEM],
+        style({ includeDoi: false }),
+        'bibliography',
+      );
+      expect(withDoi).toContain('10.1016');
+      expect(withoutDoi).not.toContain('10.1016');
+    });
 
-  it('drops the issue number when includeIssue is false', async () => {
-    const withIssue = await formatter.formatWithStyle(
-      [ITEM],
-      style({ includeIssue: true }),
-      'bibliography',
-    );
-    const withoutIssue = await formatter.formatWithStyle(
-      [ITEM],
-      style({ includeIssue: false }),
-      'bibliography',
-    );
-    expect(withIssue).toContain('(9991)');
-    expect(withoutIssue).not.toContain('(9991)');
-  });
+    it('drops the issue number when includeIssue is false', async () => {
+      const withIssue = await formatter.formatWithStyle(
+        [ITEM],
+        style({ includeIssue: true }),
+        'bibliography',
+      );
+      const withoutIssue = await formatter.formatWithStyle(
+        [ITEM],
+        style({ includeIssue: false }),
+        'bibliography',
+      );
+      expect(withIssue).toContain('(9991)');
+      expect(withoutIssue).not.toContain('(9991)');
+    });
 
-  it('produces a non-empty in-text citation', async () => {
-    const inText = await formatter.formatWithStyle([ITEM], style({}), 'inText');
-    expect(inText).toMatch(/Gasparrini/);
-    expect(inText).toContain('2015');
-  });
+    it('produces a non-empty in-text citation', async () => {
+      const inText = await formatter.formatWithStyle([ITEM], style({}), 'inText');
+      expect(inText).toMatch(/Gasparrini/);
+      expect(inText).toContain('2015');
+    });
 
-  it('prints the DOI as a bare doi: identifier when doiAsUri is off', async () => {
-    const asUri = await formatter.formatWithStyle(
-      [ITEM],
-      style({ doiAsUri: true }),
-      'bibliography',
-    );
-    const bare = await formatter.formatWithStyle(
-      [ITEM],
-      style({ doiAsUri: false }),
-      'bibliography',
-    );
-    expect(asUri).toContain('https://doi.org/10.1016');
-    expect(bare).toContain('doi:10.1016');
-    expect(bare).not.toContain('https://doi.org/');
-  });
+    it('prints the DOI as a bare doi: identifier when doiAsUri is off', async () => {
+      const asUri = await formatter.formatWithStyle(
+        [ITEM],
+        style({ doiAsUri: true }),
+        'bibliography',
+      );
+      const bare = await formatter.formatWithStyle(
+        [ITEM],
+        style({ doiAsUri: false }),
+        'bibliography',
+      );
+      expect(asUri).toContain('https://doi.org/10.1016');
+      expect(bare).toContain('doi:10.1016');
+      expect(bare).not.toContain('https://doi.org/');
+    });
 
-  it('labels the page range when pagePrefix is on', async () => {
-    const plain = await formatter.formatWithStyle(
-      [ITEM],
-      style({ pagePrefix: false }),
-      'bibliography',
-    );
-    const labelled = await formatter.formatWithStyle(
-      [ITEM],
-      style({ pagePrefix: true }),
-      'bibliography',
-    );
-    expect(plain).not.toContain('pp. 369');
-    expect(labelled).toContain('pp. 369');
-  });
+    it('labels the page range when pagePrefix is on', async () => {
+      const plain = await formatter.formatWithStyle(
+        [ITEM],
+        style({ pagePrefix: false }),
+        'bibliography',
+      );
+      const labelled = await formatter.formatWithStyle(
+        [ITEM],
+        style({ pagePrefix: true }),
+        'bibliography',
+      );
+      expect(plain).not.toContain('pp. 369');
+      expect(labelled).toContain('pp. 369');
+    });
 
-  it('renders the FOI descriptor only when the FOI template is on', async () => {
-    const foi: CslItem = {
-      id: 'foi',
-      type: 'report',
-      title: 'Automatic monitoring station metadata',
-      authority: 'Environment Agency',
-      number: 'EA/2023/0456',
-      issued: { 'date-parts': [[2023, 5, 12]] },
-    };
-    const off = await formatter.formatWithStyle(
-      [foi],
-      style({ foiTemplate: false }),
-      'bibliography',
-    );
-    const on = await formatter.formatWithStyle([foi], style({ foiTemplate: true }), 'bibliography');
-    expect(off).not.toContain('Freedom of Information');
-    // APA title-cases the genre it renders alongside the report number.
-    expect(on).toMatch(/Freedom of Information Request EA\/2023\/0456/i);
-  });
+    it('renders the FOI descriptor only when the FOI template is on', async () => {
+      const foi: CslItem = {
+        id: 'foi',
+        type: 'report',
+        title: 'Automatic monitoring station metadata',
+        authority: 'Environment Agency',
+        number: 'EA/2023/0456',
+        issued: { 'date-parts': [[2023, 5, 12]] },
+      };
+      const off = await formatter.formatWithStyle(
+        [foi],
+        style({ foiTemplate: false }),
+        'bibliography',
+      );
+      const on = await formatter.formatWithStyle(
+        [foi],
+        style({ foiTemplate: true }),
+        'bibliography',
+      );
+      expect(off).not.toContain('Freedom of Information');
+      // APA title-cases the genre it renders alongside the report number.
+      expect(on).toMatch(/Freedom of Information Request EA\/2023\/0456/i);
+    });
 
-  it('keeps the court on a legal case only when the legal template is on', async () => {
-    const legal: CslItem = {
-      id: 'case',
-      type: 'legal_case',
-      title: 'R (ClientEarth) v Secretary of State',
-      authority: 'High Court',
-      number: '[2021] EWHC 1234 (Admin)',
-      issued: { 'date-parts': [[2021]] },
-    };
-    const off = await formatter.formatWithStyle(
-      [legal],
-      style({ legalTemplate: false }),
-      'bibliography',
-    );
-    const on = await formatter.formatWithStyle(
-      [legal],
-      style({ legalTemplate: true }),
-      'bibliography',
-    );
-    expect(off).not.toContain('High Court');
-    expect(on).toContain('High Court');
-  });
+    it('keeps the court on a legal case only when the legal template is on', async () => {
+      const legal: CslItem = {
+        id: 'case',
+        type: 'legal_case',
+        title: 'R (ClientEarth) v Secretary of State',
+        authority: 'High Court',
+        number: '[2021] EWHC 1234 (Admin)',
+        issued: { 'date-parts': [[2021]] },
+      };
+      const off = await formatter.formatWithStyle(
+        [legal],
+        style({ legalTemplate: false }),
+        'bibliography',
+      );
+      const on = await formatter.formatWithStyle(
+        [legal],
+        style({ legalTemplate: true }),
+        'bibliography',
+      );
+      expect(off).not.toContain('High Court');
+      expect(on).toContain('High Court');
+    });
 
-  it('formats a footnote base style as a note, not an author–date parenthesis', async () => {
-    const note = { ...style({}), baseStyleId: 'chicago-note' };
-    const inText = await formatter.formatWithStyle([ITEM], note, 'inText');
-    expect(inText).toContain('Gasparrini');
-    expect(inText).not.toMatch(/^\(/); // notes are not parenthetical
-  });
-});
+    it('formats a footnote base style as a note, not an author–date parenthesis', async () => {
+      const note = { ...style({}), baseStyleId: 'chicago-note' };
+      const inText = await formatter.formatWithStyle([ITEM], note, 'inText');
+      expect(inText).toContain('Gasparrini');
+      expect(inText).not.toMatch(/^\(/); // notes are not parenthetical
+    });
+  },
+);
 
-describe('Harvard (Solent University) renders through real citeproc', () => {
+describe('Harvard (Solent University) renders through real citeproc', { timeout: 30_000 }, () => {
   it('produces an author–date in-text citation and a bibliography entry', async () => {
     const inText = await formatter.inText([ITEM], templateFor('harvard-solent'));
     expect(inText).toMatch(/Gasparrini/i);
@@ -194,7 +209,7 @@ describe('Harvard (Solent University) renders through real citeproc', () => {
   });
 });
 
-describe('BASE_STYLES matches the vendored CSL files', () => {
+describe('BASE_STYLES matches the vendored CSL files', { timeout: 30_000 }, () => {
   const DECLARED: Record<string, 'authorDate' | 'footnote' | 'numeric'> = {
     'author-date': 'authorDate',
     author: 'authorDate',

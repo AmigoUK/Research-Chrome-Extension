@@ -25,6 +25,30 @@ export interface PendingJump {
 /** Requests older than this are ignored — see `takePendingJump`. */
 const MAX_AGE_MS = 60_000;
 
+/**
+ * Compare URLs the way a reader would: the stored source URL is whatever the
+ * page called canonical at capture time, while the tab may end up on the same
+ * document with a fragment, a tracking parameter, or a trailing slash. Exact
+ * string equality made the jump silently do nothing on real publisher pages.
+ */
+export function sameDocumentUrl(a: string, b: string): boolean {
+  if (a === b) return true;
+  const norm = (raw: string): string => {
+    try {
+      const u = new URL(raw);
+      u.hash = '';
+      for (const key of [...u.searchParams.keys()]) {
+        if (/^(utm_|ref$|source$|fbclid$|gclid$)/i.test(key)) u.searchParams.delete(key);
+      }
+      const path = u.pathname.replace(/\/+$/, '');
+      return `${u.origin}${path}${u.search}`.toLowerCase();
+    } catch {
+      return raw.toLowerCase();
+    }
+  };
+  return norm(a) === norm(b);
+}
+
 export async function setPendingJump(
   url: string,
   annotationId: string,
@@ -47,7 +71,7 @@ export async function takePendingJump(url: string, now: number): Promise<string 
     const pending = stored[KEY] as PendingJump | undefined;
     if (!pending) return undefined;
     await chrome.storage.local.remove(KEY);
-    if (pending.url !== url) return undefined;
+    if (!sameDocumentUrl(pending.url, url)) return undefined;
     if (now - pending.at > MAX_AGE_MS) return undefined;
     return pending.annotationId;
   } catch {

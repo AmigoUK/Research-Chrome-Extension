@@ -188,6 +188,8 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
   bez stałej zgody: zaznacz zdanie, dopiero potem kliknij **Annotate this page**.
 - **Oczekiwane**: pasek **4 kolorowych kropek pojawia się od razu** przy istniejącym zaznaczeniu —
   bez powtarzania zaznaczenia; klik kropki maluje w tym kolorze.
+- **Uwaga do skoków**: strona **musi być przewijalna**, żeby skok był widoczny — na krótkiej
+  stronie wszystko jest już w widoku i „nic się nie dzieje" jest poprawnym zachowaniem.
 - **Debug**: brak paska → w konsoli strony (kontekst Scientific Context Notes) sprawdź
   `document.getElementById('context-notes-annotator')` — `null` znaczy, że wstrzyknięcie nie
   doszło (uprawnienia); element jest, paska brak → zaznaczenie było puste/zwinięte.
@@ -265,6 +267,12 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
   listy, Kanban i bibliografia pokazują wyłącznie dane aktywnego projektu.
 - **Debug**: `chrome.storage.local.get(null)` → klucz aktywnego projektu; rozjazd = jedna z
   powierzchni nie odczytała wartości po zmianie.
+
+### S6.6b Ustawienia projektu (Settings)
+- **Kroki**: Settings → zmień nazwę, opis i **Citation style** → Save project.
+- **Oczekiwane**: nagłówek w lewym górnym rogu i podtytuł zmieniają się natychmiast; wybrany styl
+  jest tym, którego używa panel („Cite", „Copy bibliography") — sprawdź, kopiując cytowanie.
+- **Problemy**: pusta nazwa jest odrzucana z komunikatem.
 
 ### S6.7 Konfiguracja kolorów (Settings)
 - **Kroki**: Settings w nawigacji → zmień nazwę koloru, kliknij inną próbkę, **Add a colour**,

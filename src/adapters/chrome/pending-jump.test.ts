@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { setPendingJump, takePendingJump } from './pending-jump';
+import { sameDocumentUrl, setPendingJump, takePendingJump } from './pending-jump';
 
 /** Minimal chrome.storage.local over a Map. */
 function installStorage(): { store: Map<string, unknown> } {
@@ -70,5 +70,28 @@ describe('pending jump', () => {
     } as unknown as typeof chrome;
     await expect(setPendingJump('https://ex.org/a', 'x', NOW)).resolves.toBeUndefined();
     await expect(takePendingJump('https://ex.org/a', NOW)).resolves.toBeUndefined();
+  });
+});
+
+describe('sameDocumentUrl', () => {
+  it('treats the same document reached by a slightly different address as the same', () => {
+    const base = 'https://journals.example.org/doi/10.1177/123';
+    expect(sameDocumentUrl(base, base)).toBe(true);
+    expect(sameDocumentUrl(base, `${base}/`)).toBe(true);
+    expect(sameDocumentUrl(base, `${base}#abstract`)).toBe(true);
+    expect(sameDocumentUrl(base, `${base}?utm_source=twitter`)).toBe(true);
+    expect(sameDocumentUrl(base, base.toUpperCase().replace('HTTPS', 'https'))).toBe(true);
+  });
+
+  it('keeps genuinely different documents apart, including by query', () => {
+    expect(sameDocumentUrl('https://ex.org/a', 'https://ex.org/b')).toBe(false);
+    expect(sameDocumentUrl('https://ex.org/a', 'https://other.org/a')).toBe(false);
+    // A query that selects content is part of the document's identity.
+    expect(sameDocumentUrl('https://ex.org/view?id=1', 'https://ex.org/view?id=2')).toBe(false);
+  });
+
+  it('falls back to plain comparison for values that are not URLs', () => {
+    expect(sameDocumentUrl('not a url', 'not a url')).toBe(true);
+    expect(sameDocumentUrl('not a url', 'other')).toBe(false);
   });
 });
