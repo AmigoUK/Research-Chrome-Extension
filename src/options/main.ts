@@ -32,6 +32,7 @@ import type {
   Id,
 } from '../core/model/types';
 import { SELF_USER_ID } from '../core/model/identity';
+import { defaultOutline } from '../core/draft/outline';
 import { DEFAULT_ACTIVITY_LIMIT } from '../core/usecases/activity';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import {
@@ -268,7 +269,7 @@ function makeProject(name: string): Project {
   return {
     id: crypto.randomUUID(),
     name,
-    sections: ['Literature', 'Methods', 'Data', 'Report'],
+    outline: defaultOutline(),
     members: [{ userId: SELF_USER_ID, role: 'owner' }],
     createdAt: now,
     updatedAt: now,
@@ -545,7 +546,7 @@ function renderOverview(view: HTMLElement, actions: HTMLElement): void {
 
   view.innerHTML = `
     <div class="stats">
-      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${p?.sections.length ?? 0} sections · ${members} member${members === 1 ? '' : 's'}</div></div>
+      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${state.annotations.filter((a) => !a.section).length} unplaced · ${members} member${members === 1 ? '' : 's'}</div></div>
       <div class="tile"><div class="tl"><span class="d" style="background:var(--s-analysed)"></span>Analysed</div><div class="tv">${progress.reviewed}</div><div class="tsub">${progress.percent}% of the corpus reviewed</div></div>
       <div class="tile"><div class="tl">Annotations</div><div class="tv">${state.annotations.length}</div><div class="tsub">${inReport} included in the report</div></div>
       <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${styleValue}</div><div class="tsub">${styleSub}</div></div>

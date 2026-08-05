@@ -92,12 +92,32 @@ export interface ProjectMember {
  */
 export type SyncMode = 'local' | 'file';
 
+/**
+ * One section of the draft. The id is stable and never reused, so renaming a
+ * section keeps its passages — exactly as `HighlightColor.id` does for the
+ * palette. Storing a section *title* on an annotation would orphan every
+ * passage on a rename and merge two sections that happened to share a name.
+ */
+export interface OutlineSection {
+  id: Id;
+  title: string;
+}
+
 export interface Project {
   id: Id;
   name: string;
   description?: string;
   defaultCitationStyleId?: Id;
-  sections: string[];
+  /** @deprecated Superseded by `outline`. Still accepted on import and derived
+   *  from once by `resolveOutline`; never written again. */
+  sections?: string[];
+  /** Draft structure. Absent → derived by `resolveOutline`. */
+  outline?: OutlineSection[];
+  /** The question this project answers. Shown above the outline. */
+  researchQuestion?: string;
+  /** Hand-in date, `YYYY-MM-DD`. A calendar fact, not an instant: a timestamp
+   *  makes "in 5 days" jump by a day across time zones. */
+  dueDate?: string;
   members: ProjectMember[];
   /** The highlight legend. Absent → DEFAULT_HIGHLIGHT_COLORS. */
   colorPalette?: HighlightColor[];
@@ -185,6 +205,8 @@ export interface Annotation {
   documentId: Id;
   anchor: Anchor;
   color?: AnnotationColor;
+  /** `OutlineSection.id` — as `color` holds a `HighlightColor.id`. */
+  section?: Id;
   content: string;
   tags: string[];
   status: AnnotationStatus;

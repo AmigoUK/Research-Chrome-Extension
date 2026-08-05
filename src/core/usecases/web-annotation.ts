@@ -8,6 +8,7 @@
  */
 import type { RepositorySet } from '../ports/repositories';
 import type { Annotation, AnnotationColor, Document, Id, Project, WebAnchor } from '../model/types';
+import { defaultOutline } from '../draft/outline';
 import { capturePage, type CaptureDeps, type CaptureInput } from './capture';
 
 export async function findDocumentByUrl(
@@ -41,7 +42,7 @@ export async function resolveProjectId(
   const seeded: Project = {
     id: deps.newId(),
     name: 'My Research',
-    sections: ['Literature', 'Methods', 'Data', 'Report'],
+    outline: defaultOutline(),
     members: [],
     createdAt: now,
     updatedAt: now,
