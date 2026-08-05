@@ -594,3 +594,55 @@ test('assigning a section from the panel updates the card', async () => {
   await expect(page.locator('.onpage-note__section').first()).toHaveValue(chosen);
   await page.close();
 });
+
+test('a dangling section id falls back to "No section" instead of leaving the picker blank', async () => {
+  const sourceUrl = 'https://example.org/e2e-dangling-section';
+  const page = await context.newPage();
+  await stubActiveTabScan(page, sourceUrl, 'Dangling section source');
+  await page.goto(panelUrl());
+  await expect(page.locator('#activeName')).toHaveText('My Research');
+
+  await page.evaluate(async (url) => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    const annotated = (await chrome.runtime.sendMessage({
+      type: 'web/annotate',
+      input: {
+        projectId: projects.data[0]!.id,
+        url,
+        type: 'article',
+        metadata: { title: 'Dangling section source' },
+      },
+      anchor: {
+        kind: 'web',
+        selectors: [{ type: 'textQuote', exact: 'A passage with a dangling section.' }],
+      },
+      color: 'yellow',
+    })) as { data: { documentId: string; annotationId: string } };
+    const byDoc = (await chrome.runtime.sendMessage({
+      type: 'annotations/listByDocument',
+      documentId: annotated.data.documentId,
+    })) as { data: Array<Record<string, unknown>> };
+    const annotation = byDoc.data.find((a) => a['id'] === annotated.data.annotationId)!;
+    // A section id that names no section the resolved outline currently has
+    // — reachable in production via `performDeleteSection`'s partial-failure
+    // branch (the section removed from `project.outline`, but a later write
+    // in that same loop fails before this annotation's own `.section` is
+    // cleared). Reproduced directly here since the picker's fallback is what
+    // is under test, not how the dangling id came to exist.
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: { ...annotation, section: 'no-such-section' },
+    });
+  }, sourceUrl);
+
+  await page.reload();
+  const pick = page.locator('.onpage-note__section').first();
+  await expect(pick).toBeVisible();
+  // `selectedIndex` must land on the real "No section" option, not fall
+  // through to -1 (nothing selected, an empty-looking picker) just because
+  // the stored id doesn't match any <option> the resolved outline produced.
+  await expect(pick).toHaveValue('');
+  await page.close();
+});

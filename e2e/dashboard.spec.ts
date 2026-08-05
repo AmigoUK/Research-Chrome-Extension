@@ -191,6 +191,49 @@ test('References view lists stored references and offers a DOI import form', asy
   await page.close();
 });
 
+test('a project with no highlights yet still shows its outline, and Add section works there', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Runs before any other test in this file gives the seeded project a
+  // highlight, so the project's own annotation list is genuinely empty here
+  // — the exact state that used to render "Nothing to outline yet" and
+  // nothing else, hiding the sections `#olAdd` was quietly still adding to.
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+
+  // The default five sections, each honestly at zero — not a blanked-out
+  // "nothing here" screen. An empty section is the one signal this view
+  // exists to show; hiding it behind an all-or-nothing empty state was the bug.
+  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
+  await expect(page.locator('.ol-warn')).toHaveCount(5);
+
+  // The relocated empty-state copy: still says nothing has been collected,
+  // now alongside the sections rather than instead of them.
+  await expect(page.locator('.ol-notice')).toContainText('Nothing to outline yet');
+  await expect(page.locator('.ol-notice')).toContainText(
+    'Highlight passages while you read and they collect here, ready to arrange.',
+  );
+
+  // Add section is live, not disabled — the student's intent is legitimate
+  // even before their first highlight — and the new section renders at once,
+  // with no reload needed to see it.
+  await expect(page.locator('#olAdd')).toBeEnabled();
+  await page.locator('#olAdd').click();
+  await page.locator('#secTitle').fill('Methodology');
+  await page.locator('#secAdd').click();
+  await expect(page.locator('.ol-sec h3', { hasText: 'Methodology' })).toBeVisible();
+  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(6);
+
+  // Persists — this was never the bug, but a section that vanished on
+  // reload would be just as unfindable as one that never rendered.
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-sec h3', { hasText: 'Methodology' })).toBeVisible();
+
+  await page.close();
+});
+
 test('Annotations view changes a note review status and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
@@ -238,9 +281,13 @@ test('deleting a section keeps its passages, as unplaced', async () => {
   await page.goto(dashboardUrl());
   await expect(page.locator('#pName')).not.toHaveText('—');
 
-  // One document, two passages each filed under a DIFFERENT real section —
-  // the project's own default outline, read back rather than guessed, so
-  // this does not depend on how ids are derived from section titles.
+  // One document, three passages: two filed under DIFFERENT real sections
+  // (so a delete-with-move can be checked against a bystander section left
+  // untouched), and a third alongside the second so that section's own
+  // delete confirmation exercises the plural wording, not just the singular
+  // one the first section's solo passage gives. Section ids come from the
+  // project's own default outline, read back rather than guessed, so this
+  // does not depend on how ids are derived from section titles.
   await page.evaluate(async () => {
     const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
     const project = projects.data[0];
@@ -285,51 +332,217 @@ test('deleting a section keeps its passages, as unplaced', async () => {
       type: 'annotations/put',
       annotation: mkAnno('e2e-outline-anno-2', project.outline[1].id),
     });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: mkAnno('e2e-outline-anno-3', project.outline[1].id),
+    });
+  });
+  await page.reload();
+
+  // In `finally` so a failed assertion below still cleans up: this suite's
+  // tests share one persistent profile and never reset storage between them
+  // (see the neighbouring tests), and leaving these rows behind on a failure
+  // would re-create exactly the cross-test interference already debugged
+  // once — see the cleanup comment below.
+  try {
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    await expect(page.locator('.ol-sec[data-sec]').first()).toBeVisible();
+
+    // Scoped by data-id rather than by a raw `.anno` count: earlier tests in
+    // this file leave their own unsectioned annotations behind in the shared
+    // profile, and those already sit in Unplaced — a bare count would be
+    // polluted by them. Real sections carry only `.ol-sec`; Unplaced carries
+    // `.ol-sec` AND `.ol-sec--loose`, so `:not(.ol-sec--loose)` isolates them.
+    const anno1InASection = page.locator(
+      '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-1"]',
+    );
+    const anno1InUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-outline-anno-1"]');
+    const anno2InASection = page.locator(
+      '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-2"]',
+    );
+    const anno2InUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-outline-anno-2"]');
+    const anno3InUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-outline-anno-3"]');
+
+    // Both passages start filed under a real section, not Unplaced.
+    await expect(anno1InASection).toHaveCount(1);
+    await expect(anno2InASection).toHaveCount(1);
+    await expect(anno1InUnplaced).toHaveCount(0);
+
+    // The first section in outline order holds e2e-outline-anno-1 alone —
+    // its confirmation must read the singular form.
+    const firstSectionId = await page.locator('[data-delsec]').first().getAttribute('data-delsec');
+    await page.locator('[data-delsec]').first().click();
+    await expect(page.locator('.pop-confirm')).toHaveText(
+      '1 passage will move to Unplaced. This cannot be undone.',
+    );
+    await page.getByRole('button', { name: /delete section/i }).click();
+
+    // Its passage survives — now in Unplaced, not gone — while the OTHER
+    // section's passages are untouched by a deletion that was not their own.
+    await expect(anno1InUnplaced).toHaveCount(1);
+    await expect(anno1InASection).toHaveCount(0);
+    await expect(anno2InASection).toHaveCount(1);
+
+    // The section that used to be second is now first, holding both anno-2
+    // and anno-3 — its confirmation must read the plural form.
+    await page.locator('[data-delsec]').first().click();
+    await expect(page.locator('.pop-confirm')).toHaveText(
+      '2 passages will move to Unplaced. This cannot be undone.',
+    );
+    await page.getByRole('button', { name: /delete section/i }).click();
+    await expect(anno2InUnplaced).toHaveCount(1);
+    await expect(anno3InUnplaced).toHaveCount(1);
+    await expect(anno2InASection).toHaveCount(0);
+
+    // Persists: a reload re-reads the state `projects/put` actually wrote,
+    // not just the optimistic in-memory update `mutateOutline` made — a
+    // write that silently failed to land would still pass every assertion
+    // above.
+    await page.reload();
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    await expect(page.locator(`.ol-sec[data-sec="${firstSectionId}"]`)).toHaveCount(0);
+    await expect(anno1InUnplaced).toHaveCount(1);
+    await expect(anno2InUnplaced).toHaveCount(1);
+    await expect(anno3InUnplaced).toHaveCount(1);
+  } finally {
+    // Deleting the document cascades to its annotations (`documents/delete`'s
+    // own contract), so the Annotations list a LATER, unrelated test reads
+    // back is the length it was before this test ran — otherwise these extra
+    // rows lengthen that list enough to push a later test's target row below
+    // the fold, which was observed to intermittently break that other test's
+    // popover interaction (a scroll event closing the popover mid-click —
+    // see `closePop`'s callers).
+    await page.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-outline-doc' });
+    });
+  }
+
+  await page.close();
+});
+
+test('a project not yet organised by section is grouped by colour, and the screen says so', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Two passages, neither ever assigned a section — the exact state
+  // `groupPassages` treats as "not organised yet", where it falls back to
+  // grouping (and citing) by highlight colour instead of by outline.
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const projectId = projects.data[0].id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-colour-doc',
+        projectId,
+        url: 'https://example.org/colour-source',
+        type: 'article',
+        metadata: { title: 'Colour source', authors: ['Hue, C.'], year: 2024 },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-colour-yellow',
+        projectId,
+        documentId: 'e2e-colour-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'a yellow passage' }] },
+        content: 'Coloured, unsectioned',
+        color: 'yellow',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-colour-none',
+        projectId,
+        documentId: 'e2e-colour-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'a colourless passage' }] },
+        content: 'Neither coloured nor sectioned',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  try {
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+
+    // The screen says what will actually happen to the export, not merely
+    // that something is unassigned.
+    await expect(page.locator('.ol-notice--accent')).toContainText('colour');
+
+    // `groupPassages`'s own definition of "unplaced" in this mode is
+    // colour-orphaned, not section-orphaned: the coloured passage is
+    // accounted for by its colour bucket, not shown as Unplaced here. If
+    // this screen ever goes back to re-implementing the predicate instead of
+    // calling `groupPassages`, this is what drifts first.
+    await expect(page.locator('.ol-sec--loose .anno[data-id="e2e-colour-none"]')).toHaveCount(1);
+    await expect(page.locator('.anno[data-id="e2e-colour-yellow"]')).toHaveCount(0);
+  } finally {
+    await page.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-colour-doc' });
+    });
+  }
+
+  await page.close();
+});
+
+test('an outline edit on a project with no stored outline persists the derived default plus the edit', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Force the "no stored outline" branch: `resolveOutline` derives the
+  // five-section default from scratch whenever `project.outline` is absent
+  // — the only way `mutateOutline`'s first-write path (deriving the outline,
+  // applying the edit, and persisting the RESULT in one write) actually
+  // runs. Every other test in this file seeds a project that already has a
+  // stored outline (`makeProject` always sets one), so this branch is
+  // otherwise never exercised.
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const project = projects.data[0];
+    delete project.outline;
+    await chrome.runtime.sendMessage({ type: 'projects/put', project });
   });
   await page.reload();
 
   await page.locator('#nav .nav-item[data-route="outline"]').click();
-  await expect(page.locator('.ol-sec[data-sec]').first()).toBeVisible();
+  // The derived default's first section, shown despite nothing being stored
+  // yet — `.ol-sec[data-sec]` excludes the Unplaced block (it never carries
+  // `data-sec`), so this is a real section, not "Unplaced (N)".
+  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
+  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Introduction');
 
-  // Scoped by data-id rather than by a raw `.anno` count: earlier tests in
-  // this file leave their own unsectioned annotations behind in the shared
-  // profile, and those already sit in Unplaced — a bare count would be
-  // polluted by them. Real sections carry only `.ol-sec`; Unplaced carries
-  // `.ol-sec` AND `.ol-sec--loose`, so `:not(.ol-sec--loose)` isolates them.
-  const anno1InASection = page.locator(
-    '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-1"]',
-  );
-  const anno1InUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-outline-anno-1"]');
-  const anno2InASection = page.locator(
-    '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-2"]',
-  );
+  // Rename it — the first-ever outline mutation for this project.
+  // `mutateOutline` must derive the default, apply the rename, and persist
+  // the RESULT (five sections, one renamed) in that same write — not persist
+  // the transient default and drop the rename, and not apply the rename to a
+  // default that never gets saved.
+  await page.locator('[data-rename]').first().click();
+  await page.locator('#secRename').fill('Framing');
+  await page.locator('#secRenameGo').click();
+  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
 
-  // Both passages start filed under a real section, not Unplaced.
-  await expect(anno1InASection).toHaveCount(1);
-  await expect(anno2InASection).toHaveCount(1);
-  await expect(anno1InUnplaced).toHaveCount(0);
-
-  // The first section in outline order is the one holding e2e-outline-anno-1.
-  await page.locator('[data-delsec]').first().click();
-  await page.getByRole('button', { name: /delete section/i }).click();
-
-  // Its passage survives — now in Unplaced, not gone — while the OTHER
-  // section's passage is untouched by a deletion that was not its own.
-  await expect(anno1InUnplaced).toHaveCount(1);
-  await expect(anno1InASection).toHaveCount(0);
-  await expect(anno2InASection).toHaveCount(1);
-
-  // This suite's tests share one persistent profile and never reset storage
-  // between them (see the neighbouring tests). Deleting the document cascades
-  // to its annotations (`documents/delete`'s own contract), so the Annotations
-  // list a LATER, unrelated test reads back is the length it was before this
-  // test ran — otherwise these two extra rows lengthen that list enough to
-  // push a later test's target row below the fold, which was observed to
-  // intermittently break that other test's popover interaction (a scroll
-  // event closing the popover mid-click — see `closePop`'s callers).
-  await page.evaluate(async () => {
-    await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-outline-doc' });
-  });
+  await page.reload();
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
+  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
 
   await page.close();
 });

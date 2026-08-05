@@ -475,13 +475,21 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   none.value = '';
   none.textContent = 'No section';
   sectionPick.append(none);
-  for (const s of currentOutline()) {
+  const outline = currentOutline();
+  for (const s of outline) {
     const option = document.createElement('option');
     option.value = s.id;
     option.textContent = s.title; // user text, from an option's textContent — never innerHTML.
     sectionPick.append(option);
   }
-  sectionPick.value = a.section ?? '';
+  // A stored id that names no section in `outline` (reachable via the delete
+  // path's partial-failure branch: the section removed from
+  // `project.outline`, but this annotation's own `.section` not yet cleared
+  // before a later write in that same loop failed) has no matching
+  // `<option>`. Assigning it anyway would leave `selectedIndex` at -1 — an
+  // empty-looking picker — instead of falling back to the "No section"
+  // option that is already there for exactly this case.
+  sectionPick.value = a.section && outline.some((s) => s.id === a.section) ? a.section : '';
   // `change`, matching the status select above: it fires once the browser has
   // already committed the pick and closed its native dropdown, so the async
   // save (and the repaint it can trigger via `renderOnPageCard`) never runs
