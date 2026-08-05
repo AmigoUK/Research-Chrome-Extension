@@ -3,22 +3,43 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
-import { composeDraft } from '../../src/core/usecases/draft';
-import type { CitationFormatter, CitationRun } from '../../src/core/ports/citation';
+import {
+  composeDraft,
+  groupPassages,
+  CitationRunLengthMismatchError,
+} from '../../src/core/usecases/draft';
+import type { CitationFormatter } from '../../src/core/ports/citation';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type { Annotation, Document, Project, Reference } from '../../src/core/model/types';
+import type {
+  Annotation,
+  Document,
+  HighlightColor,
+  OutlineSection,
+  Project,
+  Reference,
+} from '../../src/core/model/types';
 
 const NOW = '2026-08-05T00:00:00.000Z';
 const at = (min: number): string => new Date(Date.UTC(2026, 7, 5, 0, min)).toISOString();
 
-/** Deterministic stand-in: the real citeproc is covered in citation-run.test.ts. */
-const formatter = {
-  formatRun: (run: CitationRun) =>
+/** Deterministic stand-in: the real citeproc is covered in citation-run.test.ts.
+ *  Typed as `CitationFormatter` directly, not `as unknown as` — a future change
+ *  to the interface (an added method, a renamed parameter) now fails this file
+ *  at compile time instead of sliding past a cast. */
+const formatter: CitationFormatter = {
+  bibliography: (items, template) =>
+    Promise.resolve(`[${template}] ${items.map((i) => i['id']).join('; ')}`),
+  inText: (items, template) =>
+    Promise.resolve(`(${template}:${items.map((i) => i['id']).join(',')})`),
+  formatWithStyle: (items, style, kind) =>
+    Promise.resolve(`[${style.id}:${kind}] ${items.map((i) => i['id']).join('; ')}`),
+  compileStyle: (style) => Promise.resolve(`<style id="${style.id}"/>`),
+  formatRun: (run) =>
     Promise.resolve({
       inText: run.order.map((id) => `(${id})`),
       bibliography: [...new Set(run.order)].map((id) => `BIB ${id}`).join('\n'),
     }),
-} as unknown as CitationFormatter;
+};
 
 let repos: RepositorySet;
 let counter = 0;
@@ -208,5 +229,131 @@ describe('composeDraft', () => {
     const draft = await compose();
     expect(draft.sections.every((s) => s.entries.length === 0)).toBe(true);
     expect(draft.bibliography).toBe('');
+  });
+
+  it('does not claim colour grouping when nothing has a section or a colour (Ruling B)', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1'));
+
+    const draft = await compose();
+    expect(draft.groupedByColour).toBe(false);
+    expect(draft.sections.map((s) => s.title)).toEqual(['Introduction', 'Evidence']);
+    expect(draft.sections.every((s) => s.entries.length === 0)).toBe(true);
+    expect(draft.unplaced.map((e) => e.annotationId)).toEqual(['a1']);
+  });
+
+  it('keeps citations aligned across a missing reference in the middle of a bucket (cursor invariant)', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.documents.put(doc('d2')); // deliberately no reference for d2
+    await repos.documents.put(doc('d3'));
+    await repos.documents.put(doc('d4'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.references.put(ref('r3', 'd3'));
+    await repos.references.put(ref('r4', 'd4'));
+    await repos.annotations.put(anno('a1', 'd1', { section: 's1', createdAt: at(10) }));
+    await repos.annotations.put(anno('a2', 'd2', { section: 's1', createdAt: at(20) }));
+    await repos.annotations.put(anno('a3', 'd3', { section: 's1', createdAt: at(30) }));
+    await repos.annotations.put(anno('a4', 'd4', { createdAt: at(40) })); // unplaced
+
+    const draft = await compose();
+    expect(draft.sections[0]?.entries.map((e) => e.inTextFormatted)).toEqual(['(r1)', '', '(r3)']);
+    expect(draft.unplaced[0]?.inTextFormatted).toBe('(r4)');
+  });
+
+  it('throws a named error when formatRun returns the wrong number of citations', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1', { section: 's1' }));
+
+    const brokenFormatter: CitationFormatter = {
+      ...formatter,
+      formatRun: () => Promise.resolve({ inText: [], bibliography: '' }),
+    };
+
+    await expect(
+      composeDraft(repos, brokenFormatter, { projectId: 'p1', template: 'apa', flavour: 'text' }),
+    ).rejects.toThrow(CitationRunLengthMismatchError);
+  });
+
+  it('reads quote and locator from any selector, not just the first, on a multi-selector PDF anchor', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(
+      anno('a1', 'd1', {
+        section: 's1',
+        anchor: {
+          kind: 'pdf',
+          selectors: [
+            { type: 'pdfRegion', page: 3, rects: [] },
+            { type: 'pdfRegion', page: 4, rects: [], quote: 'the real quote' },
+          ],
+        },
+      }),
+    );
+
+    const draft = await compose();
+    const entry = draft.sections[0]?.entries[0];
+    expect(entry?.quote).toBe('the real quote');
+    expect(entry?.locator).toBe('PDF p. 3');
+  });
+
+  it('carries the colour label even when grouped by outline section', async () => {
+    await repos.projects.put({
+      ...project,
+      colorPalette: [{ id: 'c1', swatch: '#ffcc00', label: 'Key evidence' }],
+    });
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1', { section: 's1', color: 'c1' }));
+
+    const draft = await compose();
+    expect(draft.sections[0]?.entries[0]?.colorLabel).toBe('Key evidence');
+  });
+});
+
+describe('groupPassages', () => {
+  const outline: OutlineSection[] = [
+    { id: 's1', title: 'Introduction' },
+    { id: 's2', title: 'Evidence' },
+  ];
+  const palette: HighlightColor[] = [
+    { id: 'c1', swatch: '#ffcc00', label: 'Key evidence' },
+    { id: 'c2', swatch: '#ff0000', label: 'Disagree' },
+  ];
+
+  it('buckets by outline section, oldest first, leaving the rest unplaced', () => {
+    const annotations = [
+      anno('a1', 'd1', { section: 's1', createdAt: at(30) }),
+      anno('a2', 'd1', { section: 's1', createdAt: at(10) }),
+      anno('a3', 'd1', { section: 's2' }),
+      anno('a4', 'd1'),
+    ];
+
+    const grouped = groupPassages(annotations, outline, palette);
+    expect(grouped.buckets.map((b) => b.title)).toEqual(['Introduction', 'Evidence']);
+    expect(grouped.buckets[0]?.items.map((a) => a.id)).toEqual(['a2', 'a1']);
+    expect(grouped.buckets[1]?.items.map((a) => a.id)).toEqual(['a3']);
+    expect(grouped.unplaced.map((a) => a.id)).toEqual(['a4']);
+    expect(grouped.groupedByColour).toBe(false);
+  });
+
+  it('falls back to colour buckets only when the outline was never used and a colour bucket has entries', () => {
+    const annotations = [anno('a1', 'd1', { color: 'c1' }), anno('a2', 'd1', { color: 'c2' })];
+
+    const grouped = groupPassages(annotations, outline, palette);
+    expect(grouped.groupedByColour).toBe(true);
+    expect(grouped.buckets.map((b) => b.title)).toEqual(['Key evidence', 'Disagree']);
+    expect(grouped.unplaced).toEqual([]);
+  });
+
+  it('does not claim colour grouping when nothing has a section or a colour (Ruling B)', () => {
+    const annotations = [anno('a1', 'd1'), anno('a2', 'd1')];
+
+    const grouped = groupPassages(annotations, outline, palette);
+    expect(grouped.groupedByColour).toBe(false);
+    expect(grouped.buckets.map((b) => b.title)).toEqual(['Introduction', 'Evidence']);
+    expect(grouped.buckets.every((b) => b.items.length === 0)).toBe(true);
+    expect(grouped.unplaced.map((a) => a.id)).toEqual(['a1', 'a2']);
   });
 });
