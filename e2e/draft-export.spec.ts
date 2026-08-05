@@ -1,18 +1,26 @@
 import { test, expect, chromium, type BrowserContext, type Worker } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 
 /**
- * E2E for Task 9's export: "Copy draft" puts BOTH real HTML and real
- * Markdown on the clipboard, not just a toast claiming it did — `copyDraft`
- * (`src/options/export-draft.ts`) composes the two flavours separately and
- * renders each through its own serialiser, so this also proves the two
- * outputs are not one parsed out of the other (asserting the plain-text
- * flavour carries no HTML tags is exactly what would catch that regression).
- * `ClipboardItem` with a `text/html` entry does not exist in jsdom, so this
- * is the only place either promise can be checked — see
- * `src/options/export-draft.test.ts` for the part unit tests already cover
- * (the filename rule).
+ * E2E for Task 9's export — two independent delivery paths, neither provable
+ * from a toast alone:
+ *
+ * - "Copy draft" puts BOTH real HTML and real Markdown on the clipboard.
+ *   `copyDraft` (`src/options/export-draft.ts`) composes the two flavours
+ *   separately and renders each through its own serialiser, so this also
+ *   proves the two outputs are not one parsed out of the other (asserting the
+ *   plain-text flavour carries no HTML tags is exactly what would catch that
+ *   regression). `ClipboardItem` with a `text/html` entry does not exist in
+ *   jsdom, so this is the only place either promise can be checked.
+ * - "Download .md" hands a real file to Chrome's download manager via an
+ *   `<a download>`/blob URL (`downloadMarkdown`). jsdom has no download
+ *   manager either, so the suggested filename and the file's actual bytes
+ *   can only be inspected here, through Playwright's `download` event.
+ *
+ * See `src/options/export-draft.test.ts` for the part unit tests already
+ * cover (the filename rule in isolation).
  */
 
 const distPath = fileURLToPath(new URL('../dist', import.meta.url));
@@ -123,7 +131,12 @@ test('copying a draft puts real markup on the clipboard', async () => {
     // pattern every other spec in this suite uses (`e2e/dashboard.spec.ts`).
     await page.locator('#nav .nav-item[data-route="outline"]').click();
     await page.getByRole('button', { name: /copy draft/i }).click();
-    await expect(page.locator('.toast')).toContainText(/copied/i);
+    // Anchored at the start: the degraded-clipboard message also contains
+    // "copied" ("Copied without formatting — the bibliography's italics need
+    // fixing by hand"), so only pinning the match to the very beginning of
+    // the toast text tells the success path apart from the fallback one —
+    // an unanchored /copied/i would pass on either.
+    await expect(page.locator('.toast')).toContainText(/^Draft copied/i);
 
     // The only proof that survives: read both flavours back out.
     const { html, plain } = await page.evaluate(async () => {
@@ -155,6 +168,112 @@ test('copying a draft puts real markup on the clipboard', async () => {
     await page.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-export-doc' });
       await chrome.runtime.sendMessage({ type: 'references/delete', id: 'e2e-export-ref' });
+      await chrome.runtime.sendMessage({ type: 'annotations/delete', id: 'e2e-export-anno' });
+    });
+  }
+
+  await page.close();
+});
+
+test('downloading the .md draft produces a real Markdown file with no HTML in it', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Same shape as the clipboard fixture above (one document, one reference
+  // tied to it, one quoted and sectioned annotation) but with its own ids —
+  // this test's cleanup must not depend on the other test's having run, or
+  // having cleaned up correctly, first.
+  await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string; outline: Array<{ id: string }> }>;
+    };
+    const project = projects.data[0]!;
+    const projectId = project.id;
+    const sectionId = project.outline[0]!.id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-export-md-doc',
+        projectId,
+        url: 'https://example.org/export-md-source',
+        type: 'article',
+        metadata: { title: 'Export md source', authors: ['Oke, T. R.'], year: 1982 },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'references/put',
+      reference: {
+        id: 'e2e-export-md-ref',
+        projectId,
+        documentId: 'e2e-export-md-doc',
+        cslData: {
+          type: 'article-journal',
+          title: 'Export md source',
+          author: [{ family: 'Oke', given: 'T. R.' }],
+          issued: { 'date-parts': [[1982]] },
+          'container-title': 'QJRMS',
+        },
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-export-md-anno',
+        projectId,
+        documentId: 'e2e-export-md-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'the markdown passage' }] },
+        content: 'A note on the markdown passage',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        section: sectionId,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  try {
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: /download \.md/i }).click();
+    const download = await downloadPromise;
+
+    // `draftFilename`'s shape (`src/options/export-draft.ts`): a slug of the
+    // project name seeded at `src/options/main.ts`'s `makeProject('My
+    // Research Project')`, plus today's date.
+    expect(download.suggestedFilename()).toMatch(
+      /^draft-my-research-project-\d{4}-\d{2}-\d{2}\.md$/,
+    );
+
+    const filePath = await download.path();
+    if (!filePath) throw new Error('Chromium produced no local path for the download');
+    const body = await fs.promises.readFile(filePath, 'utf-8');
+
+    // Real Markdown from `draftToMarkdown` — a section heading and a
+    // blockquote line — not a toast's word for it.
+    expect(body).toContain('## ');
+    expect(body).toContain('> the markdown passage');
+    expect(body).toContain('Oke');
+    // Proof this was composed with `flavour: 'text'` and not the clipboard
+    // action's `'html'`-flavour draft stripped down after the fact: no HTML
+    // tag survives in a real Markdown render.
+    expect(body).not.toMatch(/<[a-zA-Z/][^>]*>/);
+  } finally {
+    await page.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-export-md-doc' });
+      await chrome.runtime.sendMessage({ type: 'references/delete', id: 'e2e-export-md-ref' });
+      await chrome.runtime.sendMessage({ type: 'annotations/delete', id: 'e2e-export-md-anno' });
     });
   }
 
