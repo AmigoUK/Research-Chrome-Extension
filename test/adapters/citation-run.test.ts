@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { CiteJsFormatter } from '../../src/adapters/citation/citejs';
+import { CiteJsFormatter, UnknownCitationIdError } from '../../src/adapters/citation/citejs';
 import { templateFor } from '../../src/core/citation/styles';
 
 /** Load a vendored CSL the way the worker does — from disk, not inlined. */
@@ -93,6 +93,15 @@ describe('formatRun', { timeout: 30_000 }, () => {
     expect(out.bibliography).toContain('<i>');
   });
 
+  it('passes the flavour to the citation call too, not just the bibliography one', async () => {
+    // The bibliography assertion above would still pass if the citation call
+    // hardcoded `format: 'text'` — it only checks bibliography markup. Compare
+    // the in-text output across flavours so that gap is covered too.
+    const textOut = await formatter.formatRun({ items, order }, templateFor('apa'), 'text');
+    const htmlOut = await formatter.formatRun({ items, order }, templateFor('apa'), 'html');
+    expect(htmlOut.inText).not.toEqual(textOut.inText);
+  });
+
   it('cites only what the draft uses', async () => {
     const out = await formatter.formatRun({ items, order: ['C'] }, templateFor('apa'), 'text');
     expect(out.inText).toHaveLength(1);
@@ -104,5 +113,17 @@ describe('formatRun', { timeout: 30_000 }, () => {
     const out = await formatter.formatRun({ items, order: [] }, templateFor('apa'), 'text');
     expect(out.inText).toEqual([]);
     expect(out.bibliography).toBe('');
+  });
+
+  it('names the missing id when a draft cites a reference that is not in items', async () => {
+    // The realistic cause: a reference the draft cites was deleted from the
+    // project. citeproc's own failure for the same miss is an opaque
+    // "Cannot find entry with id '...'" naming neither the draft nor the
+    // method — this must fail with a named error that names the id instead.
+    const run = { items, order: ['C', 'ghost'] };
+    await expect(formatter.formatRun(run, templateFor('apa'), 'text')).rejects.toThrow(
+      UnknownCitationIdError,
+    );
+    await expect(formatter.formatRun(run, templateFor('apa'), 'text')).rejects.toThrow(/ghost/);
   });
 });
