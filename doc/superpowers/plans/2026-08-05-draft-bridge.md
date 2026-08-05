@@ -1977,13 +1977,24 @@ git commit -m "Say what the project is for, and when it is due"
 
 ### Task 11: Documentation and release
 
+**Every place that teaches the workflow must learn the new step — in-app first, repo docs second.** A feature the guide page does not mention is a feature most users never find.
+
 **Files:**
+- Modify: `src/onboarding/index.html` + `src/onboarding/main.ts` — the **in-app guide** that opens on first install and stays behind the panel's Guide button. It currently teaches five steps (install → panel → file → annotate → cite). Outline belongs between *annotate* and *cite*, because that is where it falls in real use. Its button should open the dashboard on the Outline route, as the other steps' buttons open their surfaces.
+- Modify: `src/sidepanel/main.ts` — the **getting-started checklist** mirrors those same steps from real project data. If the guide gains a step, the checklist must too, or the two disagree about what the workflow is.
+- Modify: `src/options/main.ts` — empty-state copy on the Outline route and the Annotations route (the links Task 10 added), so the in-app help reads correctly with the finished feature.
 - Modify: `package.json` (version)
 - Modify: `CHANGELOG.md` (**new section only** — released sections are append-only and protected)
 - Modify: `README.md` (quick start + the "What it does" table)
 - Modify: `doc/STATUS.md`
 - Modify: `doc/MANUAL-TEST-PLAN.md` (new scenario S12)
 - Modify: `doc/architecture.md`, `doc/data-model.md` (the new fields and message)
+- Modify: `doc/ui-ux.md` (the Outline surface and where it sits in the journey)
+- Modify: `doc/STORE-LISTING.md` (the store description sells the workflow; a draft export is the strongest thing in it)
+- Check: `doc/README.md`, `doc/roadmap.md`, `doc/RESUME.md` — update where they describe the feature set, skip where they do not.
+- Check: `src/manifest.config.ts` — the `description` string IS the Chrome Web Store summary under the extension's name, capped at 132 chars by `scripts/lib/store-package-rules.mjs`. Decide whether the draft export earns a place in it.
+
+**Do not** add a step to the guide without also adding it to the panel checklist, and do not change either without re-running `e2e/onboarding.spec.ts`, which asserts the step count.
 
 - [ ] **Step 1: Write manual scenario S12**
 
