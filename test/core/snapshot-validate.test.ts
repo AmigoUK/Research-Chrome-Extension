@@ -43,6 +43,33 @@ function withDocument(patch: Record<string, unknown>): Record<string, unknown> {
   return good({ documents: [{ ...doc, ...patch }] });
 }
 
+/** A valid snapshot with the project patched by `projectPatch`, and — when
+ *  given — a single well-formed annotation patched by `annotationPatch`. */
+function validSnapshotWith(
+  projectPatch: Record<string, unknown>,
+  annotationPatch?: Record<string, unknown>,
+): Record<string, unknown> {
+  const data = good();
+  data['project'] = { ...(data['project'] as Record<string, unknown>), ...projectPatch };
+  if (annotationPatch) {
+    data['annotations'] = [
+      {
+        id: 'a1',
+        projectId: 'p1',
+        documentId: 'd1',
+        author: 'me',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'x' }] },
+        content: '',
+        status: 'draft',
+        createdAt: NOW,
+        updatedAt: NOW,
+        ...annotationPatch,
+      },
+    ];
+  }
+  return data;
+}
+
 describe('a well-formed snapshot', () => {
   it('passes and comes back as a fresh object', () => {
     const parsed = validateSnapshotData(good());
@@ -300,5 +327,22 @@ describe('shape', () => {
     delete data['commentThreads'];
     delete data['activity'];
     expect(validateSnapshotData(data).commentThreads).toEqual([]);
+  });
+});
+
+describe('outline and section validation', () => {
+  it('keeps a well-formed outline', () => {
+    const snap = validSnapshotWith({ outline: [{ id: 's1', title: 'Intro' }] });
+    expect(validateSnapshotData(snap).project.outline).toEqual([{ id: 's1', title: 'Intro' }]);
+  });
+
+  it('rejects an outline entry with a bad id', () => {
+    const snap = validSnapshotWith({ outline: [{ id: '<script>', title: 'Intro' }] });
+    expect(() => validateSnapshotData(snap)).toThrow();
+  });
+
+  it('drops an annotation section that names no section in this project', () => {
+    const snap = validSnapshotWith({ outline: [{ id: 's1', title: 'Intro' }] }, { section: 's9' });
+    expect(validateSnapshotData(snap).annotations[0]?.section).toBeUndefined();
   });
 });

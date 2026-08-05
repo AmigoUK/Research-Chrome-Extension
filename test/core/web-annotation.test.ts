@@ -11,6 +11,7 @@ import {
 import type { RepositorySet } from '../../src/core/ports/repositories';
 import type { CaptureInput } from '../../src/core/usecases/capture';
 import type { Project, WebAnchor } from '../../src/core/model/types';
+import { DEFAULT_OUTLINE_TITLES } from '../../src/core/draft/outline';
 
 let repos: RepositorySet;
 let counter = 0;
@@ -84,7 +85,7 @@ describe('resolveProjectId / no-active-project fallback (spec: web-annotation de
     const projects = await repos.projects.list();
     expect(projects).toHaveLength(1);
     expect(projects[0]?.name).toBe('My Research');
-    expect(projects[0]?.sections).toEqual(['Literature', 'Methods', 'Data', 'Report']);
+    expect(projects[0]?.outline?.map((s) => s.title)).toEqual([...DEFAULT_OUTLINE_TITLES]);
     expect(document.projectId).toBe(projects[0]?.id);
     expect(document.projectId).not.toBe('');
     expect(annotation.projectId).toBe(projects[0]?.id);

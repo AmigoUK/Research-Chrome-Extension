@@ -233,33 +233,51 @@ export function validateSnapshotData(value: unknown): SnapshotData {
     };
   });
 
-  const out: SnapshotData = {
-    project: {
-      ...(project as unknown as SnapshotData['project']),
-      id: projectId,
-      name: text(project['name'], 'the project name', 512),
-      sections: list(project['sections'], 'the section list').map((s, i) =>
-        text(s, `section ${i + 1}`, 128),
-      ),
-      members,
-      ...(project['colorPalette'] === undefined
-        ? {}
-        : {
-            colorPalette: list(project['colorPalette'], 'the colour palette').map((c, i) => {
-              const entry = record(c, `palette colour ${i + 1}`);
-              return {
-                id: colorId(entry['id'], `palette colour ${i + 1}'s id`),
-                swatch: swatch(entry['swatch'], `palette colour ${i + 1}'s swatch`),
-                label: text(entry['label'], `palette colour ${i + 1}'s label`, 64),
-              };
-            }),
+  const validatedProject: SnapshotData['project'] = {
+    ...(project as unknown as SnapshotData['project']),
+    id: projectId,
+    name: text(project['name'], 'the project name', 512),
+    sections: list(project['sections'], 'the section list').map((s, i) =>
+      text(s, `section ${i + 1}`, 128),
+    ),
+    members,
+    ...(project['outline'] === undefined
+      ? {}
+      : {
+          outline: list(project['outline'], 'the outline').map((s, i) => {
+            const entry = record(s, `outline entry ${i + 1}`);
+            return {
+              id: id(entry['id'], `outline entry ${i + 1}'s id`),
+              title: text(entry['title'], `outline entry ${i + 1}'s title`, 200),
+            };
           }),
-      ...(project['syncMode'] === undefined
-        ? {}
-        : { syncMode: oneOf(project['syncMode'], SYNC_MODES, 'the sync mode') }),
-      createdAt: timestamp(project['createdAt'], 'the project creation date'),
-      updatedAt: timestamp(project['updatedAt'], 'the project update date'),
-    },
+        }),
+    ...(project['colorPalette'] === undefined
+      ? {}
+      : {
+          colorPalette: list(project['colorPalette'], 'the colour palette').map((c, i) => {
+            const entry = record(c, `palette colour ${i + 1}`);
+            return {
+              id: colorId(entry['id'], `palette colour ${i + 1}'s id`),
+              swatch: swatch(entry['swatch'], `palette colour ${i + 1}'s swatch`),
+              label: text(entry['label'], `palette colour ${i + 1}'s label`, 64),
+            };
+          }),
+        }),
+    ...(project['syncMode'] === undefined
+      ? {}
+      : { syncMode: oneOf(project['syncMode'], SYNC_MODES, 'the sync mode') }),
+    createdAt: timestamp(project['createdAt'], 'the project creation date'),
+    updatedAt: timestamp(project['updatedAt'], 'the project update date'),
+  };
+
+  // An annotation's `section` only means something within its own project's
+  // outline; built once, before annotations are validated, exactly as the
+  // palette's colour ids are handled per-annotation below.
+  const sectionIds = new Set((validatedProject.outline ?? []).map((s) => s.id));
+
+  const out: SnapshotData = {
+    project: validatedProject,
 
     documents: list(data['documents'], 'the document list').map((d, i) => {
       const doc = record(d, `source ${i + 1}`);
@@ -283,7 +301,10 @@ export function validateSnapshotData(value: unknown): SnapshotData {
     }),
 
     annotations: list(data['annotations'], 'the annotation list').map((a, i) => {
-      const note = record(a, `annotation ${i + 1}`);
+      // `section` is pulled out of the raw record before the wholesale spread
+      // below, not read off `note` — otherwise a dangling id we mean to drop
+      // would still ride through in the `...note` spread untouched.
+      const { section: rawSection, ...note } = record(a, `annotation ${i + 1}`);
       return {
         ...(note as unknown as SnapshotData['annotations'][number]),
         id: id(note['id'], `annotation ${i + 1}'s id`),
@@ -294,6 +315,10 @@ export function validateSnapshotData(value: unknown): SnapshotData {
         ...(note['color'] === undefined
           ? {}
           : { color: colorId(note['color'], `annotation ${i + 1}'s colour`) }),
+        // A dangling section id is dropped, not rejected: a partial snapshot is a
+        // normal thing to receive, and losing the whole annotation over a missing
+        // heading would be a worse trade than showing it as unplaced.
+        ...(sectionIds.has(String(rawSection)) ? { section: String(rawSection) } : {}),
         content: text(note['content'] ?? '', `annotation ${i + 1}'s content`, 65_536),
         ...(note['tags'] === undefined
           ? {}

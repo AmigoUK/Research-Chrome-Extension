@@ -26,6 +26,7 @@ import type {
   TextQuoteSelector,
 } from '../core/model/types';
 import { templateFor } from '../core/citation/styles';
+import { defaultOutline } from '../core/draft/outline';
 import type { CaptureInput } from '../core/usecases/capture';
 import {
   STATUS_META,
@@ -148,7 +149,7 @@ async function ensureSeedProject(): Promise<void> {
     const project: Project = {
       id: crypto.randomUUID(),
       name: 'My Research',
-      sections: ['Literature', 'Methods', 'Data', 'Report'],
+      outline: defaultOutline(),
       members: [],
       createdAt: nowIso(),
       updatedAt: nowIso(),
@@ -1080,7 +1081,7 @@ async function createProject(): Promise<void> {
   const project: Project = {
     id: crypto.randomUUID(),
     name,
-    sections: ['Literature', 'Methods', 'Data', 'Report'],
+    outline: defaultOutline(),
     members: [],
     createdAt: nowIso(),
     updatedAt: nowIso(),
