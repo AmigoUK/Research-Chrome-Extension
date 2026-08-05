@@ -36,11 +36,11 @@ test.afterAll(async () => {
 const url = (...parts: string[]): string =>
   `chrome-extension://${extensionId}/${path.posix.join(...parts)}`;
 
-test('the guide page renders its five steps and its dashboard button', async () => {
+test('the guide page renders its six steps and its dashboard button', async () => {
   const page = await context.newPage();
   await page.goto(url('src', 'onboarding', 'index.html'));
-  await expect(page.locator('h1')).toHaveText('Five moves and it makes sense');
-  await expect(page.locator('.step')).toHaveCount(5);
+  await expect(page.locator('h1')).toHaveText('Six moves and it makes sense');
+  await expect(page.locator('.step')).toHaveCount(6);
   await expect(page.locator('#openDashboard')).toBeVisible();
   await page.close();
 });
@@ -132,5 +132,26 @@ test('the checklist starts unchecked, checks off a filed source, and hides once 
   await page.reload();
   await expect(page.locator('#activeName')).toHaveText('My Research');
   await expect(page.locator('#gsCard')).toBeHidden();
+  await page.close();
+});
+
+// Last in the file deliberately: this is the one test here that opens the
+// dashboard, and the dashboard seeds its own default project the moment it
+// finds none — running it before the tests above would leave them racing a
+// "My Research Project" seed instead of the side panel's own "My Research".
+test('the guide’s Outline step opens the dashboard already on that route', async () => {
+  const page = await context.newPage();
+  await page.goto(url('src', 'onboarding', 'index.html'));
+
+  const dashboardPagePromise = context.waitForEvent('page');
+  await page.locator('#openOutline').click();
+  const dashboardPage = await dashboardPagePromise;
+  await dashboardPage.waitForLoadState('domcontentloaded');
+  expect(dashboardPage.url()).toContain('src/options/index.html');
+  // The dashboard reads its topbar title from `state.route` — 'Outline' here
+  // is proof the pending-route handoff actually landed, not just that the
+  // dashboard opened at its default Overview.
+  await expect(dashboardPage.locator('#viewTitle')).toHaveText('Outline');
+  await dashboardPage.close();
   await page.close();
 });

@@ -11,6 +11,7 @@
 import './dashboard.css';
 import { CLIENT_ID, sendRequest } from '../adapters/chrome/messaging';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
+import { takePendingRoute } from '../adapters/chrome/pending-route';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
   Project,
@@ -3975,6 +3976,12 @@ async function init(): Promise<void> {
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Failed to load projects', ICON.warn, true);
   }
+  // A cross-surface link (the guide's Outline step) parks its target route
+  // rather than passing it to openOptionsPage(), which takes no arguments —
+  // see adapters/chrome/pending-route.ts. Only ever a nav route: a deep link
+  // has no business landing mid-edit in the full-screen style editor.
+  const pendingRoute = await takePendingRoute();
+  if (pendingRoute && isNavRoute(pendingRoute)) state.route = pendingRoute;
   render();
 }
 
