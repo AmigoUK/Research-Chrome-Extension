@@ -34,7 +34,7 @@ import type {
 } from '../core/model/types';
 import { SELF_USER_ID } from '../core/model/identity';
 import { defaultOutline, resolveOutline } from '../core/draft/outline';
-import { orderedEntries } from '../core/usecases/draft';
+import { groupPassages, orderedEntries } from '../core/usecases/draft';
 import { DEFAULT_ACTIVITY_LIMIT } from '../core/usecases/activity';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import {
@@ -1671,41 +1671,56 @@ function renderOutline(view: HTMLElement, actions: HTMLElement): void {
   $('#olCopy', actions).onclick = () => toast('Coming in the next step', ICON.note);
   $('#olMd', actions).onclick = () => toast('Coming in the next step', ICON.note);
 
-  if (state.annotations.length === 0) {
-    view.innerHTML = emptyState(
-      'Nothing to outline yet',
-      'Highlight passages while you read and they collect here, ready to arrange.',
-    );
+  const project = activeProject();
+  if (!project) {
+    view.innerHTML = emptyState('No project', 'Create a project to configure it.');
     return;
   }
 
-  const sections = outlineOf();
-  const sectionIds = new Set(sections.map((s) => s.id));
-  // The same predicate `groupPassages` uses for its non-colour branch,
-  // inlined rather than called: this screen must always show the REAL
-  // outline sections, including ones at zero — never `groupPassages`'s
-  // colour-bucket fallback, which is exactly what a project with nothing
-  // sectioned yet would trigger, hiding the "0 passages" signal this screen
-  // exists to show. `orderedEntries` keeps the sort identical to
-  // `composeDraft`'s own, so the order shown here matches citation order in
-  // the export once the project stops being all-unplaced.
-  const loose = orderedEntries(
-    state.annotations.filter((a) => a.section === undefined || !sectionIds.has(a.section)),
-  );
+  // `unplaced` and `groupedByColour` come from the SAME function
+  // `composeDraft` calls — not a re-derived predicate. A project where
+  // nothing has ever been assigned a section but passages carry colours
+  // groups (and cites) those passages by colour there; recomputing "no
+  // section" here instead used to show one flat, `createdAt`-ordered
+  // Unplaced list for the very same passages — a different order, and colour
+  // headings the student never saw. The section buckets below stay driven by
+  // `resolveOutline` directly, not by `groupPassages`'s buckets: they carry
+  // Rename/Delete/Move controls that write to `project.outline`, and
+  // `groupPassages`'s buckets are colour buckets whenever `groupedByColour`
+  // is true — attaching outline-editing controls to those would let an edit
+  // here silently target the wrong grouping.
+  const { unplaced: loose, groupedByColour } = groupPassages(state.annotations, project);
+  const sections = resolveOutline(project);
 
-  const project = activeProject();
   const head =
     `<div class="ol-head">` +
-    (project?.researchQuestion
+    (project.researchQuestion
       ? `<div class="ol-q">${esc(project.researchQuestion)}</div>`
       : `<div class="ol-q ol-q--empty">No research question set</div>`) +
-    `<div class="ol-meta">${project?.dueDate ? esc(dueLabel(project.dueDate, todayDateIso())) : 'No due date'}` +
+    `<div class="ol-meta">${project.dueDate ? esc(dueLabel(project.dueDate, todayDateIso())) : 'No due date'}` +
     ` · <button class="btn btn--ghost btn--sm" id="olEdit">Edit</button></div></div>`;
+
+  // Says what will actually happen, not just that something is unassigned:
+  // the export follows this same `groupedByColour` flag, so the citation
+  // order behind it is exactly what this notice describes.
+  const colourNotice = groupedByColour
+    ? `<div class="ol-notice ol-notice--accent">Nothing has been assigned to a section yet, so the export groups these passages by highlight colour instead — and cites them in that order. Assign a passage to a section (here or from the side panel) to switch the draft to your outline order.</div>`
+    : '';
+
+  // Relocated from the old all-or-nothing empty state: a project with
+  // sections and no passages still shows those sections, at their real,
+  // honest zero — an empty section is the single most useful signal this
+  // screen gives — plus this line, alongside them rather than instead of
+  // them.
+  const noPassages =
+    state.annotations.length === 0
+      ? `<div class="ol-notice"><strong>Nothing to outline yet.</strong> Highlight passages while you read and they collect here, ready to arrange.</div>`
+      : '';
 
   const looseBlock =
     loose.length > 0
       ? `<section class="ol-sec ol-sec--loose"><h3>Unplaced (${loose.length})</h3>` +
-        loose.map(annoRowHtml).join('') +
+        loose.map((a) => annoRowHtml(a, sections)).join('') +
         `</section>`
       : '';
 
@@ -1722,13 +1737,13 @@ function renderOutline(view: HTMLElement, actions: HTMLElement): void {
         `<button class="btn btn--ghost btn--sm" data-rename="${esc(s.id)}">Rename</button>` +
         `<button class="btn btn--ghost btn--sm" data-delsec="${esc(s.id)}">Delete</button>` +
         `</span></h3>` +
-        entries.map(annoRowHtml).join('') +
+        entries.map((a) => annoRowHtml(a, sections)).join('') +
         `</section>`
       );
     })
     .join('');
 
-  view.innerHTML = head + looseBlock + body;
+  view.innerHTML = head + colourNotice + noPassages + looseBlock + body;
   wireOutline(view, sections);
 }
 
@@ -1737,17 +1752,20 @@ function renderOutline(view: HTMLElement, actions: HTMLElement): void {
  *  in `wireOutline` after this markup is inserted, not baked in here as a
  *  `selected` attribute: `a.section` is a plain DOM-property assignment there
  *  (`el.value = …`), which cannot be parsed as HTML no matter what it holds —
- *  unlike interpolating it into the markup to decide which `<option>` wins. */
-function annoRowHtml(a: Annotation): string {
+ *  unlike interpolating it into the markup to decide which `<option>` wins.
+ *  `sections` is the caller's already-resolved outline, passed in rather than
+ *  re-resolved per row: `renderOutline` calls this once per passage on the
+ *  screen, and re-running `resolveOutline` (which rebuilds its default-titles
+ *  array from scratch every call) that many times would be wasted work
+ *  repeated once per row instead of once per render. */
+function annoRowHtml(a: Annotation, sections: OutlineSection[]): string {
   const doc = docById(a.documentId);
   const m = doc?.metadata;
   const srcLine = m ? [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ') : '';
   const entry = paletteEntry(a.color);
   const options =
     `<option value="">No section</option>` +
-    outlineOf()
-      .map((s) => `<option value="${esc(s.id)}">${esc(s.title)}</option>`)
-      .join('');
+    sections.map((s) => `<option value="${esc(s.id)}">${esc(s.title)}</option>`).join('');
   return `<article class="anno anno--clickable" data-id="${esc(a.id)}" tabindex="0" role="button" aria-label="Show this highlight on its source">
     <div class="anno-top">${entry ? `<span class="cdot" style="background:${esc(entry.swatch)}" title="${esc(entry.label)}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
     <div class="anno-body">${esc(a.content)}</div>
