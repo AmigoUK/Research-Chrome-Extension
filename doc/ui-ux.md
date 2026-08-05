@@ -61,9 +61,40 @@ Sections:
 - **Projects**: list, creation, deletion, and configuration (sections, default styles, members).
 - **Documents**: per project, with status, section, and quick navigation to source.
 - **Annotations**: searchable/filterable list across the project.
+- **Outline**: where a highlight becomes part of a written argument — see below.
 - **References**: bibliographic records, import/export, source information.
 - **Citation Styles**: style profiles, base style selection, rule editor.
 
 Workflow Views:
 - Kanban-style view per project: `To read`, `In review`, `Analysed`, `Used in output` for documents.
 - Counters per status to track progress on literature review or investigation.
+
+### Outline (v1.8.0)
+
+Sits in the nav directly after Annotations, which it feeds on — Overview · Documents · Annotations
+· **Outline** · References · Citation styles · Team · Settings. Its badge is deliberately not a
+total like every other nav count: it shows the number of **unplaced** passages, so it reads as work
+outstanding and disappears once the outline is complete.
+
+The screen itself:
+- A read-only strip at the top for the project's **research question** and **due date** (`Edit`
+  hands off to Settings, the one place that writes them — one source of truth).
+- An **Unplaced** bucket, shown first when non-empty, listing every highlight with no section yet
+  and a picker to assign one on the spot.
+- The project's sections, each showing its passage count, `Rename`/`Delete`/reorder controls, and —
+  this is deliberate — an explicit **"empty section"** flag at zero: an undergraduate essay missing
+  a counter-arguments section is a common way to lose marks, and this is the one screen positioned
+  to say so.
+- **Copy draft** (rich `text/html` + `text/plain` to the clipboard, degrading honestly to plain
+  text with a toast if the browser refuses the rich write) and **Download .md**.
+- If nothing has been assigned to a section anywhere in the project yet, the **export** falls back
+  to grouping by **highlight colour** instead, with a visible notice on this screen that says so.
+  The **screen itself does not** switch to colour buckets: it keeps showing the real outline
+  sections (empty) with everything sitting in Unplaced. Reading `unplaced` here instead of
+  `unsectioned` would make a coloured-but-unsectioned passage vanish from the page the moment
+  colour grouping kicks in — a bug this feature already had and fixed.
+
+A highlight is assigned to a section from two places that both write the same `Annotation.section`
+field: this Outline screen (any row's picker), and a matching control on the **side panel**'s note
+card, so a student can place a passage the moment they read it rather than only in a later bulk
+pass.

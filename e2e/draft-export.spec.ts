@@ -175,6 +175,115 @@ test('copying a draft puts real markup on the clipboard', async () => {
   await page.close();
 });
 
+test('a clipboard write the browser refuses still lands the plain text, with an honest toast', async () => {
+  const page = await context.newPage();
+  // `copyDraft`'s `catch` → `writeText` fallback (src/options/export-draft.ts)
+  // is the path CHANGELOG.md promises but the earlier test above never
+  // exercises — it only ever sees the rich write succeed. Playwright has no
+  // built-in way to make a real browser refuse `navigator.clipboard.write`,
+  // so the API is monkeypatched to reject instead, the same technique
+  // `e2e/webannotation.spec.ts`'s `stubActiveTabScan` uses (an
+  // `addInitScript` that replaces a Chrome/Web API before the page's own
+  // scripts run). `writeText` is left untouched, so the fallback's own write
+  // still lands and can be read back.
+  await page.addInitScript(() => {
+    navigator.clipboard.write = () => Promise.reject(new Error('e2e: rich write refused'));
+  });
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // Same shape as the clipboard fixture above, with its own ids — this
+  // test's cleanup must not depend on the other test's having run, or having
+  // cleaned up correctly, first.
+  await page.evaluate(async () => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string; outline: Array<{ id: string }> }>;
+    };
+    const project = projects.data[0]!;
+    const projectId = project.id;
+    const sectionId = project.outline[0]!.id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-export-fallback-doc',
+        projectId,
+        url: 'https://example.org/export-fallback-source',
+        type: 'article',
+        metadata: { title: 'Export fallback source', authors: ['Oke, T. R.'], year: 1982 },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'references/put',
+      reference: {
+        id: 'e2e-export-fallback-ref',
+        projectId,
+        documentId: 'e2e-export-fallback-doc',
+        cslData: {
+          type: 'article-journal',
+          title: 'Export fallback source',
+          author: [{ family: 'Oke', given: 'T. R.' }],
+          issued: { 'date-parts': [[1982]] },
+          'container-title': 'QJRMS',
+        },
+        source: 'manual',
+        usedInOutputs: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: {
+        id: 'e2e-export-fallback-anno',
+        projectId,
+        documentId: 'e2e-export-fallback-doc',
+        anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: 'the degraded passage' }] },
+        content: 'A note on the degraded passage',
+        tags: [],
+        status: 'draft',
+        author: 'me',
+        section: sectionId,
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+  });
+  await page.reload();
+
+  try {
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    await page.getByRole('button', { name: /copy draft/i }).click();
+    // The honest toast, not the success one — this is exactly the text the
+    // success test's own `/^Draft copied/i` anchor is written to exclude.
+    await expect(page.locator('.toast')).toContainText(/^Copied without formatting/i);
+
+    // The rich write never happened (it was made to reject), but the plain
+    // text still landed via the fallback's own `writeText` call.
+    const plain = await page.evaluate(() => navigator.clipboard.readText());
+    expect(plain).toContain('> the degraded passage');
+    expect(plain).toContain('Oke');
+    expect(plain).not.toContain('<blockquote>');
+  } finally {
+    await page.evaluate(async () => {
+      await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-export-fallback-doc' });
+      await chrome.runtime.sendMessage({
+        type: 'references/delete',
+        id: 'e2e-export-fallback-ref',
+      });
+      await chrome.runtime.sendMessage({
+        type: 'annotations/delete',
+        id: 'e2e-export-fallback-anno',
+      });
+    });
+  }
+
+  await page.close();
+});
+
 test('downloading the .md draft produces a real Markdown file with no HTML in it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());

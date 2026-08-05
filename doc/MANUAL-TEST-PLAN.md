@@ -1,7 +1,7 @@
 # Plan testów manualnych — Scientific Context Notes
 
-_Wersja pod testy: **v1.7.3** · plan z 2026-08-04. Aktualizuj razem z funkcjami; testy
-automatyczne (376 unit + 39 e2e) pokrywają logikę — ten plan pokrywa to, czego automat nie
+_Wersja pod testy: **v1.8.0** · plan z 2026-08-05. Aktualizuj razem z funkcjami; testy
+automatyczne (465 unit + 54 e2e) pokrywają logikę — ten plan pokrywa to, czego automat nie
 może: natywne uprawnienia Chrome, prawdziwe strony wydawców, gesty użytkownika i odczucie
 całej podróży._
 
@@ -84,7 +84,7 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 
 ### S1.1 Pierwsza instalacja otwiera samouczek
 - **Kroki**: świeży profil → Load unpacked.
-- **Oczekiwane**: automatycznie otwiera się karta „Five moves and it makes sense". Dokładnie raz.
+- **Oczekiwane**: automatycznie otwiera się karta „Six moves and it makes sense". Dokładnie raz.
 - **Potencjalne problemy**: samouczek otwiera się też przy każdej aktualizacji (ma otwierać się
   tylko przy `reason === 'install'`); pusta karta = błąd ładowania assetów.
 - **Debug**: konsola SW — błąd przy `chrome.tabs.create`; sieć karty samouczka (F12) — 404 na
@@ -107,8 +107,9 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 
 ### S1.4 Checklista „Getting started"
 - **Kroki**: otwórz panel na świeżym profilu; obserwuj listę; kliknij ✕; przeładuj panel.
-- **Oczekiwane**: 5 kroków, wszystkie ○, pierwszy pogrubiony z jednozdaniową podpowiedzią;
-  po ✕ znika i **nie wraca po przeładowaniu**; po wykonaniu wszystkich kroków znika sama.
+- **Oczekiwane**: 6 kroków (od v1.8.0 — szósty to przypisanie sekcji), wszystkie ○, pierwszy
+  pogrubiony z jednozdaniową podpowiedzią; po ✕ znika i **nie wraca po przeładowaniu**; po
+  wykonaniu wszystkich kroków znika sama.
 - **Potencjalne problemy**: kroki odhaczają się bez wykonania (złe liczenie z danych);
   „Copy a citation" nie odhacza się mimo kopiowania (flaga w storage nie zapisana).
 - **Debug**: `chrome.storage.local.get(null)` → `gettingStartedDismissed`, `hasCopiedCitation`;
@@ -386,6 +387,29 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 - **Oczekiwane**: po zapisie → podpowiedź o adnotacji; po 1. adnotacji → o statusie; po zmianie
   statusu → o Cite; po 1. cytowaniu → o bibliografii/Sync. Każda **raz na sesję**; po
   zamknięciu checklisty (✕) — **żadna**.
+
+## S12. Outline i eksport szkicu (Copy draft / Download .md)
+
+### S12.1 Cytowania w skopiowanym szkicu wklejone do Worda
+- **Kroki**: w **Outline** przypisz trzy zaznaczone fragmenty do dwóch różnych sekcji z poziomu
+  **panelu bocznego** (karta notatki → selektor sekcji przy statusie), a czwarty fragment —
+  selektorem sekcji przy wierszu na ekranie **Outline** w **dashboardzie**. Kliknij
+  **Copy draft**, wklej do Worda albo Google Docs.
+- **Oczekiwane**: nagłówki sekcji; każdy cytowany fragment, a zaraz po nim jego cytowanie; na
+  końcu lista bibliograficzna z tytułem czasopisma *kursywą* i wcięciem wysuniętym (hanging
+  indent); na liście wyłącznie źródła faktycznie zacytowane w szkicu — nie cały projekt.
+- **Potencjalne problemy**: przebudowany, ale nieodświeżony profil Chrome (pułapka z sekcji 0,
+  punkt 4 — stary, zbuforowany service worker) sprawia, że `draft/compose` wygląda na nieznany
+  typ wiadomości — kliknij ⟳ przy rozszerzeniu i spróbuj ponownie; projekt, w którym nic nie
+  zostało jeszcze przypisane do sekcji, przełącza eksport na grupowanie po **kolorze
+  podświetlenia** i mówi o tym wprost na ekranie oraz w samym szkicu, zamiast po cichu pokazać
+  pustkę; ręcznie dodany PDF bez powiązanego rekordu Reference nie ma czym się zacytować — w
+  jego miejscu w szkicu pojawia się znacznik „no bibliographic data — complete it in Documents".
+- **Debug**: w konsoli DevTools dashboardu
+  `await chrome.runtime.sendMessage({type:'draft/compose', projectId:'<ID>', template:'apa', flavour:'html'})`
+  zwraca `{ok:true, data:{...}}` — strukturę, z której budowany jest eksport (sprawdzone
+  ręcznie na tym branchu). Sprawdź najpierw `data.missingReferenceCount` (ile fragmentów zostało
+  bez cytowania) i `data.groupedByColour` (czy zadziałał fallback do grupowania po kolorze).
 
 ---
 

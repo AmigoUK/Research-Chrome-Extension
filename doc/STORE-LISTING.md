@@ -21,7 +21,7 @@ Scientific Context Notes
 generated from `package.json`; change it there, not here)
 
 ```
-File web pages and PDFs into research projects, anchor notes to the exact passage, and generate real CSL citations — all locally.
+File web pages and PDFs into research projects, anchor notes to the passage, and export a cited draft — real CSL, all locally.
 ```
 
 **Category:** Productivity → Workflow & Planning
@@ -34,14 +34,17 @@ Scientific Context Notes is a research companion for people who read for a livin
 
 File the page you are reading into a project, and it arrives with its title, authors, year, journal and DOI already filled in, deduplicated against what you have. Select a passage and take a note, and the note stays attached to that passage: web pages are anchored with W3C selectors (quote, then position, then CSS), PDFs by page and coordinate rectangle. Reload the page, come back a month later, and the highlight is still on the sentence you meant.
 
+Then take it all the way to a written draft. Give each highlight a place in your argument — a section of the essay — and export the whole thing: section headings, each quote followed by its citation, and a reference list holding only what you actually cited, ready to paste into Word.
+
 WHAT YOU GET
 
 • Capture — file any page or PDF into a project, with metadata extracted for you and duplicates caught by DOI.
 • Web annotation — select text on a live page, choose Highlight or Note, and see it painted back on your next visit. Access is opt-in per site: nothing is injected anywhere until you choose to annotate a site, and after you opt in, the annotator loads only on that site (revocable any time in the extension's Site access settings).
 • A bundled PDF reader — text highlights and drag-a-rectangle region anchors, stored as fractions of the page box so they survive zoom, reload and a different screen.
+• Outline and draft export — assign each highlight to a section, from the side panel while you read or in bulk on the Outline screen, then Copy draft (formatted for Word or Google Docs) or Download .md. Every citation is resolved against the whole draft in one pass, so a numbered style counts sources in the order they are actually cited and the reference list holds only what you cited — not everything you ever read.
 • Real citations — citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date and notes). Copy an in-text citation or a bibliography entry wherever you are working.
 • A citation-style editor — turn plain rules (maximum authors, et al. thresholds, DOI and URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live preview that formats through the real engine. Import a journal's own .csl as a base style, or export the compiled one.
-• A project dashboard — an overview with a Kanban board by review status, plus Documents, References, Annotations and Citation styles.
+• A project dashboard — an overview with a Kanban board by review status, plus Documents, References, Annotations, Outline and Citation styles.
 • Team — members and roles with a capability matrix, an activity feed with before-and-after diffs, and comment threads anchored to a specific note.
 • Portable snapshots — export a whole project as one JSON file, optionally encrypted with AES-GCM, and merge it back on another machine. An import shows exactly what it would change before it writes anything.
 

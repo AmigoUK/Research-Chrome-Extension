@@ -586,10 +586,10 @@ test('assigning a section from the panel updates the card', async () => {
   await expect(pick).toHaveValue(/.+/);
   const chosen = await pick.inputValue();
 
-  // The write is optimistic AND the list repaints; if `section` were missing
-  // from `onPageSignature` this would still show the old (empty) value on
-  // reload even though the database was already correct — exactly the bug
-  // Task 6's fold-in of `section` guards against.
+  // This only pins that the picked section survives a reload — `page.reload()`
+  // re-renders from storage and never consults `onPageSignature`, so it
+  // cannot catch `section` going missing from that signature. That guard is
+  // `src/sidepanel/on-page-signature.test.ts`'s job, not this test's.
   await page.reload();
   await expect(page.locator('.onpage-note__section').first()).toHaveValue(chosen);
   await page.close();
