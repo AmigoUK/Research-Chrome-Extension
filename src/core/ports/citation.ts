@@ -35,4 +35,35 @@ export interface CitationFormatter {
    * old XML for the rest of its life.
    */
   forget?(template: string): void;
+  /**
+   * Format every citation of one draft against a single engine state.
+   *
+   * Necessary, not merely tidier: `.format('citation')` renders one cluster,
+   * so per-source calls give every source `(1)` under a numeric style; and
+   * citeproc disambiguates retroactively, so a cluster formatted without the
+   * clusters that follow it can say "(Nowak 2016)" where the finished document
+   * says "(Nowak 2016a)".
+   *
+   * `flavour: 'html'` keeps the italics a word processor needs.
+   */
+  formatRun(
+    run: CitationRun,
+    template: string,
+    flavour: 'text' | 'html',
+    style?: CitationStyle,
+  ): Promise<CitationRunOutput>;
+}
+
+/** A whole document's citing, resolved in a single engine state. */
+export interface CitationRun {
+  items: CslItem[];
+  /** Item ids in the order they are cited in the draft. Repeats allowed. */
+  order: string[];
+}
+
+export interface CitationRunOutput {
+  /** One citation per position in `order` — same length, same order. */
+  inText: string[];
+  /** The reference list, in the order the style dictates. */
+  bibliography: string;
 }
