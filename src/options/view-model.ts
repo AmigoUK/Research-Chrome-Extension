@@ -17,6 +17,7 @@ export const NAV_ROUTES = [
   'overview',
   'documents',
   'annotations',
+  'outline',
   'references',
   'styles',
   'team',
@@ -47,6 +48,7 @@ export const ROUTE_TITLES: Record<Route, readonly [string, string]> = {
   overview: ['Overview', 'Project workspace'],
   documents: ['Documents', 'Sources in this project'],
   annotations: ['Annotations', 'Notes across the project'],
+  outline: ['Outline', 'Arrange passages into your draft'],
   references: ['References', 'Bibliographic records'],
   styles: ['Citation styles', 'Style profiles & rules'],
   styleEditor: ['Style editor', 'Rules compile to CSL overrides'],
@@ -177,4 +179,25 @@ export function sourceCountLabel(count: number): string {
 /** Short project-name token for buttons like "File into <token>". */
 export function projectShortName(name: string): string {
   return name.split(/[ —&]/)[0] || name;
+}
+
+/* ---- Outline (Phase 5 extension: outline & draft) ---- */
+
+/**
+ * "in 5 days" / "due today" / "2 days overdue" for `Project.dueDate`, a bare
+ * `YYYY-MM-DD` calendar day with no timezone attached (see the model
+ * comment). Both dates are read as UTC midnight, not local time: comparing a
+ * calendar day against a LOCAL "now" would flip "due today" to "overdue" (or
+ * back) for anyone west of UTC in the hours between their local midnight and
+ * UTC midnight. `todayIso` is a parameter, not read internally, so this stays
+ * unit-testable without mocking the clock.
+ */
+export function dueLabel(dueIso: string, todayIso: string): string {
+  const due = Date.parse(`${dueIso}T00:00:00Z`);
+  const today = Date.parse(`${todayIso}T00:00:00Z`);
+  const days = Math.round((due - today) / 86_400_000);
+  if (days === 0) return 'due today';
+  if (days > 0) return `in ${days} day${days === 1 ? '' : 's'}`;
+  const overdue = -days;
+  return `${overdue} day${overdue === 1 ? '' : 's'} overdue`;
 }

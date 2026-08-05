@@ -7,6 +7,7 @@ import {
   ROUTE_TITLES,
   activityFilterKinds,
   diffLabel,
+  dueLabel,
   escapeHtml,
   groupActivityByDay,
   highlightEntity,
@@ -25,6 +26,7 @@ describe('dashboard view-model', () => {
       'overview',
       'documents',
       'annotations',
+      'outline',
       'references',
       'styles',
       'team',
@@ -139,5 +141,23 @@ describe('activity feed view-model', () => {
     ]);
     expect(kinds).toEqual(['source', 'member']);
     expect(activityFilterKinds([])).toEqual([]);
+  });
+});
+
+describe('outline view-model', () => {
+  it('labels a due date relative to today', () => {
+    expect(dueLabel('2026-08-10', '2026-08-05')).toBe('in 5 days');
+    expect(dueLabel('2026-08-06', '2026-08-05')).toBe('in 1 day');
+    expect(dueLabel('2026-08-05', '2026-08-05')).toBe('due today');
+    expect(dueLabel('2026-08-04', '2026-08-05')).toBe('1 day overdue');
+    expect(dueLabel('2026-08-01', '2026-08-05')).toBe('4 days overdue');
+  });
+
+  it('compares dates at UTC midnight, not local time', () => {
+    // A due date of "today" must read as due today regardless of which side
+    // of UTC midnight the reader's local clock currently sits on — comparing
+    // by timestamp instead of by calendar day is exactly the bug this
+    // exists to avoid.
+    expect(dueLabel('2026-01-01', '2026-01-01')).toBe('due today');
   });
 });

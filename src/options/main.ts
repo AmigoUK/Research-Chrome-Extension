@@ -23,6 +23,7 @@ import type {
   Anchor,
   CommentThread,
   HighlightColor,
+  OutlineSection,
   SyncMode,
   Reference,
   CitationStyle,
@@ -32,7 +33,8 @@ import type {
   Id,
 } from '../core/model/types';
 import { SELF_USER_ID } from '../core/model/identity';
-import { defaultOutline } from '../core/draft/outline';
+import { defaultOutline, resolveOutline } from '../core/draft/outline';
+import { orderedEntries } from '../core/usecases/draft';
 import { DEFAULT_ACTIVITY_LIMIT } from '../core/usecases/activity';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import {
@@ -69,6 +71,7 @@ import {
   STATUS_META,
   activityFilterKinds,
   diffLabel,
+  dueLabel,
   escapeHtml,
   groupActivityByDay,
   highlightEntity,
@@ -151,6 +154,18 @@ const NAV: NavDef[] = [
     label: 'Annotations',
     count: () => state.annotations.length,
     icon: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+  },
+  {
+    id: 'outline',
+    label: 'Outline',
+    // Deliberately NOT a total, unlike every other badge here: a total tells
+    // the student nothing, while "7 unplaced" is the work outstanding — and it
+    // disappears when the outline is complete.
+    count: () => {
+      const n = state.annotations.filter((a) => !a.section).length;
+      return n > 0 ? n : undefined;
+    },
+    icon: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
   },
   {
     id: 'references',
@@ -510,6 +525,7 @@ const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = 
   overview: renderOverview,
   documents: renderDocuments,
   annotations: renderAnnotations,
+  outline: renderOutline,
   references: renderReferences,
   styles: renderStyles,
   styleEditor: renderStyleEditor,
@@ -1622,6 +1638,366 @@ async function citeDocument(
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t copy citation', ICON.warn, true);
   }
+}
+
+/* ---- Outline ---- */
+
+/** The single source of truth for "what are this project's sections" — see
+ *  `resolveOutline`'s own doc comment. Never read `project.outline` here
+ *  directly: a project with no stored outline has to resolve to the same
+ *  five-section default this function derives, or a section that looks
+ *  present on this screen would not be the one `composeDraft` cites against. */
+function outlineOf(): OutlineSection[] {
+  const project = activeProject();
+  return project ? resolveOutline(project) : [];
+}
+
+/** `Project.dueDate` compares at UTC midnight (see `dueLabel`); "today" has
+ *  to be read the same way, or the two would disagree by a day for anyone
+ *  not on UTC. */
+function todayDateIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function renderOutline(view: HTMLElement, actions: HTMLElement): void {
+  actions.innerHTML =
+    `<button class="btn btn--sm" id="olAdd">Add section</button>` +
+    `<button class="btn btn--sm" id="olCopy">${ICON.copy} Copy draft</button>` +
+    `<button class="btn btn--sm" id="olMd">Download .md</button>`;
+  $('#olAdd', actions).onclick = (e) => openAddSectionPop(e.currentTarget as HTMLElement);
+  // Task 9 wires these to the real export. Leaving them dead would look like
+  // a finished feature that silently does nothing; saying so is honest about
+  // where the work stands.
+  $('#olCopy', actions).onclick = () => toast('Coming in the next step', ICON.note);
+  $('#olMd', actions).onclick = () => toast('Coming in the next step', ICON.note);
+
+  if (state.annotations.length === 0) {
+    view.innerHTML = emptyState(
+      'Nothing to outline yet',
+      'Highlight passages while you read and they collect here, ready to arrange.',
+    );
+    return;
+  }
+
+  const sections = outlineOf();
+  const sectionIds = new Set(sections.map((s) => s.id));
+  // The same predicate `groupPassages` uses for its non-colour branch,
+  // inlined rather than called: this screen must always show the REAL
+  // outline sections, including ones at zero — never `groupPassages`'s
+  // colour-bucket fallback, which is exactly what a project with nothing
+  // sectioned yet would trigger, hiding the "0 passages" signal this screen
+  // exists to show. `orderedEntries` keeps the sort identical to
+  // `composeDraft`'s own, so the order shown here matches citation order in
+  // the export once the project stops being all-unplaced.
+  const loose = orderedEntries(
+    state.annotations.filter((a) => a.section === undefined || !sectionIds.has(a.section)),
+  );
+
+  const project = activeProject();
+  const head =
+    `<div class="ol-head">` +
+    (project?.researchQuestion
+      ? `<div class="ol-q">${esc(project.researchQuestion)}</div>`
+      : `<div class="ol-q ol-q--empty">No research question set</div>`) +
+    `<div class="ol-meta">${project?.dueDate ? esc(dueLabel(project.dueDate, todayDateIso())) : 'No due date'}` +
+    ` · <button class="btn btn--ghost btn--sm" id="olEdit">Edit</button></div></div>`;
+
+  const looseBlock =
+    loose.length > 0
+      ? `<section class="ol-sec ol-sec--loose"><h3>Unplaced (${loose.length})</h3>` +
+        loose.map(annoRowHtml).join('') +
+        `</section>`
+      : '';
+
+  const body = sections
+    .map((s, i) => {
+      const entries = orderedEntries(state.annotations.filter((a) => a.section === s.id));
+      return (
+        `<section class="ol-sec" data-sec="${esc(s.id)}">` +
+        `<h3>${esc(s.title)} <span class="ol-n">${entries.length}</span>` +
+        (entries.length === 0 ? `<span class="ol-warn">empty section</span>` : '') +
+        `<span class="ol-tools">` +
+        `<button class="btn btn--ghost btn--sm" data-up="${esc(s.id)}"${i === 0 ? ' disabled' : ''} aria-label="Move up">↑</button>` +
+        `<button class="btn btn--ghost btn--sm" data-down="${esc(s.id)}"${i === sections.length - 1 ? ' disabled' : ''} aria-label="Move down">↓</button>` +
+        `<button class="btn btn--ghost btn--sm" data-rename="${esc(s.id)}">Rename</button>` +
+        `<button class="btn btn--ghost btn--sm" data-delsec="${esc(s.id)}">Delete</button>` +
+        `</span></h3>` +
+        entries.map(annoRowHtml).join('') +
+        `</section>`
+      );
+    })
+    .join('');
+
+  view.innerHTML = head + looseBlock + body;
+  wireOutline(view, sections);
+}
+
+/** One passage, wherever it appears (a real section or Unplaced) — modelled
+ *  on `drawAnnotations`'s `.anno` card. The section `<select>`'s value is set
+ *  in `wireOutline` after this markup is inserted, not baked in here as a
+ *  `selected` attribute: `a.section` is a plain DOM-property assignment there
+ *  (`el.value = …`), which cannot be parsed as HTML no matter what it holds —
+ *  unlike interpolating it into the markup to decide which `<option>` wins. */
+function annoRowHtml(a: Annotation): string {
+  const doc = docById(a.documentId);
+  const m = doc?.metadata;
+  const srcLine = m ? [authorLabel(m.authors), m.year, m.journal].filter(Boolean).join(' · ') : '';
+  const entry = paletteEntry(a.color);
+  const options =
+    `<option value="">No section</option>` +
+    outlineOf()
+      .map((s) => `<option value="${esc(s.id)}">${esc(s.title)}</option>`)
+      .join('');
+  return `<article class="anno anno--clickable" data-id="${esc(a.id)}" tabindex="0" role="button" aria-label="Show this highlight on its source">
+    <div class="anno-top">${entry ? `<span class="cdot" style="background:${esc(entry.swatch)}" title="${esc(entry.label)}"></span>` : ''}<span class="anno-anchor">${esc(anchorLabel(a.anchor))}</span><span class="anno-src">${esc(srcLine)}</span></div>
+    <div class="anno-body">${esc(a.content)}</div>
+    <div class="anno-foot">
+      <select class="sel" data-secpick="${esc(a.id)}" aria-label="Section for this passage">${options}</select>
+    </div></article>`;
+}
+
+function wireOutline(view: HTMLElement, sections: OutlineSection[]): void {
+  $('#olEdit', view).onclick = () => go('settings');
+
+  $$('.anno', view).forEach((card) => {
+    const jump = (): void => {
+      const anno = state.annotations.find((x) => x.id === card.getAttribute('data-id'));
+      if (anno) jumpToAnnotation(anno);
+    };
+    card.addEventListener('click', (e) => {
+      // The section picker owns its own click (opening the dropdown); the
+      // card underneath must not also treat that as "jump to source".
+      if ((e.target as HTMLElement).closest('select')) return;
+      jump();
+    });
+    card.addEventListener('keydown', (e) => {
+      if ((e.target as HTMLElement).closest('select')) return;
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        jump();
+      }
+    });
+  });
+
+  $$<HTMLSelectElement>('[data-secpick]', view).forEach((select) => {
+    const id = select.dataset['secpick'];
+    const anno = id ? state.annotations.find((a) => a.id === id) : undefined;
+    if (!anno) return;
+    select.value = anno.section ?? '';
+    select.addEventListener('change', () => {
+      void setAnnotationSection(anno, select.value || undefined);
+    });
+  });
+
+  $$('[data-up]', view).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset['up'];
+      if (id) void moveSection(id, -1);
+    };
+  });
+  $$('[data-down]', view).forEach((b) => {
+    b.onclick = () => {
+      const id = b.dataset['down'];
+      if (id) void moveSection(id, 1);
+    };
+  });
+  $$('[data-rename]', view).forEach((b) => {
+    b.onclick = () => {
+      const section = sections.find((s) => s.id === b.dataset['rename']);
+      if (section) openRenameSectionPop(b, section);
+    };
+  });
+  $$('[data-delsec]', view).forEach((b) => {
+    b.onclick = () => {
+      const section = sections.find((s) => s.id === b.dataset['delsec']);
+      if (section) confirmDeleteSection(b, section);
+    };
+  });
+}
+
+/** `section` is `Id | undefined`, never `''` — the picker's "No section"
+ *  option maps to `undefined` before this is called. `exactOptionalPropertyTypes`
+ *  means clearing it has to delete the key, not assign it away. */
+async function setAnnotationSection(a: Annotation, section: Id | undefined): Promise<void> {
+  if ((a.section ?? '') === (section ?? '')) return;
+  const updated: Annotation = { ...a, updatedAt: nowIso() };
+  if (section === undefined) delete updated.section;
+  else updated.section = section;
+  try {
+    await sendRequest({ type: 'annotations/put', annotation: updated });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t move that passage', ICON.warn, true);
+    render(); // put the picker back to the stored value
+    return;
+  }
+  state.annotations = state.annotations.map((x) => (x.id === a.id ? updated : x));
+  render();
+  const title = outlineOf().find((s) => s.id === section)?.title;
+  toast(title ? `Moved to “${title}”` : 'Moved to Unplaced', ICON.check);
+}
+
+/**
+ * Every outline edit (reorder, rename, add, delete) funnels through here.
+ * `resolveOutline` is pure and only derives a default when `project.outline`
+ * is empty; feeding that straight into the SAME `projects/put` that also
+ * applies the edit is where the derived outline first becomes real storage —
+ * a project with no stored outline never has an edit land on a synthesised
+ * value that would otherwise vanish on the next render.
+ */
+async function mutateOutline(
+  transform: (outline: OutlineSection[]) => OutlineSection[],
+): Promise<Project | undefined> {
+  const project = activeProject();
+  if (!project) return undefined;
+  const outline = transform(resolveOutline(project));
+  const updated: Project = { ...project, outline, updatedAt: nowIso() };
+  try {
+    await sendRequest({ type: 'projects/put', project: updated });
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t update the outline', ICON.warn, true);
+    return undefined;
+  }
+  state.projects = state.projects.map((p) => (p.id === updated.id ? updated : p));
+  return updated;
+}
+
+async function moveSection(id: Id, dir: -1 | 1): Promise<void> {
+  const updated = await mutateOutline((outline) => {
+    const i = outline.findIndex((s) => s.id === id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= outline.length) return outline;
+    const next = [...outline];
+    const secAtI = next[i]!;
+    const secAtJ = next[j]!;
+    next[i] = secAtJ;
+    next[j] = secAtI;
+    return next;
+  });
+  if (updated) render();
+}
+
+function openAddSectionPop(anchor: HTMLElement): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">Add a section</div>
+    <div class="pop-form">
+      <input id="secTitle" class="sel" type="text" placeholder="e.g. Methodology" maxlength="120" aria-label="Section title" style="width:220px">
+      <button class="btn btn--primary btn--sm" id="secAdd">${ICON.check} Add</button>
+    </div>`;
+  const input = $<HTMLInputElement>('#secTitle', pop);
+  const submit = (): void => void addSection(input.value);
+  $('#secAdd', pop).onclick = submit;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  placePop(anchor);
+  input.focus();
+}
+
+async function addSection(rawTitle: string): Promise<void> {
+  const title = rawTitle.trim();
+  if (!title) return;
+  const updated = await mutateOutline((outline) => [
+    ...outline,
+    { id: crypto.randomUUID(), title },
+  ]);
+  if (!updated) return;
+  closePop();
+  render();
+  toast(`Section added · “${title}”`, ICON.check);
+}
+
+function openRenameSectionPop(anchor: HTMLElement, section: OutlineSection): void {
+  const pop = $('#pop');
+  pop.innerHTML = `<div class="pl">Rename section</div>
+    <div class="pop-form">
+      <input id="secRename" class="sel" type="text" value="${esc(section.title)}" maxlength="120" aria-label="Section title" style="width:220px">
+      <button class="btn btn--primary btn--sm" id="secRenameGo">${ICON.check} Save</button>
+    </div>`;
+  const input = $<HTMLInputElement>('#secRename', pop);
+  const submit = (): void => void renameSection(section, input.value);
+  $('#secRenameGo', pop).onclick = submit;
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    }
+  });
+  placePop(anchor);
+  input.focus();
+  input.select();
+}
+
+async function renameSection(section: OutlineSection, rawTitle: string): Promise<void> {
+  const title = rawTitle.trim();
+  // Empty stays open for a retry, matching `addSection`; unchanged closes —
+  // Save was pressed with a value already on record, nothing to persist.
+  if (!title) return;
+  if (title === section.title) {
+    closePop();
+    return;
+  }
+  const updated = await mutateOutline((outline) =>
+    outline.map((s) => (s.id === section.id ? { ...s, title } : s)),
+  );
+  if (!updated) return;
+  closePop();
+  render();
+  toast('Section renamed', ICON.check);
+}
+
+/** Deleting a section must never delete the passages filed under it — there
+ *  is no undo and no backend, so losing collected quotes to a rename-gone-
+ *  wrong would be unrecoverable. The confirmation names the count so that
+ *  cost is visible before the click, not after. */
+function confirmDeleteSection(anchor: HTMLElement, section: OutlineSection): void {
+  const count = state.annotations.filter((a) => a.section === section.id).length;
+  openConfirmPop(anchor, {
+    title: `Delete “${section.title}”?`,
+    body:
+      count > 0
+        ? `${count} passage${count === 1 ? '' : 's'} will move to Unplaced. This cannot be undone.`
+        : 'This section has no passages assigned. This cannot be undone.',
+    confirmLabel: 'Delete section',
+    onConfirm: () => void performDeleteSection(section),
+  });
+}
+
+async function performDeleteSection(section: OutlineSection): Promise<void> {
+  const affected = state.annotations.filter((a) => a.section === section.id);
+  const updated = await mutateOutline((outline) => outline.filter((s) => s.id !== section.id));
+  if (!updated) return;
+  closePop();
+  // Sequential, mirroring the router's own cascade for `documents/delete`:
+  // a batch of parallel writes into the same store has no precedent here.
+  try {
+    for (const a of affected) {
+      const next: Annotation = { ...a, updatedAt: nowIso() };
+      delete next.section;
+      await sendRequest({ type: 'annotations/put', annotation: next });
+    }
+  } catch (err) {
+    await loadProjectData();
+    render();
+    toast(
+      err instanceof Error
+        ? err.message
+        : 'Section deleted, but some passages could not be moved to Unplaced',
+      ICON.warn,
+      true,
+    );
+    return;
+  }
+  await loadProjectData();
+  render();
+  toast(
+    affected.length > 0
+      ? `Section deleted · ${affected.length} passage${affected.length === 1 ? '' : 's'} moved to Unplaced`
+      : 'Section deleted',
+    ICON.trash,
+  );
 }
 
 /* ---- References ---- */
