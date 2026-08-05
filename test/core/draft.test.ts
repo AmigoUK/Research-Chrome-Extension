@@ -10,14 +10,7 @@ import {
 } from '../../src/core/usecases/draft';
 import type { CitationFormatter } from '../../src/core/ports/citation';
 import type { RepositorySet } from '../../src/core/ports/repositories';
-import type {
-  Annotation,
-  Document,
-  HighlightColor,
-  OutlineSection,
-  Project,
-  Reference,
-} from '../../src/core/model/types';
+import type { Annotation, Document, Project, Reference } from '../../src/core/model/types';
 
 const NOW = '2026-08-05T00:00:00.000Z';
 const at = (min: number): string => new Date(Date.UTC(2026, 7, 5, 0, min)).toISOString();
@@ -170,6 +163,22 @@ describe('composeDraft', () => {
     expect(entry?.locator).toBe('PDF p. 4');
   });
 
+  it('treats a stored empty-string quote as no quote at all', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(
+      anno('a1', 'd1', {
+        section: 's1',
+        anchor: { kind: 'pdf', selectors: [{ type: 'pdfRegion', page: 4, rects: [], quote: '' }] },
+      }),
+    );
+
+    const draft = await compose();
+    const entry = draft.sections[0]?.entries[0];
+    expect(entry?.quote).toBeUndefined();
+    expect(entry && 'quote' in entry).toBe(false);
+  });
+
   it('keeps a passage whose document has no reference, and counts it', async () => {
     await repos.documents.put(doc('d1'));
     await repos.annotations.put(anno('a1', 'd1', { section: 's1' }));
@@ -208,6 +217,36 @@ describe('composeDraft', () => {
     expect(draft.groupedByColour).toBe(false);
   });
 
+  it('does not let an empty-string section id place an annotation in both a bucket and unplaced', async () => {
+    // An outline section with an empty-string id is a pathological input,
+    // not one the UI produces — but the bucket predicate (`a.section ===
+    // s.id`) and the old unplaced predicate (`!a.section`) disagreed on it:
+    // both are satisfied by `section: ''`, which used to double the
+    // annotation into a bucket AND `unplaced`. Since citations are now
+    // looked up by annotation id, a duplicate would make one occurrence
+    // silently take the other's citation.
+    await repos.projects.put({
+      ...project,
+      outline: [
+        { id: '', title: 'Untitled' },
+        { id: 's2', title: 'Evidence' },
+      ],
+    });
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1', { section: '' }));
+
+    const draft = await compose();
+    const inSections = draft.sections.reduce(
+      (n, s) => n + s.entries.filter((e) => e.annotationId === 'a1').length,
+      0,
+    );
+    const inUnplaced = draft.unplaced.filter((e) => e.annotationId === 'a1').length;
+    expect(inSections + inUnplaced).toBe(1);
+    expect(draft.sections[0]?.entries.map((e) => e.annotationId)).toEqual(['a1']);
+    expect(draft.unplaced).toEqual([]);
+  });
+
   it('treats a colour that names no palette entry as unplaced, in colour-grouping mode', async () => {
     await repos.projects.put({
       ...project,
@@ -243,6 +282,13 @@ describe('composeDraft', () => {
     expect(draft.unplaced.map((e) => e.annotationId)).toEqual(['a1']);
   });
 
+  // This passes against the pre-Finding-3 shared-cursor implementation too —
+  // it does not prove the `Map<Id, string>` lookup is *necessary*. What it
+  // does pin: a passage with no matching Reference consumes no citation slot
+  // (the missing one leaves `''`, not a shift), and crossing the
+  // bucket→unplaced boundary does not itself misalign the citations that
+  // follow. That is real coverage against a regression on either point; it
+  // just isn't evidence that the cursor was ever actually unsafe.
   it('keeps citations aligned across a missing reference in the middle of a bucket (cursor invariant)', async () => {
     await repos.documents.put(doc('d1'));
     await repos.documents.put(doc('d2')); // deliberately no reference for d2
@@ -313,14 +359,21 @@ describe('composeDraft', () => {
 });
 
 describe('groupPassages', () => {
-  const outline: OutlineSection[] = [
-    { id: 's1', title: 'Introduction' },
-    { id: 's2', title: 'Evidence' },
-  ];
-  const palette: HighlightColor[] = [
-    { id: 'c1', swatch: '#ffcc00', label: 'Key evidence' },
-    { id: 'c2', swatch: '#ff0000', label: 'Disagree' },
-  ];
+  // `groupPassages` now derives `outline`/`palette` from a `Project` itself
+  // (Fix round 3, item 1) rather than taking them as separate parameters, so
+  // these tests build a project literal the same way the `composeDraft`
+  // tests above do, reusing the module-level `project`'s shape.
+  const groupPassagesProject: Project = {
+    ...project,
+    outline: [
+      { id: 's1', title: 'Introduction' },
+      { id: 's2', title: 'Evidence' },
+    ],
+    colorPalette: [
+      { id: 'c1', swatch: '#ffcc00', label: 'Key evidence' },
+      { id: 'c2', swatch: '#ff0000', label: 'Disagree' },
+    ],
+  };
 
   it('buckets by outline section, oldest first, leaving the rest unplaced', () => {
     const annotations = [
@@ -330,7 +383,7 @@ describe('groupPassages', () => {
       anno('a4', 'd1'),
     ];
 
-    const grouped = groupPassages(annotations, outline, palette);
+    const grouped = groupPassages(annotations, groupPassagesProject);
     expect(grouped.buckets.map((b) => b.title)).toEqual(['Introduction', 'Evidence']);
     expect(grouped.buckets[0]?.items.map((a) => a.id)).toEqual(['a2', 'a1']);
     expect(grouped.buckets[1]?.items.map((a) => a.id)).toEqual(['a3']);
@@ -341,7 +394,7 @@ describe('groupPassages', () => {
   it('falls back to colour buckets only when the outline was never used and a colour bucket has entries', () => {
     const annotations = [anno('a1', 'd1', { color: 'c1' }), anno('a2', 'd1', { color: 'c2' })];
 
-    const grouped = groupPassages(annotations, outline, palette);
+    const grouped = groupPassages(annotations, groupPassagesProject);
     expect(grouped.groupedByColour).toBe(true);
     expect(grouped.buckets.map((b) => b.title)).toEqual(['Key evidence', 'Disagree']);
     expect(grouped.unplaced).toEqual([]);
@@ -350,7 +403,7 @@ describe('groupPassages', () => {
   it('does not claim colour grouping when nothing has a section or a colour (Ruling B)', () => {
     const annotations = [anno('a1', 'd1'), anno('a2', 'd1')];
 
-    const grouped = groupPassages(annotations, outline, palette);
+    const grouped = groupPassages(annotations, groupPassagesProject);
     expect(grouped.groupedByColour).toBe(false);
     expect(grouped.buckets.map((b) => b.title)).toEqual(['Introduction', 'Evidence']);
     expect(grouped.buckets.every((b) => b.items.length === 0)).toBe(true);

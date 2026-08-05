@@ -14,7 +14,7 @@ import type {
   CitationStyle,
   HighlightColor,
   Id,
-  OutlineSection,
+  Project,
   Reference,
 } from '../model/types';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../model/types';
@@ -73,15 +73,19 @@ function quoteOf(annotation: Annotation): string | undefined {
     return undefined;
   }
   for (const selector of anchor.selectors) {
+    // Truthy, not `!== undefined`: a stored `quote: ''` is treated as no
+    // quote at all — an empty string is not a passage to display.
     if (selector.quote) return selector.quote;
   }
   return undefined;
 }
 
 /** "PDF p. N", never a bare page number: a PDF's file page is not the
- *  journal's printed page, so this must never be mistaken for one. Loops for
- *  the same reason `quoteOf` does — `selectors` is an uncapped array, not
- *  guaranteed to carry the relevant page at index 0. */
+ *  journal's printed page, so this must never be mistaken for one. Loops in
+ *  the same shape as `quoteOf`, for symmetry — but unlike `quoteOf`, this
+ *  loop cannot currently skip anything: `PdfRegionSelector.page` is a
+ *  required `number`, so the guard is already satisfied at index 0 for every
+ *  well-typed anchor. */
 function locatorOf(annotation: Annotation): string | undefined {
   const anchor = annotation.anchor;
   if (anchor.kind !== 'pdf') return undefined;
@@ -113,15 +117,24 @@ export interface GroupedPassages {
  * from here rather than re-deriving it: a second implementation of this
  * grouping would be free to drift from the one that actually drives
  * `formatRun`'s `order`, and drift here is a silently renumbered essay.
+ *
+ * Takes the `Project` itself, not a bare `outline`/`palette` pair: both are
+ * *derived* values — `resolveOutline(project)` synthesises a five-section
+ * default with derived ids when `project.outline` is empty, and the palette
+ * falls back to `DEFAULT_HIGHLIGHT_COLORS` when `project.colorPalette` is
+ * absent. A caller that derived either differently (e.g. `project.outline ??
+ * []`, which yields zero buckets instead of the five-section default) would
+ * silently produce a different citation order than `composeDraft`'s own —
+ * exactly the drift this function exists to prevent, just relocated one
+ * level up. Deriving both here, from the project the caller already has,
+ * makes that mistake impossible rather than merely documented against.
  */
-export function groupPassages(
-  annotations: Annotation[],
-  outline: OutlineSection[],
-  // `readonly`, not `HighlightColor[]`: `composeDraft` passes
-  // `project.colorPalette ?? DEFAULT_HIGHLIGHT_COLORS`, and the fallback is
-  // `readonly` (the shared default must never be mutated in place).
-  palette: readonly HighlightColor[],
-): GroupedPassages {
+export function groupPassages(annotations: Annotation[], project: Project): GroupedPassages {
+  const outline = resolveOutline(project);
+  // `readonly`, not `HighlightColor[]`: `DEFAULT_HIGHLIGHT_COLORS` is
+  // `readonly` (the shared default must never be mutated in place), and
+  // `project.colorPalette ?? DEFAULT_HIGHLIGHT_COLORS` inherits that.
+  const palette: readonly HighlightColor[] = project.colorPalette ?? DEFAULT_HIGHLIGHT_COLORS;
   const sectionIds = new Set(outline.map((s) => s.id));
   const paletteIds = new Set(palette.map((c) => c.id));
 
@@ -161,9 +174,22 @@ export function groupPassages(
   // dropping the passage would be the same failure as the section case, with
   // a worse symptom: the student loses a passage from their essay with
   // nothing on screen to say it ever existed.
+  //
+  // `=== undefined`, not a truthy check: the bucket predicates above test
+  // `a.color === c.id` / `a.section === s.id`, which — for an empty-string
+  // id — is satisfiable. A truthy `!a.color` / `!a.section` guard is *also*
+  // satisfied by an empty string regardless of whether some bucket actually
+  // claims it, so the two predicates would no longer be complements and an
+  // empty-string id could land an annotation in a bucket AND in `unplaced`.
+  // Since citations are keyed by `annotation.id` (not by position), a
+  // duplicate silently makes one occurrence steal the other's citation.
+  // Testing `undefined` explicitly keeps the two predicates exact opposites
+  // for every id, including the empty string.
   const unplaced = groupedByColour
-    ? orderedEntries(annotations.filter((a) => !a.color || !paletteIds.has(a.color)))
-    : orderedEntries(annotations.filter((a) => !a.section || !sectionIds.has(a.section)));
+    ? orderedEntries(annotations.filter((a) => a.color === undefined || !paletteIds.has(a.color)))
+    : orderedEntries(
+        annotations.filter((a) => a.section === undefined || !sectionIds.has(a.section)),
+      );
 
   return { buckets, unplaced, groupedByColour };
 }
@@ -193,7 +219,9 @@ export async function composeDraft(
     repos.references.listByProject(args.projectId),
   ]);
 
-  const outline = resolveOutline(project);
+  // `palette` is still resolved here too, separately from `groupPassages`'s
+  // own internal derivation: `entryFor` below needs it for `colorLabel`
+  // regardless of which grouping mode won, not just for bucketing.
   const palette = project.colorPalette ?? DEFAULT_HIGHLIGHT_COLORS;
   const refByDocument = new Map<Id, Reference>();
   for (const reference of references) {
@@ -202,12 +230,11 @@ export async function composeDraft(
 
   // The bucket order, plus the unplaced complement, is what fixes citation
   // order — delegated to `groupPassages` so the Outline view can group the
-  // same annotations identically without re-deriving this logic.
-  const {
-    buckets,
-    unplaced: unplacedItems,
-    groupedByColour,
-  } = groupPassages(annotations, outline, palette);
+  // same annotations identically without re-deriving this logic. Passing
+  // `project` (not a separately-resolved `outline`) is what makes the two
+  // derivations impossible to get out of sync — see `groupPassages`'s doc
+  // comment.
+  const { buckets, unplaced: unplacedItems, groupedByColour } = groupPassages(annotations, project);
 
   // Flatten in exactly the order the draft reads: this becomes the citation
   // order. Record each cited annotation's position in `order` right here, in
