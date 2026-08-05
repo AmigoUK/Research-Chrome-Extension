@@ -1077,15 +1077,23 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
  *  The chained promise must never reject, or a later queued save would be
  *  skipped entirely (a rejected `.then` short-circuits the next `.then` in
  *  the chain) — so failures are caught and reported here, inside the link,
- *  rather than left to propagate. */
+ *  rather than left to propagate. That includes `apply` itself: it has to
+ *  run inside the `try`, not before it, or a synchronous throw from a future
+ *  `apply` would reject this link exactly the same way an uncaught
+ *  `sendRequest` failure would.
+ *
+ *  `{ ok: true }` means a write happened. A project that has gone missing
+ *  from `state.projects` by the time this link runs is a bug, not a no-op —
+ *  reporting it as `ok: true` would let the caller toast success and
+ *  `render()` over an edit that was never saved. */
 let projectSaveChain: Promise<{ ok: boolean }> = Promise.resolve({ ok: true });
 
 function queueProjectSave(id: Id, apply: (project: Project) => Project): Promise<{ ok: boolean }> {
   const next = projectSaveChain.then(async () => {
-    const current = state.projects.find((pr) => pr.id === id);
-    if (!current) return { ok: true };
-    const updated = apply(current);
     try {
+      const current = state.projects.find((pr) => pr.id === id);
+      if (!current) throw new Error('That project could not be found — nothing was saved');
+      const updated = apply(current);
       await sendRequest({ type: 'projects/put', project: updated });
       state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
       return { ok: true };

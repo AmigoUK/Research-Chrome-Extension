@@ -1477,3 +1477,72 @@ test('blurring the research question and immediately blurring the due date persi
 
   await page.close();
 });
+
+test('a link in queueProjectSave that fails reports it honestly and does not wedge the ones after it', async () => {
+  // `queueProjectSave`'s not-found guard and the possibility of `apply`
+  // throwing are both defensive: nothing in the shipped app can currently
+  // desync `state.projects` from storage (there is no project-delete
+  // message), and the three real `apply` closures only ever spread/delete
+  // plain fields, so none of them can throw. Neither branch is reachable
+  // through the UI, so this test exercises the one failure this chain link
+  // *can* hit for real — `sendRequest` rejecting — and checks the two
+  // properties that matter for both defensive branches too, since all three
+  // failure modes now share the same `try`/`catch`: (1) a failed link must
+  // report `ok: false`, not a false "saved", and (2) failing must not wedge
+  // `projectSaveChain` for the rest of the session.
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  const readProject = async (): Promise<{ name: string }> => {
+    const projects = (await page.evaluate(() =>
+      chrome.runtime.sendMessage({ type: 'projects/list' }),
+    )) as { data: Array<{ name: string }> };
+    return projects.data[0] as { name: string };
+  };
+
+  const original = await readProject();
+
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+
+  // Same technique as e2e/webannotation.spec.ts's "asleep service worker"
+  // test: reject one specific `projects/put` call client-side so the write
+  // never reaches the service worker, without touching any other message.
+  await page.evaluate(() => {
+    const runtime = chrome.runtime as unknown as {
+      sendMessage: (m: unknown, ...r: unknown[]) => Promise<unknown>;
+    };
+    const orig = runtime.sendMessage.bind(chrome.runtime);
+    runtime.sendMessage = (m: unknown, ...r: unknown[]) => {
+      const msg = m as { type?: string; project?: { name?: string } };
+      if (msg?.type === 'projects/put' && msg.project?.name === 'Queue link should fail') {
+        return Promise.reject(new Error('simulated: write dropped'));
+      }
+      return orig(m, ...r);
+    };
+  });
+
+  await page.locator('#setName').fill('Queue link should fail');
+  await page.locator('#setSave').click();
+
+  // Honest failure: no "Project saved" toast, and the stored name is
+  // unchanged — `ok: true` must mean a write actually happened.
+  await expect(page.locator('.toast--error')).toContainText('simulated: write dropped');
+  expect((await readProject()).name).toBe(original.name);
+
+  // Not wedged: a save queued after the failed one still has to land. A
+  // rejected link in `projectSaveChain` would short-circuit every `.then`
+  // chained onto it afterward — a reload is the only thing that resets the
+  // module-level chain — so this is the assertion that actually matters,
+  // not merely that the failure above was caught.
+  await page.locator('#setName').fill('Queue link recovered');
+  await page.locator('#setSave').click();
+  await expect.poll(async () => (await readProject()).name).toBe('Queue link recovered');
+
+  // Restore.
+  await page.locator('#setName').fill(original.name);
+  await page.locator('#setSave').click();
+  await expect.poll(async () => (await readProject()).name).toBe(original.name);
+
+  await page.close();
+});
