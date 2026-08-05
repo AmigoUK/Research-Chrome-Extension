@@ -45,6 +45,7 @@ import {
   markCitationCopied,
 } from '../adapters/chrome/onboarding-state';
 import { getUpdateNotice, dismissUpdateNotice } from '../adapters/chrome/update-notice';
+import { onPageSignature } from './on-page-signature';
 
 interface State {
   projects: Project[];
@@ -516,16 +517,6 @@ function restoreFocusedNoteEdit(focused: FocusedNoteEdit | null): void {
   }
 }
 
-/** What the rendered note list depends on — a cheap identity for "nothing
- *  the reader can see has changed", so an incidental refresh is not allowed
- *  to rebuild the DOM under them. */
-function onPageSignature(): string {
-  return JSON.stringify([
-    state.pageAnnotations.map((a) => [a.id, a.content, a.status, a.color]),
-    [...state.resolvedIds].sort(),
-    palette.map((c) => [c.id, c.swatch, c.label]),
-  ]);
-}
 let lastOnPageSignature: string | null = null;
 
 function renderOnPageCard(): void {
@@ -537,7 +528,7 @@ function renderOnPageCard(): void {
     return;
   }
 
-  const signature = onPageSignature();
+  const signature = onPageSignature(state.pageAnnotations, palette, state.resolvedIds);
   if (signature === lastOnPageSignature && $('onPageList').childElementCount > 0) return;
   lastOnPageSignature = signature;
 
@@ -594,7 +585,7 @@ async function savePageAnnotationContent(id: Id, content: string): Promise<void>
   state.pageAnnotations[idx] = updated;
   // The textarea already shows this; keep the signature in step so no later
   // render rebuilds the list for a change the reader is looking at.
-  lastOnPageSignature = onPageSignature();
+  lastOnPageSignature = onPageSignature(state.pageAnnotations, palette, state.resolvedIds);
   try {
     await sendRequest({ type: 'annotations/put', annotation: updated });
   } catch (err) {
