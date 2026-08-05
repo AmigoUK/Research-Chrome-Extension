@@ -1,9 +1,10 @@
 /**
  * Two renderings of one `Draft`, chosen by `draft.flavour`.
  *
- * `quote`, `note`, section titles, the project name, the research question and
- * `dueDate` are text captured from arbitrary web pages — or from an imported
- * snapshot, someone else's file — and MUST be escaped in `draftToHtml`.
+ * `quote`, `note`, `locator`, section titles, the project name, the research
+ * question and `dueDate` are text captured from arbitrary web pages — or from
+ * an imported snapshot, someone else's file — and MUST be escaped in
+ * `draftToHtml`.
  *
  * `inTextFormatted` and `bibliography` are citeproc's own output. In an
  * `'html'`-flavour draft that output is real markup (the italics a word
@@ -45,10 +46,16 @@ export class DraftFlavourMismatchError extends Error {
   }
 }
 
+// The single place `entry.locator` is rendered for HTML — `entryHtml`'s
+// no-quote branch used to interpolate it a second time (its own bracket, next
+// to `NO_TEXT`), so a no-quote entry with a resolved citation and a locator
+// showed "PDF p. 4" twice. Centralising it here, always (even when there is
+// no citation to hang it off), is what keeps it to exactly one appearance
+// regardless of which branch of `entryHtml` calls this.
 function citationHtml(entry: DraftEntry): string {
   const where = entry.locator ? ` <em>&lt;${escapeHtml(entry.locator)}&gt;</em>` : '';
   if (entry.missingReference) return ` <em>&lt;${escapeHtml(NO_REFERENCE)}&gt;</em>${where}`;
-  if (!entry.inTextFormatted) return '';
+  if (!entry.inTextFormatted) return where;
   const page = entry.quote ? ` ${escapeHtml(PAGE_PLACEHOLDER)}` : '';
   return ` ${entry.inTextFormatted}${page}${where}`;
 }
@@ -68,10 +75,9 @@ function quoteHtml(quote: string): string {
 }
 
 function entryHtml(entry: DraftEntry): string {
-  const locatorSuffix = entry.locator ? `, ${escapeHtml(entry.locator)}` : '';
   const body = entry.quote
     ? `<blockquote><p>${quoteHtml(entry.quote)}${citationHtml(entry)}</p></blockquote>`
-    : `<p><em>&lt;${escapeHtml(NO_TEXT)}${locatorSuffix}&gt;</em>${citationHtml(entry)}</p>`;
+    : `<p><em>&lt;${escapeHtml(NO_TEXT)}&gt;</em>${citationHtml(entry)}</p>`;
   const note = entry.note ? `<p><em>My note:</em> ${escapeHtml(entry.note)}</p>` : '';
   return body + note;
 }
@@ -104,10 +110,12 @@ export function draftToHtml(draft: Draft): string {
   return head + body + unplaced + bibliography;
 }
 
+// Mirrors citationHtml's reasoning: the single place `entry.locator` is
+// rendered for Markdown, always, so a no-quote entry never shows it twice.
 function citationText(entry: DraftEntry): string {
   const where = entry.locator ? ` <${entry.locator}>` : '';
   if (entry.missingReference) return ` <${NO_REFERENCE}>${where}`;
-  if (!entry.inTextFormatted) return '';
+  if (!entry.inTextFormatted) return where;
   const page = entry.quote ? ` ${PAGE_PLACEHOLDER}` : '';
   return ` ${entry.inTextFormatted}${page}${where}`;
 }
@@ -128,7 +136,7 @@ function quoteMarkdown(quote: string): string {
 function entryMarkdown(entry: DraftEntry): string {
   const body = entry.quote
     ? `${quoteMarkdown(entry.quote)}${citationText(entry)}`
-    : `<${NO_TEXT}${entry.locator ? `, ${entry.locator}` : ''}>${citationText(entry)}`;
+    : `<${NO_TEXT}>${citationText(entry)}`;
   const note = entry.note ? `\n\n*My note:* ${entry.note}` : '';
   return `${body}${note}\n`;
 }

@@ -35,20 +35,24 @@ const draft: Draft = {
 const textDraft: Draft = { ...draft, flavour: 'text' };
 
 describe('draftToHtml', () => {
-  // Fix round 1, item 2: each hostile field below carries its own marker tag
-  // AND its own `&`, so no assertion can be satisfied by a DIFFERENT field's
-  // escaped output — the original version of this test used '<script>' for
-  // the quote and 'me & you' for the note but only ever asserted the quote's
-  // escaped form and an ampersand that happened to come from the quote's own
-  // tail, so deleting the note's `escapeHtml` call left the suite green.
-  // Verified by removing each `escapeHtml(...)` call below one at a time and
-  // confirming exactly its own pair of assertions goes red — see Fix round 1
-  // report for which were checked.
+  // Fix round 1, item 2 (dueDate added in Fix round 2, item 2): each hostile
+  // field below carries its own marker tag AND its own `&`, so no assertion
+  // can be satisfied by a DIFFERENT field's escaped output — the original
+  // version of this test used '<script>' for the quote and 'me & you' for the
+  // note but only ever asserted the quote's escaped form and an ampersand
+  // that happened to come from the quote's own tail, so deleting the note's
+  // `escapeHtml` call left the suite green. `dueDate` was added after
+  // round 1's own "prints the due date" test turned out to use a value
+  // ('2026-08-10') with no metacharacters, so it passed identically escaped
+  // or not. Verified by removing each `escapeHtml(...)` call below one at a
+  // time and confirming exactly its own pair of assertions goes red — see
+  // the Fix round 1/2 report for which were checked.
   it('escapes every page-derived field independently and leaves citeproc markup alone', () => {
     const hostile: Draft = {
       ...draft,
       projectName: 'Essay <ptag> & pamp',
       researchQuestion: 'RQ <rtag> & ramp',
+      dueDate: '2026-08-10 <dtag> & damp',
       sections: [
         {
           id: 's1',
@@ -69,6 +73,7 @@ describe('draftToHtml', () => {
 
     expect(html).toContain('Essay &lt;ptag&gt; &amp; pamp');
     expect(html).toContain('RQ &lt;rtag&gt; &amp; ramp');
+    expect(html).toContain('Due: 2026-08-10 &lt;dtag&gt; &amp; damp');
     expect(html).toContain('Barriers &lt;ttag&gt; &amp; tamp');
     expect(html).toContain('Quote &lt;qtag&gt; &amp; qamp');
     expect(html).toContain('Note &lt;ntag&gt; &amp; namp');
@@ -76,6 +81,7 @@ describe('draftToHtml', () => {
 
     expect(html).not.toContain('<ptag>');
     expect(html).not.toContain('<rtag>');
+    expect(html).not.toContain('<dtag>');
     expect(html).not.toContain('<ttag>');
     expect(html).not.toContain('<qtag>');
     expect(html).not.toContain('<ntag>');
@@ -167,6 +173,40 @@ describe('draftToHtml', () => {
     const html = draftToHtml(orphan);
     expect(html).toContain('no bibliographic data');
     expect(html).toContain('PDF p. 4');
+  });
+
+  // Fix round 2, items 1 & 4: every earlier fixture with a `locator` also had
+  // a `quote`, so `body` always took the blockquote branch and the no-quote
+  // branch's own (now-removed) locator interpolation was never exercised —
+  // deleting its escape left all tests green. Fixing that by centralising
+  // locator rendering in citationHtml also closed a real duplicate-output bug
+  // (a no-quote, referenced entry with a locator used to print it twice: once
+  // from entryHtml's own bracket, once from citationHtml's `where`). This
+  // entry has no quote, a resolved citation, and a hostile locator, so it
+  // pins both at once: the escaped form is present, and it appears exactly
+  // once.
+  it("escapes a no-quote entry's locator and shows it exactly once", () => {
+    const noQuote: Draft = {
+      ...draft,
+      sections: [
+        {
+          id: 's1',
+          title: 'Barriers',
+          entries: [
+            {
+              annotationId: 'a1',
+              note: '',
+              inTextFormatted: '(Nowak, 2016)',
+              locator: 'PDF p. 9 <loctag> & locamp',
+            },
+          ],
+        },
+      ],
+    };
+    const html = draftToHtml(noQuote);
+    expect(html).toContain('PDF p. 9 &lt;loctag&gt; &amp; locamp');
+    expect(html).not.toContain('<loctag>');
+    expect(html.split('PDF p. 9').length - 1).toBe(1);
   });
 
   it('renders unplaced passages last, under their own heading', () => {
@@ -364,6 +404,27 @@ describe('draftToMarkdown', () => {
     const md = draftToMarkdown(orphan);
     expect(md).toContain('no bibliographic data');
     expect(md).toContain('PDF p. 4');
+  });
+
+  // Fix round 2, item 4, Markdown side — mirrors the HTML fix: a no-quote,
+  // referenced entry with a locator used to show it twice (entryMarkdown's
+  // own bracket, plus citationText's `where`).
+  it("shows a no-quote entry's locator exactly once", () => {
+    const noQuote: Draft = {
+      ...textDraft,
+      sections: [
+        {
+          id: 's1',
+          title: 'Barriers',
+          entries: [
+            { annotationId: 'a1', note: '', inTextFormatted: '(Nowak, 2016)', locator: 'PDF p. 9' },
+          ],
+        },
+      ],
+    };
+    const md = draftToMarkdown(noQuote);
+    expect(md).toContain('PDF p. 9');
+    expect(md.split('PDF p. 9').length - 1).toBe(1);
   });
 
   it('refuses to render an html-flavour draft as Markdown', () => {
