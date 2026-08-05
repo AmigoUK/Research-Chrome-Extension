@@ -3,11 +3,16 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 /**
- * E2E for Task 9's export: "Copy draft" puts real HTML on the clipboard, not
- * just a toast claiming it did. `ClipboardItem` with a `text/html` entry does
- * not exist in jsdom, so this is the only place that promise can be checked —
- * see `src/options/export-draft.ts` and `src/options/export-draft.test.ts`
- * for the parts that unit tests already cover (the filename rule).
+ * E2E for Task 9's export: "Copy draft" puts BOTH real HTML and real
+ * Markdown on the clipboard, not just a toast claiming it did — `copyDraft`
+ * (`src/options/export-draft.ts`) composes the two flavours separately and
+ * renders each through its own serialiser, so this also proves the two
+ * outputs are not one parsed out of the other (asserting the plain-text
+ * flavour carries no HTML tags is exactly what would catch that regression).
+ * `ClipboardItem` with a `text/html` entry does not exist in jsdom, so this
+ * is the only place either promise can be checked — see
+ * `src/options/export-draft.test.ts` for the part unit tests already cover
+ * (the filename rule).
  */
 
 const distPath = fileURLToPath(new URL('../dist', import.meta.url));
@@ -120,15 +125,17 @@ test('copying a draft puts real markup on the clipboard', async () => {
     await page.getByRole('button', { name: /copy draft/i }).click();
     await expect(page.locator('.toast')).toContainText(/copied/i);
 
-    // The only proof that survives: read the html flavour back out.
-    const html = await page.evaluate(async () => {
+    // The only proof that survives: read both flavours back out.
+    const { html, plain } = await page.evaluate(async () => {
       const items = await navigator.clipboard.read();
+      let html = '';
+      let plain = '';
       for (const item of items) {
-        if (item.types.includes('text/html')) {
-          return await (await item.getType('text/html')).text();
-        }
+        if (item.types.includes('text/html')) html = await (await item.getType('text/html')).text();
+        if (item.types.includes('text/plain'))
+          plain = await (await item.getType('text/plain')).text();
       }
-      return '';
+      return { html, plain };
     });
     expect(html).toContain('<blockquote>');
     expect(html).toContain('<h2>');
@@ -136,6 +143,14 @@ test('copying a draft puts real markup on the clipboard', async () => {
     // entry both made it across — not just matching tags.
     expect(html).toContain('the observed passage');
     expect(html).toContain('Oke');
+
+    // `text/plain` comes from a SEPARATE `'text'`-flavour compose through
+    // `draftToMarkdown`, not from stripping the html string — so it must be
+    // real Markdown (a `>` blockquote marker) and carry no HTML tags at all.
+    expect(plain).toContain('> the observed passage');
+    expect(plain).toContain('Oke');
+    expect(plain).not.toContain('<blockquote>');
+    expect(plain).not.toContain('<h2>');
   } finally {
     await page.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-export-doc' });

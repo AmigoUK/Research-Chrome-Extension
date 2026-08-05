@@ -1668,23 +1668,36 @@ function missingReferenceSuffix(count: number): string {
   return count > 0 ? ` · ${count} source${count === 1 ? '' : 's'} without citation data` : '';
 }
 
-/** "Copy draft" — composes with `flavour: 'html'` so the clipboard gets real
- *  markup (the italics a word processor needs); `copyDraft` derives its own
- *  plain-text sibling from that same rendering rather than a second,
- *  `'text'`-flavour compose (see `export-draft.ts`'s `plainTextFrom`). */
+/** "Copy draft" — composes TWICE, once per flavour: `'html'` for
+ *  `draftToHtml`'s `text/html` rendering, `'text'` for `draftToMarkdown`'s
+ *  `text/plain` sibling. Two citeproc runs, not one draft parsed into the
+ *  other flavour after the fact — see `copyDraft`'s own doc comment in
+ *  `export-draft.ts` for why. */
 async function copyDraftToClipboard(): Promise<void> {
   if (!state.activeProjectId) return;
   const { template, styleId } = citeArgs();
   try {
-    const draft = await sendRequest({
-      type: 'draft/compose',
-      projectId: state.activeProjectId,
-      template,
-      flavour: 'html',
-      styleId,
-    });
-    const how = await copyDraft(draft);
-    const warn = missingReferenceSuffix(draft.missingReferenceCount);
+    const [htmlDraft, textDraft] = await Promise.all([
+      sendRequest({
+        type: 'draft/compose',
+        projectId: state.activeProjectId,
+        template,
+        flavour: 'html',
+        styleId,
+      }),
+      sendRequest({
+        type: 'draft/compose',
+        projectId: state.activeProjectId,
+        template,
+        flavour: 'text',
+        styleId,
+      }),
+    ]);
+    const how = await copyDraft({ html: htmlDraft, text: textDraft });
+    // Both composes read the same project/references, so the count agrees
+    // regardless of which draft it's read from — it only reflects which
+    // passages lack a Reference, never the citeproc flavour.
+    const warn = missingReferenceSuffix(htmlDraft.missingReferenceCount);
     toast(
       how === 'rich'
         ? `Draft copied${warn}`

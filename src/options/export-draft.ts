@@ -1,7 +1,7 @@
 /** Clipboard and file delivery for a composed draft. Kept out of `main.ts`
  *  because the filename rule is worth testing on its own. */
 import type { Draft } from '../core/usecases/draft';
-import { draftToHtml } from '../core/draft/serialise';
+import { draftToHtml, draftToMarkdown } from '../core/draft/serialise';
 
 export function draftFilename(projectName: string, today: string): string {
   const slug = projectName
@@ -12,48 +12,27 @@ export function draftFilename(projectName: string, today: string): string {
 }
 
 /**
- * The clipboard's plain-text sibling, derived from the rendered HTML rather
- * than `draftToMarkdown`. `copyDraft` is always handed an `'html'`-flavour
- * draft (that is what the "Copy draft" button composes), and
- * `draftToMarkdown` requires `'text'` — calling it here would throw
- * `DraftFlavourMismatchError`, and composing a second, `'text'`-flavour
- * draft just to feed it would be the "compose once, render both" mistake
- * that guard exists to catch one level up (see `serialise.ts`).
- *
- * Regex, not `innerHTML` into a scratch element: `draftToHtml`'s output uses
- * exactly one escaper (`escapeHtml`, four entities) and a small, closed set
- * of tags, so reversing both here is exact — and it never hands parsed
- * markup back to the DOM at all, so there is nothing to sanitize.
- */
-function plainTextFrom(html: string): string {
-  const withBreaks = html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(h1|h2|p|blockquote)>/gi, '\n')
-    .replace(/<[^>]+>/g, '');
-  // `&amp;` must decode last: `escapeHtml` turns a literal "&lt;" into
-  // "&amp;lt;". Decoding `&lt;`/`&gt;`/`&quot;` first leaves that alone (its
-  // only `&` belongs to "&amp;", not to a "&lt;" substring), so the final
-  // `&amp;` step correctly restores "&lt;". Decoding `&amp;` first would
-  // produce "&lt;" one step early, which the *later* `&lt;` replace would
-  // then wrongly decode a second time, into "<".
-  const decoded = withBreaks
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, '&');
-  return decoded.replace(/\n{3,}/g, '\n\n').trim();
-}
-
-/**
  * Copy the draft, keeping formatting where the platform allows it.
+ *
+ * Takes two SEPARATELY COMPOSED drafts — an `'html'`-flavour one, rendered
+ * by `draftToHtml` for `text/html`, and a `'text'`-flavour one, rendered by
+ * `draftToMarkdown` for `text/plain` — never one derived from the other's
+ * output. The module doc comment on `src/core/usecases/draft.ts` states why
+ * the draft model is a structure rather than a string in the first place:
+ * "a service worker has no `DOMParser` — deriving one [flavour] from the
+ * other would mean hand-writing an HTML parser." Named fields, not two
+ * positional `Draft`s, so a caller cannot swap them by argument order —
+ * `draftToHtml`/`draftToMarkdown` would throw `DraftFlavourMismatchError` on
+ * a swapped pair anyway, but naming the fields makes the correct pairing the
+ * only one that is easy to write.
  *
  * Returns which flavour actually landed so the caller can tell the truth: a
  * silent drop to plain text would leave a student wondering why their
  * bibliography lost its italics.
  */
-export async function copyDraft(draft: Draft): Promise<'rich' | 'plain'> {
-  const html = draftToHtml(draft);
-  const text = plainTextFrom(html);
+export async function copyDraft(drafts: { html: Draft; text: Draft }): Promise<'rich' | 'plain'> {
+  const html = draftToHtml(drafts.html);
+  const text = draftToMarkdown(drafts.text);
   try {
     await navigator.clipboard.write([
       new ClipboardItem({
