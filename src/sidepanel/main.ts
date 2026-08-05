@@ -667,20 +667,23 @@ async function updatePageAnnotationSection(id: Id, section: Id | undefined): Pro
   state.pageAnnotations[idx] = updated;
   try {
     await sendRequest({ type: 'annotations/put', annotation: updated });
-    const title = currentOutline().find((s) => s.id === section)?.title;
-    toast(title ? `Section · ${title}` : 'Removed from the outline');
-    // Only assigning (not clearing) a section can create the states either
-    // nudge cares about — clearing one can only ever add to Unplaced.
-    if (section !== undefined) void nudgeOutlineProgress(id);
-    // The checklist's Outline step is project-wide data, not part of
-    // `pageAnnotations` above — without this, assigning a section from THIS
-    // panel would only tick the checklist off after a later `data/changed`
-    // broadcast (which this client's own writes are filtered out of).
-    await loadAnnotationCount();
-    renderGettingStarted();
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t change section', true);
+    return;
   }
+  const title = currentOutline().find((s) => s.id === section)?.title;
+  toast(title ? `Section · ${title}` : 'Removed from the outline');
+  // Only assigning (not clearing) a section can create the states either
+  // nudge cares about — clearing one can only ever add to Unplaced.
+  if (section !== undefined) void nudgeOutlineProgress(id);
+  // The checklist's Outline step is project-wide data, not part of
+  // `pageAnnotations` above — without this, assigning a section from THIS
+  // panel would only tick the checklist off after a later `data/changed`
+  // broadcast (which this client's own writes are filtered out of). Outside
+  // the try above deliberately: a throw here follows a SUCCESSFUL put, and
+  // must not surface as "Couldn't change section".
+  await loadAnnotationCount();
+  renderGettingStarted();
 }
 
 /**

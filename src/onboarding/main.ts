@@ -3,7 +3,6 @@
  * *reacts* to what the user has actually done lives in the side panel's
  * getting-started checklist.
  */
-import { setPendingRoute } from '../adapters/chrome/pending-route';
 
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('openPanel')?.addEventListener('click', () => {
@@ -26,13 +25,12 @@ document.addEventListener('DOMContentLoaded', () => {
     void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
   });
   document.getElementById('openOutline')?.addEventListener('click', () => {
-    // openOptionsPage() takes no arguments — park the target route first, the
-    // same handoff pending-jump.ts uses for "open this page and scroll to
-    // that highlight" — see adapters/chrome/pending-route.ts.
-    void (async () => {
-      await setPendingRoute('outline');
-      void chrome.runtime.openOptionsPage();
-    })();
+    // openOptionsPage() takes no arguments, and if a dashboard tab is already
+    // open it is merely focused, not reloaded — so a parked request would
+    // never be claimed. chrome.tabs.create() always loads fresh, and a URL
+    // fragment lives on the tab itself, so it can't go stale the way a
+    // storage-parked request could. `isNavRoute` validates it on arrival.
+    void chrome.tabs.create({ url: chrome.runtime.getURL('src/options/index.html#outline') });
   });
   document.getElementById('closeGuide')?.addEventListener('click', () => {
     window.close();

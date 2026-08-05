@@ -11,7 +11,6 @@
 import './dashboard.css';
 import { CLIENT_ID, sendRequest } from '../adapters/chrome/messaging';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
-import { takePendingRoute } from '../adapters/chrome/pending-route';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
   Project,
@@ -81,6 +80,7 @@ import {
   isNavRoute,
   statusDot,
   statusLabel,
+  type NavRoute,
   type Route,
 } from './view-model';
 import { highlightJson } from './csl-code';
@@ -432,8 +432,7 @@ function renderNav(): void {
   $$('.nav-item', nav).forEach((b) => {
     b.onclick = () => {
       const r = b.dataset.route;
-      if (r === 'team') void openTeam();
-      else if (r && isNavRoute(r)) go(r);
+      if (r && isNavRoute(r)) goNav(r);
       closeSidebar();
     };
   });
@@ -523,6 +522,18 @@ function go(route: Route): void {
   state.route = route;
   render();
   $('#view').scrollTop = 0;
+}
+
+/** Every entry point that lands on a `NavRoute` — the sidebar's own clicks,
+ *  and a cross-surface deep link (the guide's Outline step) arriving via a
+ *  URL fragment on load — goes through this, not `go()` directly. `team` is
+ *  the one nav route `go()` alone doesn't fully wire up: it also needs a
+ *  fresh activity feed, which is `openTeam()`'s job. Routing every arrival
+ *  through here means a deep link into `#team` behaves exactly like clicking
+ *  Team in the sidebar, instead of silently missing that reload. */
+function goNav(route: NavRoute): void {
+  if (route === 'team') void openTeam();
+  else go(route);
 }
 const VIEWS: Record<Route, (view: HTMLElement, actions: HTMLElement) => void> = {
   overview: renderOverview,
@@ -3976,13 +3987,17 @@ async function init(): Promise<void> {
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Failed to load projects', ICON.warn, true);
   }
-  // A cross-surface link (the guide's Outline step) parks its target route
-  // rather than passing it to openOptionsPage(), which takes no arguments —
-  // see adapters/chrome/pending-route.ts. Only ever a nav route: a deep link
-  // has no business landing mid-edit in the full-screen style editor.
-  const pendingRoute = await takePendingRoute();
-  if (pendingRoute && isNavRoute(pendingRoute)) state.route = pendingRoute;
-  render();
+  // A cross-surface link (the guide's Outline step) opens this page with a
+  // URL fragment naming the route, e.g. "#outline" — chrome.tabs.create()
+  // always starts a fresh load (unlike openOptionsPage(), which merely
+  // focuses an existing tab), so the fragment is read on every arrival and
+  // can never go stale the way a request parked in storage could. `isNavRoute`
+  // rejects anything else, so a deep link can't land mid-edit in the
+  // full-screen style editor. `goNav` renders for us, so only the no-fragment
+  // path needs its own `render()` call here.
+  const hashRoute = location.hash.slice(1);
+  if (isNavRoute(hashRoute)) goNav(hashRoute);
+  else render();
 }
 
 document.addEventListener('DOMContentLoaded', () => void init());
