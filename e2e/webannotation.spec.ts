@@ -512,3 +512,85 @@ test("the side panel jumps by URL, so it lands on the notes' page and not the ac
   await decoy.close();
   await article.close();
 });
+
+function panelUrl(): string {
+  return `chrome-extension://${extensionId}/${path.posix.join('src', 'sidepanel', 'index.html')}`;
+}
+
+/**
+ * The panel's "Notes on this page" list only appears for a preview whose URL
+ * matches `/^https?:/` (`isCapturablePreview`), and getting one populated
+ * needs `scanActiveTab`'s `chrome.scripting.executeScript` to succeed — which
+ * needs a real `activeTab` grant Playwright cannot produce any more than it
+ * could for annotator activation (see this file's header comment). Faking
+ * the scan's result is the same class of workaround: it lets production code
+ * (`buildCaptureInput`, `isCapturablePreview`, `renderOnPageCard`) run
+ * unmodified against a URL that satisfies the gate, with no real
+ * network-reachable page required.
+ */
+async function stubActiveTabScan(page: Page, url: string, title: string): Promise<void> {
+  await page.addInitScript(
+    ({ url, title }) => {
+      const tabs = chrome.tabs as unknown as {
+        query: (query: unknown) => Promise<Array<{ id: number }>>;
+      };
+      tabs.query = () => Promise.resolve([{ id: 999999 }]);
+      const scripting = chrome.scripting as unknown as {
+        executeScript: (details: unknown) => Promise<Array<{ result: unknown }>>;
+      };
+      scripting.executeScript = () =>
+        Promise.resolve([{ result: { url, raw: { title, metaTags: {} } } }]);
+    },
+    { url, title },
+  );
+}
+
+test('assigning a section from the panel updates the card', async () => {
+  const sourceUrl = 'https://example.org/e2e-section-test';
+  const page = await context.newPage();
+  await stubActiveTabScan(page, sourceUrl, 'Section test source');
+  await page.goto(panelUrl());
+  await expect(page.locator('#activeName')).toHaveText('My Research');
+
+  // Seed a web annotation the same way a real highlight commits
+  // (`web/annotate`) rather than driving the real annotator: this test is
+  // about the section picker, not anchoring, and the annotator can't paint
+  // onto a URL that only exists via the scan stub above.
+  await page.evaluate(async (url) => {
+    const projects = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+      data: Array<{ id: string }>;
+    };
+    await chrome.runtime.sendMessage({
+      type: 'web/annotate',
+      input: {
+        projectId: projects.data[0]!.id,
+        url,
+        type: 'article',
+        metadata: { title: 'Section test source' },
+      },
+      anchor: {
+        kind: 'web',
+        selectors: [{ type: 'textQuote', exact: 'A passage worth citing.' }],
+      },
+      color: 'yellow',
+    });
+  }, sourceUrl);
+
+  // Reload onto the panel's real init path — `loadPreview` → `loadPageAnnotations`
+  // → `renderOnPageCard` — the same path a fresh open runs, so the card under
+  // test is exactly what a user would see.
+  await page.reload();
+  const pick = page.locator('.onpage-note__section').first();
+  await expect(pick).toBeVisible();
+  await pick.selectOption({ label: 'Evidence' });
+  await expect(pick).toHaveValue(/.+/);
+  const chosen = await pick.inputValue();
+
+  // The write is optimistic AND the list repaints; if `section` were missing
+  // from `onPageSignature` this would still show the old (empty) value on
+  // reload even though the database was already correct — exactly the bug
+  // Task 6's fold-in of `section` guards against.
+  await page.reload();
+  await expect(page.locator('.onpage-note__section').first()).toHaveValue(chosen);
+  await page.close();
+});
