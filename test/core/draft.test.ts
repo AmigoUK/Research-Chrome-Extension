@@ -187,6 +187,23 @@ describe('composeDraft', () => {
     expect(draft.groupedByColour).toBe(false);
   });
 
+  it('treats a colour that names no palette entry as unplaced, in colour-grouping mode', async () => {
+    await repos.projects.put({
+      ...project,
+      colorPalette: [{ id: 'c1', swatch: '#ffcc00', label: 'Evidence' }],
+    });
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1', { color: 'c1' }));
+    await repos.annotations.put(anno('a2', 'd1', { color: 'deleted-colour' }));
+
+    const draft = await compose();
+    expect(draft.groupedByColour).toBe(true);
+    expect(draft.sections.map((s) => s.title)).toEqual(['Evidence']);
+    expect(draft.sections[0]?.entries.map((e) => e.annotationId)).toEqual(['a1']);
+    expect(draft.unplaced.map((e) => e.annotationId)).toEqual(['a2']);
+  });
+
   it('returns an empty draft rather than throwing when there is nothing collected', async () => {
     const draft = await compose();
     expect(draft.sections.every((s) => s.entries.length === 0)).toBe(true);
