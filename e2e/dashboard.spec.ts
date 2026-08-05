@@ -40,8 +40,9 @@ test('dashboard shell renders: wordmark, project switcher, nav and credit footer
   await expect(page.locator('#pName')).not.toHaveText('—');
   await expect(page.locator('#pName')).not.toHaveText('Loading…');
 
-  // Seven nav items: the five Phase 2 views, Team (Phase 5) and Settings.
-  await expect(page.locator('#nav .nav-item')).toHaveCount(7);
+  // Eight nav items: the five Phase 2 views, Outline (draft & export), Team
+  // (Phase 5) and Settings.
+  await expect(page.locator('#nav .nav-item')).toHaveCount(8);
 
   // Credit footer (dashboard only) with attribution and version.
   await expect(page.locator('.credit')).toContainText('dev@attv.uk');
@@ -228,6 +229,107 @@ test('Annotations view changes a note review status and persists it', async () =
   await page.reload();
   await page.locator('#nav .nav-item[data-route="annotations"]').click();
   await expect(page.locator('.anno[data-id="e2e-anno-1"] [data-status]')).toHaveText('Accepted');
+
+  await page.close();
+});
+
+test('deleting a section keeps its passages, as unplaced', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  // One document, two passages each filed under a DIFFERENT real section —
+  // the project's own default outline, read back rather than guessed, so
+  // this does not depend on how ids are derived from section titles.
+  await page.evaluate(async () => {
+    const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+    const project = projects.data[0];
+    const projectId = project.id;
+    const now = new Date().toISOString();
+    await chrome.runtime.sendMessage({
+      type: 'documents/put',
+      document: {
+        id: 'e2e-outline-doc',
+        projectId,
+        url: 'https://example.org/outline-source',
+        type: 'article',
+        metadata: {
+          title: 'Outline source',
+          authors: ['Doe, J.'],
+          year: 2024,
+          journal: 'Journal',
+        },
+        status: 'toRead',
+        createdAt: now,
+        updatedAt: now,
+      },
+    });
+    const mkAnno = (id: string, section: string) => ({
+      id,
+      projectId,
+      documentId: 'e2e-outline-doc',
+      anchor: { kind: 'web', selectors: [{ type: 'textQuote', exact: `passage for ${id}` }] },
+      content: `Note for ${id}`,
+      tags: [],
+      status: 'draft',
+      author: 'me',
+      section,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: mkAnno('e2e-outline-anno-1', project.outline[0].id),
+    });
+    await chrome.runtime.sendMessage({
+      type: 'annotations/put',
+      annotation: mkAnno('e2e-outline-anno-2', project.outline[1].id),
+    });
+  });
+  await page.reload();
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-sec[data-sec]').first()).toBeVisible();
+
+  // Scoped by data-id rather than by a raw `.anno` count: earlier tests in
+  // this file leave their own unsectioned annotations behind in the shared
+  // profile, and those already sit in Unplaced — a bare count would be
+  // polluted by them. Real sections carry only `.ol-sec`; Unplaced carries
+  // `.ol-sec` AND `.ol-sec--loose`, so `:not(.ol-sec--loose)` isolates them.
+  const anno1InASection = page.locator(
+    '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-1"]',
+  );
+  const anno1InUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-outline-anno-1"]');
+  const anno2InASection = page.locator(
+    '.ol-sec:not(.ol-sec--loose) .anno[data-id="e2e-outline-anno-2"]',
+  );
+
+  // Both passages start filed under a real section, not Unplaced.
+  await expect(anno1InASection).toHaveCount(1);
+  await expect(anno2InASection).toHaveCount(1);
+  await expect(anno1InUnplaced).toHaveCount(0);
+
+  // The first section in outline order is the one holding e2e-outline-anno-1.
+  await page.locator('[data-delsec]').first().click();
+  await page.getByRole('button', { name: /delete section/i }).click();
+
+  // Its passage survives — now in Unplaced, not gone — while the OTHER
+  // section's passage is untouched by a deletion that was not its own.
+  await expect(anno1InUnplaced).toHaveCount(1);
+  await expect(anno1InASection).toHaveCount(0);
+  await expect(anno2InASection).toHaveCount(1);
+
+  // This suite's tests share one persistent profile and never reset storage
+  // between them (see the neighbouring tests). Deleting the document cascades
+  // to its annotations (`documents/delete`'s own contract), so the Annotations
+  // list a LATER, unrelated test reads back is the length it was before this
+  // test ran — otherwise these two extra rows lengthen that list enough to
+  // push a later test's target row below the fold, which was observed to
+  // intermittently break that other test's popover interaction (a scroll
+  // event closing the popover mid-click — see `closePop`'s callers).
+  await page.evaluate(async () => {
+    await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-outline-doc' });
+  });
 
   await page.close();
 });

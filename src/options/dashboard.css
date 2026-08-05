@@ -977,6 +977,78 @@ button.stat-tag:hover {
   flex-wrap: wrap;
 }
 
+/* ---- Outline ---- */
+.ol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface);
+  padding: 13px 16px;
+  margin-bottom: 18px;
+}
+.ol-q {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--fg);
+}
+.ol-q--empty {
+  font-family: var(--font-body);
+  color: var(--muted);
+  font-style: italic;
+}
+.ol-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ol-sec {
+  margin-bottom: 22px;
+}
+.ol-sec--loose {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--surface-2);
+}
+.ol-sec h3 {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 11px;
+}
+.ol-n {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.ol-warn {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--danger);
+  border: 1px solid oklch(82% 0.09 27);
+  border-radius: 5px;
+  padding: 2px 7px;
+}
+.ol-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
 /* ---- Citation styles ---- */
 .styles-grid {
   display: grid;
