@@ -34,6 +34,7 @@ import type {
 } from '../core/model/types';
 import { SELF_USER_ID } from '../core/model/identity';
 import { defaultOutline, resolveOutline } from '../core/draft/outline';
+import { draftToMarkdown } from '../core/draft/serialise';
 import { groupPassages, orderedEntries } from '../core/usecases/draft';
 import { DEFAULT_ACTIVITY_LIMIT } from '../core/usecases/activity';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
@@ -83,6 +84,7 @@ import {
 } from './view-model';
 import { highlightJson } from './csl-code';
 import { PREVIEW_SAMPLES, previewItems } from './preview-samples';
+import { copyDraft, downloadMarkdown, draftFilename } from './export-draft';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document): T =>
   root.querySelector(sel) as T;
@@ -1659,17 +1661,75 @@ function todayDateIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** How many sources this draft cites without any bibliographic record to
+ *  cite them with — appended to both export toasts so a student sees the
+ *  gap at the moment they hand the draft over, not later in Word. */
+function missingReferenceSuffix(count: number): string {
+  return count > 0 ? ` · ${count} source${count === 1 ? '' : 's'} without citation data` : '';
+}
+
+/** "Copy draft" — composes with `flavour: 'html'` so the clipboard gets real
+ *  markup (the italics a word processor needs); `copyDraft` derives its own
+ *  plain-text sibling from that same rendering rather than a second,
+ *  `'text'`-flavour compose (see `export-draft.ts`'s `plainTextFrom`). */
+async function copyDraftToClipboard(): Promise<void> {
+  if (!state.activeProjectId) return;
+  const { template, styleId } = citeArgs();
+  try {
+    const draft = await sendRequest({
+      type: 'draft/compose',
+      projectId: state.activeProjectId,
+      template,
+      flavour: 'html',
+      styleId,
+    });
+    const how = await copyDraft(draft);
+    const warn = missingReferenceSuffix(draft.missingReferenceCount);
+    toast(
+      how === 'rich'
+        ? `Draft copied${warn}`
+        : `Copied without formatting — the bibliography’s italics need fixing by hand${warn}`,
+      ICON.copy,
+      how !== 'rich',
+    );
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t build the draft', ICON.warn, true);
+  }
+}
+
+/** "Download .md" — composes with `flavour: 'text'`, the flavour
+ *  `draftToMarkdown` requires: pairing it with the `'html'`-flavour draft the
+ *  clipboard action composes would throw `DraftFlavourMismatchError`. */
+async function downloadDraftAsMarkdown(): Promise<void> {
+  if (!state.activeProjectId) return;
+  const { template, styleId } = citeArgs();
+  try {
+    const draft = await sendRequest({
+      type: 'draft/compose',
+      projectId: state.activeProjectId,
+      template,
+      flavour: 'text',
+      styleId,
+    });
+    const filename = draftFilename(activeProject()?.name ?? '', todayDateIso());
+    downloadMarkdown(filename, draftToMarkdown(draft));
+    toast(
+      `Draft downloaded · ${filename}${missingReferenceSuffix(draft.missingReferenceCount)}`,
+      ICON.down,
+    );
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t build the draft', ICON.warn, true);
+  }
+}
+
 function renderOutline(view: HTMLElement, actions: HTMLElement): void {
   actions.innerHTML =
     `<button class="btn btn--sm" id="olAdd">Add section</button>` +
     `<button class="btn btn--sm" id="olCopy">${ICON.copy} Copy draft</button>` +
     `<button class="btn btn--sm" id="olMd">Download .md</button>`;
   $('#olAdd', actions).onclick = (e) => openAddSectionPop(e.currentTarget as HTMLElement);
-  // Task 9 wires these to the real export. Leaving them dead would look like
-  // a finished feature that silently does nothing; saying so is honest about
-  // where the work stands.
-  $('#olCopy', actions).onclick = () => toast('Coming in the next step', ICON.note);
-  $('#olMd', actions).onclick = () => toast('Coming in the next step', ICON.note);
+  $('#olCopy', actions).onclick = () => void copyDraftToClipboard();
+  $('#olMd', actions).onclick = () => void downloadDraftAsMarkdown();
 
   const project = activeProject();
   if (!project) {
