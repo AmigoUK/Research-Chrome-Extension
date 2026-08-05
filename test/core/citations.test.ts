@@ -24,6 +24,11 @@ const stubFormatter: CitationFormatter = {
   formatWithStyle: (items: CslItem[], style, kind) =>
     Promise.resolve(`[${style.id}:${kind}] ${items.map((i) => i['id']).join('; ')}`),
   compileStyle: (style) => Promise.resolve(`<style id="${style.id}"/>`),
+  formatRun: (run) =>
+    Promise.resolve({
+      inText: run.order.map((id) => `(${id})`),
+      bibliography: [...new Set(run.order)].map((id) => `BIB ${id}`).join('\n'),
+    }),
 };
 
 function makeRef(id: string, projectId: string): Reference {

@@ -10,7 +10,13 @@
  */
 import { Cite, plugins } from '@citation-js/core';
 import '@citation-js/plugin-csl';
-import type { CitationFormatter, CitationKind, CslItem } from '../../core/ports/citation';
+import type {
+  CitationFormatter,
+  CitationKind,
+  CitationRun,
+  CitationRunOutput,
+  CslItem,
+} from '../../core/ports/citation';
 import type { CitationStyle } from '../../core/model/types';
 import { templateFor } from '../../core/citation/styles';
 import { isCustomBaseStyleId } from '../../core/citation/parse';
@@ -89,34 +95,95 @@ export class CiteJsFormatter implements CitationFormatter {
     return baseCsl ? compileCsl(baseCsl, style.userRules) : '';
   }
 
-  async formatWithStyle(
-    items: CslItem[],
-    style: CitationStyle,
-    kind: CitationKind,
-  ): Promise<string> {
+  /**
+   * Resolve a `CitationStyle` to the template name it should format under:
+   * the base CSL compiled with the style's user rules, registered as a
+   * `custom:${hash(...)}` template, or the plain base template when there is
+   * nothing to compile. Shared by `formatWithStyle` and `formatRun` — both
+   * need the same custom-style resolution, just against a different call to
+   * citeproc afterwards.
+   */
+  private async styleTemplate(style: CitationStyle): Promise<string> {
     const { template: baseTemplate, csl } = await this.ensureTemplate(
       templateFor(style.baseStyleId),
     );
     const rules = style.userRules;
     const compiled = csl ? compileCsl(csl, rules) : '';
-    let template = baseTemplate;
+    if (!compiled) return baseTemplate;
 
-    if (compiled) {
-      // The base XML goes into the hash as well as the rules: a re-imported
-      // style must not be served by the engine built from the old file.
-      const name = `custom:${hash(`${baseTemplate}:${JSON.stringify(rules)}`)}`;
-      if (!this.registered.has(name)) {
-        cslConfig().templates.add(name, compiled);
-        this.registered.add(name);
-      }
-      template = name;
+    // The base XML goes into the hash as well as the rules: a re-imported
+    // style must not be served by the engine built from the old file.
+    const name = `custom:${hash(`${baseTemplate}:${JSON.stringify(rules)}`)}`;
+    if (!this.registered.has(name)) {
+      cslConfig().templates.add(name, compiled);
+      this.registered.add(name);
     }
+    return name;
+  }
 
+  async formatWithStyle(
+    items: CslItem[],
+    style: CitationStyle,
+    kind: CitationKind,
+  ): Promise<string> {
+    const template = await this.styleTemplate(style);
+    const rules = style.userRules;
     const processed = items.map((item) => applyRulesToItem(item, rules));
     const type = kind === 'bibliography' ? 'bibliography' : 'citation';
     const text = new Cite(processed)
       .format(type, { format: 'text', template, lang: 'en-US' })
       .trim();
     return applyDoiFormat(text, rules);
+  }
+
+  async formatRun(
+    run: CitationRun,
+    template: string,
+    flavour: 'text' | 'html',
+    style?: CitationStyle,
+  ): Promise<CitationRunOutput> {
+    if (run.order.length === 0) return { inText: [], bibliography: '' };
+
+    // Resolve the template exactly as the other methods do, so a user's
+    // compiled rules apply here too.
+    const name = style
+      ? await this.styleTemplate(style)
+      : (await this.ensureTemplate(template)).template;
+    const rules = style?.userRules;
+    const processed = run.items.map((item) => (rules ? applyRulesToItem(item, rules) : item));
+
+    // Only the sources the draft actually cites, ordered by FIRST citation:
+    // Vancouver numbers its reference list that way, and a bibliography built
+    // on input order would disagree with the numbers in the text. Author-date
+    // styles sort themselves, so this ordering is a no-op for them.
+    const firstCited = [...new Set(run.order)];
+    const byId = new Map(processed.map((i) => [String((i as { id?: unknown }).id), i]));
+    const cited = firstCited.map((id) => byId.get(id)).filter((i): i is CslItem => i !== undefined);
+
+    const cite = new Cite(processed);
+    const inText = run.order.map((id, i) =>
+      cite
+        .format('citation', {
+          format: flavour,
+          template: name,
+          lang: 'en-US',
+          entry: [id],
+          // Both sides, not just `citationsPre`: citeproc disambiguates
+          // retroactively, so a cluster that cannot see the ones after it
+          // freezes an answer that stops being true further down the draft.
+          citationsPre: run.order.slice(0, i).map((p) => [p]),
+          citationsPost: run.order.slice(i + 1).map((p) => [p]),
+        })
+        .trim(),
+    );
+
+    const bibliography = new Cite(cited)
+      .format('bibliography', { format: flavour, template: name, lang: 'en-US' })
+      .trim();
+
+    return {
+      inText: rules ? inText.map((t) => applyDoiFormat(t, rules)) : inText,
+      bibliography: rules ? applyDoiFormat(bibliography, rules) : bibliography,
+    };
   }
 }
