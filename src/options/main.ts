@@ -1006,10 +1006,14 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
   // Research question and due date save on `change` (i.e. on blur), independently
   // of the "Save project" button below: a student following the Outline route's
   // Edit link here is fixing one fact, not batching a project-identity edit, and
-  // should not have to find a Save button for it.
+  // should not have to find a Save button for it. Both go through
+  // `queueProjectSave`, not a direct sendRequest: clicking "Save project" while
+  // a field still has focus fires that field's `blur` (and so `change`) before
+  // the button's own `click`, and queueing is what keeps the two writes from
+  // racing — see the comment on `queueProjectSave` for why.
   $<HTMLInputElement>('#setQ', host).addEventListener('change', () => {
     const value = $<HTMLInputElement>('#setQ', host).value.trim();
-    void saveProjectField(project.id, (p) => {
+    void queueProjectSave(project.id, (p) => {
       const next = { ...p, updatedAt: nowIso() };
       if (value) next.researchQuestion = value;
       else delete next.researchQuestion;
@@ -1018,7 +1022,7 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
   });
   $<HTMLInputElement>('#setDue', host).addEventListener('change', () => {
     const value = $<HTMLInputElement>('#setDue', host).value;
-    void saveProjectField(project.id, (p) => {
+    void queueProjectSave(project.id, (p) => {
       const next = { ...p, updatedAt: nowIso() };
       if (value) next.dueDate = value;
       else delete next.dueDate;
@@ -1035,48 +1039,63 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
       }
       const description = $<HTMLInputElement>('#setDesc', host).value.trim();
       const styleId = $<HTMLSelectElement>('#setStyle', host).value;
-      // Read from `state.projects`, not the `project` this draw call closed
-      // over: a `change`-triggered field save above (or a concurrent editor
-      // in another tab) may already have persisted a newer copy, and building
-      // `updated` from the stale closure would silently resurrect whatever
-      // this card looked like when it was first drawn.
-      const base = state.projects.find((pr) => pr.id === project.id) ?? project;
-      const updated: Project = {
+      // `apply` runs inside the queue, once any field save already in flight
+      // has landed, and reads `state.projects` at that moment — not `project`,
+      // the snapshot this draw call closed over, and not a `base` read here
+      // synchronously, which would still be the pre-edit copy on the "blur
+      // #setQ then click Save" sequence this fixes.
+      const result = await queueProjectSave(project.id, (base) => ({
         ...base,
         name,
         ...(description ? { description } : {}),
         ...(styleId ? { defaultCitationStyleId: styleId } : {}),
         updatedAt: nowIso(),
-      };
-      try {
-        await sendRequest({ type: 'projects/put', project: updated });
-        state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
+      }));
+      if (result.ok) {
         render();
         toast('Project saved', ICON.check);
-      } catch (err) {
-        toast(err instanceof Error ? err.message : 'Couldn’t save the project', ICON.warn, true);
       }
     })();
   };
 }
 
-/** Shared by the research-question and due-date `change` handlers above: both
- *  save independently and immediately, so each has to start from whatever is
- *  freshest in `state.projects` rather than a closure-captured `Project` —
- *  otherwise saving one field right after the other could overwrite the first
- *  save with a copy that predates it. Deliberately does not call `render()`
- *  on success: this card may still hold an un-saved edit in the Name or
- *  Description input, and a full re-render would discard it mid-edit. */
-async function saveProjectField(id: Id, apply: (project: Project) => Project): Promise<void> {
-  const current = state.projects.find((pr) => pr.id === id);
-  if (!current) return;
-  const updated = apply(current);
-  try {
-    await sendRequest({ type: 'projects/put', project: updated });
-    state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
-  } catch (err) {
-    toast(err instanceof Error ? err.message : 'Couldn’t save the project', ICON.warn, true);
-  }
+/** Every write to a project's fields — the "Save project" button and the
+ *  independent `#setQ`/`#setDue` blur-saves — goes through this one chain so
+ *  only one `projects/put` for a given project is ever in flight. Without it,
+ *  clicking "Save project" while `#setQ` still has focus fires `change` (blur)
+ *  before `click`; both handlers would then read `state.projects` before
+ *  either write resolves — since `sendRequest` is an IPC round trip, neither
+ *  can finish in the same synchronous tick — and build competing updates from
+ *  the same pre-edit snapshot. `projects/put` writes the whole object, so
+ *  whichever write lands last would silently win, dropping the other's edit
+ *  (an optimistic local update doesn't help here: the two payloads still
+ *  disagree on every field neither one is deliberately changing). Queueing
+ *  fixes that two ways at once: each write's `apply` doesn't run until prior
+ *  writes have actually applied their result to `state.projects`, and it
+ *  reads state fresh at that point rather than whenever it was queued.
+ *
+ *  The chained promise must never reject, or a later queued save would be
+ *  skipped entirely (a rejected `.then` short-circuits the next `.then` in
+ *  the chain) — so failures are caught and reported here, inside the link,
+ *  rather than left to propagate. */
+let projectSaveChain: Promise<{ ok: boolean }> = Promise.resolve({ ok: true });
+
+function queueProjectSave(id: Id, apply: (project: Project) => Project): Promise<{ ok: boolean }> {
+  const next = projectSaveChain.then(async () => {
+    const current = state.projects.find((pr) => pr.id === id);
+    if (!current) return { ok: true };
+    const updated = apply(current);
+    try {
+      await sendRequest({ type: 'projects/put', project: updated });
+      state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
+      return { ok: true };
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Couldn’t save the project', ICON.warn, true);
+      return { ok: false };
+    }
+  });
+  projectSaveChain = next;
+  return next;
 }
 
 function drawPaletteSettings(view: HTMLElement): void {
