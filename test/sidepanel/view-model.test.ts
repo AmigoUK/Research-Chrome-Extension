@@ -74,12 +74,13 @@ describe('gettingStartedSteps', () => {
     documentCount: 0,
     annotationCount: 0,
     movedBeyondToRead: false,
+    hasSectionedAnnotation: false,
     copiedCitation: false,
   };
 
   it('starts with everything undone on a fresh install', () => {
     const steps = gettingStartedSteps(fresh);
-    expect(steps).toHaveLength(5);
+    expect(steps).toHaveLength(6);
     expect(steps.every((s) => !s.done)).toBe(true);
     expect(gettingStartedComplete(steps)).toBe(false);
   });
@@ -90,10 +91,18 @@ describe('gettingStartedSteps', () => {
       documentCount: 2,
       annotationCount: 1,
       movedBeyondToRead: false,
+      hasSectionedAnnotation: false,
       copiedCitation: false,
     });
     const byId = Object.fromEntries(steps.map((s) => [s.id, s.done]));
-    expect(byId).toEqual({ open: true, file: true, annotate: true, status: false, cite: false });
+    expect(byId).toEqual({
+      open: true,
+      file: true,
+      annotate: true,
+      status: false,
+      outline: false,
+      cite: false,
+    });
   });
 
   it('treats a filed project as proof the user has opened an article before', () => {
@@ -103,12 +112,31 @@ describe('gettingStartedSteps', () => {
     expect(steps.find((s) => s.id === 'open')?.done).toBe(true);
   });
 
+  it('checks off the outline step only once a passage has a section, not merely once one exists', () => {
+    // Mirrors the annotate/status distinction above: having passages is not
+    // the same as having arranged one of them.
+    const steps = gettingStartedSteps({
+      ...fresh,
+      annotationCount: 3,
+      hasSectionedAnnotation: false,
+    });
+    expect(steps.find((s) => s.id === 'outline')?.done).toBe(false);
+
+    const arranged = gettingStartedSteps({
+      ...fresh,
+      annotationCount: 3,
+      hasSectionedAnnotation: true,
+    });
+    expect(arranged.find((s) => s.id === 'outline')?.done).toBe(true);
+  });
+
   it('reports complete only when every step is done', () => {
     const steps = gettingStartedSteps({
       hasCapturablePage: true,
       documentCount: 1,
       annotationCount: 1,
       movedBeyondToRead: true,
+      hasSectionedAnnotation: true,
       copiedCitation: true,
     });
     expect(gettingStartedComplete(steps)).toBe(true);

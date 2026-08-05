@@ -81,6 +81,8 @@ interface State {
   resolvedIds: Set<string>;
   /** Getting-started checklist inputs the documents list cannot prove. */
   annotationCount: number;
+  /** At least one of the project's annotations carries a section. */
+  hasSectionedAnnotation: boolean;
   copiedCitation: boolean;
   gettingStartedDismissed: boolean;
 }
@@ -101,6 +103,7 @@ const state: State = {
   pageDocumentId: null,
   resolvedIds: new Set(),
   annotationCount: 0,
+  hasSectionedAnnotation: false,
   copiedCitation: false,
   gettingStartedDismissed: true, // hidden until storage says otherwise
 };
@@ -210,6 +213,7 @@ function paletteEntry(colorId: string | undefined): HighlightColor | undefined {
 async function loadAnnotationCount(): Promise<void> {
   if (!state.activeProjectId) {
     state.annotationCount = 0;
+    state.hasSectionedAnnotation = false;
     return;
   }
   try {
@@ -218,6 +222,10 @@ async function loadAnnotationCount(): Promise<void> {
       projectId: state.activeProjectId,
     });
     state.annotationCount = annotations.length;
+    // Project-wide, not just this page's: the checklist's Outline step must
+    // reflect a section assigned from the dashboard just as much as one
+    // assigned from this panel's own picker.
+    state.hasSectionedAnnotation = annotations.some((a) => a.section !== undefined);
   } catch {
     // The checklist is decoration; a failed count must not break the panel.
   }
@@ -664,6 +672,12 @@ async function updatePageAnnotationSection(id: Id, section: Id | undefined): Pro
     // Only assigning (not clearing) a section can create the states either
     // nudge cares about — clearing one can only ever add to Unplaced.
     if (section !== undefined) void nudgeOutlineProgress(id);
+    // The checklist's Outline step is project-wide data, not part of
+    // `pageAnnotations` above — without this, assigning a section from THIS
+    // panel would only tick the checklist off after a later `data/changed`
+    // broadcast (which this client's own writes are filtered out of).
+    await loadAnnotationCount();
+    renderGettingStarted();
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t change section', true);
   }
@@ -899,7 +913,7 @@ function nudgeNext(id: string, message: string): void {
 }
 
 /**
- * The built-in tutorial: five workflow steps checked off from real project
+ * The built-in tutorial: six workflow steps checked off from real project
  * data, shown until every step is done or the user closes it. The first
  * undone step carries a one-line hint — teaching one move at a time instead
  * of a wall of instructions.
@@ -911,6 +925,7 @@ function renderGettingStarted(): void {
     documentCount: state.documents.length,
     annotationCount: state.annotationCount,
     movedBeyondToRead: state.documents.some((d) => d.status !== 'toRead'),
+    hasSectionedAnnotation: state.hasSectionedAnnotation,
     copiedCitation: state.copiedCitation,
   });
   const hide = state.gettingStartedDismissed || gettingStartedComplete(steps);

@@ -91,12 +91,16 @@ export interface GettingStartedInputs {
   annotationCount: number;
   /** At least one source has moved past "To read". */
   movedBeyondToRead: boolean;
+  /** At least one passage has been given a section of the outline — from
+   *  either the dashboard's Outline route or the panel's own per-passage
+   *  picker, both of which write the same `Annotation.section`. */
+  hasSectionedAnnotation: boolean;
   /** The user has copied any citation or bibliography at least once. */
   copiedCitation: boolean;
 }
 
 export interface GettingStartedStep {
-  id: 'open' | 'file' | 'annotate' | 'status' | 'cite';
+  id: 'open' | 'file' | 'annotate' | 'status' | 'outline' | 'cite';
   label: string;
   /** One short sentence shown for the first not-done step. */
   hint: string;
@@ -104,7 +108,7 @@ export interface GettingStartedStep {
 }
 
 /**
- * The five moves that make the tool make sense, checked off from real data —
+ * The six moves that make the tool make sense, checked off from real data —
  * a tutorial that reads the project instead of trusting the user to say
  * "done". Order is the workflow order; the first undone step is "current".
  */
@@ -133,6 +137,12 @@ export function gettingStartedSteps(i: GettingStartedInputs): GettingStartedStep
       label: 'Move a source along the workflow',
       hint: 'Use the status chip on a reading-list row: To read → In review → Analysed → Used.',
       done: i.movedBeyondToRead,
+    },
+    {
+      id: 'outline',
+      label: 'Assign a passage to a section',
+      hint: 'Open the dashboard’s Outline screen and give one highlight a section — Introduction, Evidence, whatever fits your draft.',
+      done: i.hasSectionedAnnotation,
     },
     {
       id: 'cite',
