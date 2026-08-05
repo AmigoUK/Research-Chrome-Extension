@@ -433,4 +433,21 @@ describe('groupPassages', () => {
     expect(grouped.buckets.every((b) => b.items.length === 0)).toBe(true);
     expect(grouped.unplaced.map((a) => a.id)).toEqual(['a1', 'a2']);
   });
+
+  // Fix round 2: in colour mode, a passage with a valid colour but no
+  // section is accounted for by its colour bucket, so `unplaced` (what the
+  // export means by the word) correctly excludes it. But the Outline screen
+  // renders no colour buckets of its own — it exists to assign sections — so
+  // reading `unplaced` there made this exact passage disappear from the page
+  // entirely. `unsectioned` fixes that: it means "has no section", full stop,
+  // regardless of grouping mode, so the passage stays visible here even while
+  // `unplaced` (rightly) omits it.
+  it('keeps a coloured unsectioned passage out of `unplaced` but visible in `unsectioned`, in colour-grouping mode', () => {
+    const annotations = [anno('a1', 'd1', { color: 'c1' })];
+
+    const grouped = groupPassages(annotations, groupPassagesProject);
+    expect(grouped.groupedByColour).toBe(true);
+    expect(grouped.unplaced.map((a) => a.id)).toEqual([]);
+    expect(grouped.unsectioned.map((a) => a.id)).toEqual(['a1']);
+  });
 });
