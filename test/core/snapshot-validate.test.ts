@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ID_PATTERN, validateSnapshotData } from '../../src/core/snapshot/validate';
+import { resolveOutline } from '../../src/core/draft/outline';
 
 const NOW = '2026-07-24T12:00:00.000Z';
 
@@ -344,5 +345,61 @@ describe('outline and section validation', () => {
   it('drops an annotation section that names no section in this project', () => {
     const snap = validSnapshotWith({ outline: [{ id: 's1', title: 'Intro' }] }, { section: 's9' });
     expect(validateSnapshotData(snap).annotations[0]?.section).toBeUndefined();
+  });
+
+  it('does not admit a non-string section via coercion (e.g. an array that stringifies to a real id)', () => {
+    const snap = validSnapshotWith(
+      { outline: [{ id: 's1', title: 'Intro' }] },
+      { section: ['s1'] },
+    );
+    expect(validateSnapshotData(snap).annotations[0]?.section).toBeUndefined();
+  });
+
+  it('keeps an annotation placement made against a legacy project (sections only, no outline)', () => {
+    // Same shape resolveOutline sees for `good()`'s default project — no
+    // `outline`, just legacy `sections` — so the derived id below is exactly
+    // what a real annotation on such a project would have stored.
+    const derived = resolveOutline({
+      id: 'p1',
+      name: 'Urban Heat',
+      sections: ['Literature'],
+      members: [],
+      createdAt: NOW,
+      updatedAt: NOW,
+    })[0]?.id;
+    const snap = validSnapshotWith({}, { section: derived });
+    expect(validateSnapshotData(snap).annotations[0]?.section).toBe(derived);
+  });
+});
+
+describe("the project's research question and due date", () => {
+  it('keeps a well-formed research question and due date', () => {
+    const snap = validSnapshotWith({
+      researchQuestion: 'Does urban heat correlate with tree cover?',
+      dueDate: '2026-09-01',
+    });
+    const parsed = validateSnapshotData(snap);
+    expect(parsed.project.researchQuestion).toBe('Does urban heat correlate with tree cover?');
+    expect(parsed.project.dueDate).toBe('2026-09-01');
+  });
+
+  it('leaves both fields absent when the project never had them', () => {
+    const parsed = validateSnapshotData(good());
+    expect(parsed.project.researchQuestion).toBeUndefined();
+    expect(parsed.project.dueDate).toBeUndefined();
+  });
+
+  it('refuses an over-long research question rather than storing it', () => {
+    expect(() =>
+      validateSnapshotData(validSnapshotWith({ researchQuestion: 'x'.repeat(2001) })),
+    ).toThrow(/research question/);
+  });
+
+  it('refuses a due date that is not a bare YYYY-MM-DD calendar day', () => {
+    for (const bad of ['2026-9-1', '09/01/2026', '2026-09-01T00:00:00Z', 'next tuesday', '']) {
+      expect(() => validateSnapshotData(validSnapshotWith({ dueDate: bad })), bad).toThrow(
+        /due date/,
+      );
+    }
   });
 });

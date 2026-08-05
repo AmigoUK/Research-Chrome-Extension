@@ -26,6 +26,7 @@ import {
 import { DOCUMENT_STATUSES } from '../model/workflow';
 import { ROLES } from '../model/roles';
 import type { SnapshotData } from '../usecases/snapshot';
+import { resolveOutline } from '../draft/outline';
 
 /**
  * Ids we are willing to store. Wide enough for UUIDs, `custom-base:<slug>`,
@@ -134,6 +135,17 @@ function url(value: unknown, what: string): string {
   return raw;
 }
 
+/** `Project.dueDate` is a calendar day, not an instant (see the model
+ *  comment) — accepting anything looser than `YYYY-MM-DD` would let an ISO
+ *  instant or a locale string through, which is exactly what that field
+ *  exists to avoid. */
+function dueDate(value: unknown, what: string): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    fail(`${what} is not a YYYY-MM-DD date`);
+  }
+  return value;
+}
+
 /**
  * Rebuild metadata from its known fields only. The old shape-check
  * (`is it a record?`) let a tampered snapshot smuggle markup through fields
@@ -237,10 +249,18 @@ export function validateSnapshotData(value: unknown): SnapshotData {
     ...(project as unknown as SnapshotData['project']),
     id: projectId,
     name: text(project['name'], 'the project name', 512),
-    sections: list(project['sections'], 'the section list').map((s, i) =>
-      text(s, `section ${i + 1}`, 128),
-    ),
     members,
+    // `sections` is deprecated and "never written again" (see the model
+    // comment) — materialising it as `[]` for every project that never had
+    // one would keep re-writing the field a fresh export is supposed to be
+    // free of, same as `outline`/`colorPalette`/`syncMode` below.
+    ...(project['sections'] === undefined
+      ? {}
+      : {
+          sections: list(project['sections'], 'the section list').map((s, i) =>
+            text(s, `section ${i + 1}`, 128),
+          ),
+        }),
     ...(project['outline'] === undefined
       ? {}
       : {
@@ -252,6 +272,18 @@ export function validateSnapshotData(value: unknown): SnapshotData {
             };
           }),
         }),
+    ...(project['researchQuestion'] === undefined
+      ? {}
+      : {
+          researchQuestion: text(
+            project['researchQuestion'],
+            "the project's research question",
+            2000,
+          ),
+        }),
+    ...(project['dueDate'] === undefined
+      ? {}
+      : { dueDate: dueDate(project['dueDate'], "the project's due date") }),
     ...(project['colorPalette'] === undefined
       ? {}
       : {
@@ -273,8 +305,13 @@ export function validateSnapshotData(value: unknown): SnapshotData {
 
   // An annotation's `section` only means something within its own project's
   // outline; built once, before annotations are validated, exactly as the
-  // palette's colour ids are handled per-annotation below.
-  const sectionIds = new Set((validatedProject.outline ?? []).map((s) => s.id));
+  // palette's colour ids are handled per-annotation below. Goes through
+  // `resolveOutline` rather than reading `validatedProject.outline` directly:
+  // a project carrying only legacy `sections` has no `outline` at all, but
+  // its annotations were assigned against the *derived* ids `resolveOutline`
+  // mints for it — reading `outline` here would see an empty set and drop
+  // every one of those placements on the way back in.
+  const sectionIds = new Set(resolveOutline(validatedProject).map((s) => s.id));
 
   const out: SnapshotData = {
     project: validatedProject,
@@ -317,8 +354,13 @@ export function validateSnapshotData(value: unknown): SnapshotData {
           : { color: colorId(note['color'], `annotation ${i + 1}'s colour`) }),
         // A dangling section id is dropped, not rejected: a partial snapshot is a
         // normal thing to receive, and losing the whole annotation over a missing
-        // heading would be a worse trade than showing it as unplaced.
-        ...(sectionIds.has(String(rawSection)) ? { section: String(rawSection) } : {}),
+        // heading would be a worse trade than showing it as unplaced. Checked with
+        // `typeof`, not `String(rawSection)`: coercing first would admit a value
+        // like `['s1']`, which stringifies to `'s1'` and would pass the has-check
+        // for something that was never actually a section id.
+        ...(typeof rawSection === 'string' && sectionIds.has(rawSection)
+          ? { section: rawSection }
+          : {}),
         content: text(note['content'] ?? '', `annotation ${i + 1}'s content`, 65_536),
         ...(note['tags'] === undefined
           ? {}
