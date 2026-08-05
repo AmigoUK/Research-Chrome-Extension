@@ -24,6 +24,7 @@ import type { MemberView } from './usecases/members';
 import type { ReplyInput, StartThreadInput } from './usecases/comments';
 import type { MergeReport } from './usecases/snapshot';
 import type { BaseStyleSummary } from './usecases/base-styles';
+import type { Draft } from './usecases/draft';
 
 /** File bytes cross the messaging boundary as base64 (JSON-safe). */
 export interface FilePayload {
@@ -88,6 +89,10 @@ export interface MessageMap {
     res: Array<{ inText: string; bibliography: string }>;
   };
   'citations/compiledCsl': { req: { style: CitationStyle }; res: string };
+  'draft/compose': {
+    req: { projectId: Id; template: string; flavour: 'text' | 'html'; styleId?: Id | undefined };
+    res: Draft;
+  };
   'users/list': { req: Record<never, never>; res: User[] };
   'users/put': { req: { user: User }; res: null };
   'members/list': { req: { projectId: Id }; res: MemberView[] };

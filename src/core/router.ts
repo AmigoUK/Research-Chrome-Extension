@@ -38,6 +38,7 @@ import {
   startThread,
 } from './usecases/comments';
 import { buildSnapshot, mergeSnapshot, previewMerge, readSnapshotData } from './usecases/snapshot';
+import { composeDraft } from './usecases/draft';
 import { openSnapshot, sealSnapshot } from './snapshot/envelope';
 import {
   deleteCustomBaseStyle,
@@ -289,6 +290,21 @@ export async function handleRequest(
         ) as Result;
       case 'citations/compiledCsl':
         return ok(await requireFormatter(deps).compileStyle(request.style)) as Result;
+      case 'draft/compose': {
+        // `composeDraft`'s `style` is `style?: CitationStyle` (no `| undefined`
+        // in the type, unlike the citations/* use-cases above) — under
+        // exactOptionalPropertyTypes, passing `style: undefined` directly is a
+        // type error, so the resolved style is spread in only when defined.
+        const style = await resolveStyle(repos, request.styleId);
+        return ok(
+          await composeDraft(repos, requireFormatter(deps), {
+            projectId: request.projectId,
+            template: request.template,
+            flavour: request.flavour,
+            ...(style === undefined ? {} : { style }),
+          }),
+        ) as Result;
+      }
       case 'users/list':
         return ok(await repos.users.list()) as Result;
       case 'users/put':
