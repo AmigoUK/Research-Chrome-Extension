@@ -22,11 +22,12 @@ import type {
   Document,
   HighlightColor,
   Id,
+  OutlineSection,
   Project,
   TextQuoteSelector,
 } from '../core/model/types';
 import { templateFor } from '../core/citation/styles';
-import { defaultOutline } from '../core/draft/outline';
+import { defaultOutline, resolveOutline } from '../core/draft/outline';
 import type { CaptureInput } from '../core/usecases/capture';
 import {
   STATUS_META,
@@ -118,6 +119,15 @@ const nowIso = (): string => new Date().toISOString();
 
 function activeProject(): Project | undefined {
   return state.projects.find((p) => p.id === state.activeProjectId);
+}
+
+/** `resolveOutline` needs a `Project`; before one has loaded (or a fresh
+ *  profile with none yet), the picker still needs options to show — the same
+ *  defaults `resolveOutline` itself falls back to for a project with no
+ *  outline of its own. */
+function currentOutline(): OutlineSection[] {
+  const project = activeProject();
+  return project ? resolveOutline(project) : defaultOutline();
 }
 
 /**
@@ -458,6 +468,29 @@ function makeOnPageCard(a: Annotation, jumpable: boolean): HTMLElement {
   });
   foot.append(select);
 
+  const sectionPick = document.createElement('select');
+  sectionPick.className = 'onpage-note__section';
+  sectionPick.setAttribute('aria-label', 'Section of your draft');
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = 'No section';
+  sectionPick.append(none);
+  for (const s of currentOutline()) {
+    const option = document.createElement('option');
+    option.value = s.id;
+    option.textContent = s.title; // user text, from an option's textContent — never innerHTML.
+    sectionPick.append(option);
+  }
+  sectionPick.value = a.section ?? '';
+  // `change`, matching the status select above: it fires once the browser has
+  // already committed the pick and closed its native dropdown, so the async
+  // save (and the repaint it can trigger via `renderOnPageCard`) never runs
+  // while that dropdown is still open.
+  sectionPick.addEventListener('change', () => {
+    void updatePageAnnotationSection(a.id, sectionPick.value || undefined);
+  });
+  foot.append(sectionPick);
+
   if (jumpable) {
     const jumpBtn = document.createElement('button');
     jumpBtn.type = 'button';
@@ -603,6 +636,25 @@ async function updatePageAnnotationStatus(id: Id, status: AnnotationStatus): Pro
     toast(`Status · ${ANNO_STATUS[status]}`);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t change status', true);
+  }
+}
+
+/** `section` is `Id | undefined`, never `''` — the picker's "No section"
+ *  option maps to `undefined` before this is called. `exactOptionalPropertyTypes`
+ *  means clearing it has to delete the key, not assign it away. */
+async function updatePageAnnotationSection(id: Id, section: Id | undefined): Promise<void> {
+  const idx = state.pageAnnotations.findIndex((a) => a.id === id);
+  if (idx < 0) return;
+  const updated: Annotation = { ...state.pageAnnotations[idx]!, updatedAt: nowIso() };
+  if (section === undefined) delete updated.section;
+  else updated.section = section;
+  state.pageAnnotations[idx] = updated;
+  try {
+    await sendRequest({ type: 'annotations/put', annotation: updated });
+    const title = currentOutline().find((s) => s.id === section)?.title;
+    toast(title ? `Section · ${title}` : 'Removed from the outline');
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t change section', true);
   }
 }
 
