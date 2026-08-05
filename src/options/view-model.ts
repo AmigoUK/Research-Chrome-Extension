@@ -8,8 +8,9 @@ import { ACTIVITY_KINDS, type ActivityEvent, type ActivityKind } from '../core/m
 import type { DocumentStatus } from '../core/model/workflow';
 import { ROLE_LABELS } from '../core/model/roles';
 import { STATUS_META, statusLabel } from '../sidepanel/view-model';
+import { escapeHtml } from '../core/text/escape';
 
-export { STATUS_META, statusLabel };
+export { STATUS_META, statusLabel, escapeHtml };
 
 /** Routes reachable from the sidebar nav, in nav order. */
 export const NAV_ROUTES = [
@@ -66,14 +67,6 @@ export function statusDot(status: DocumentStatus): string {
 }
 
 /* ---- Activity feed (Phase 5, M2) ---- */
-
-/** HTML-escape a value for interpolation into a template string. */
-export function escapeHtml(value: unknown): string {
-  return String(value).replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c] as string,
-  );
-}
 
 const MONTHS = [
   'Jan',
