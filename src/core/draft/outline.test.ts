@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { resolveOutline, DEFAULT_OUTLINE_TITLES } from './outline';
+import { ID_PATTERN } from '../snapshot/validate';
 import type { Project } from '../model/types';
 
 const base: Project = {
@@ -24,8 +25,14 @@ describe('resolveOutline', () => {
   });
 
   it('is stable across calls, so the screen and the export agree', () => {
-    const project = { ...base, sections: ['Literature', 'Methods'] };
-    expect(resolveOutline(project)).toEqual(resolveOutline(project));
+    // Two distinct objects with the same content, not one object called
+    // twice: a resolver that memoised a random id per object identity would
+    // still pass the old two-calls-on-one-reference version of this test.
+    const projectA = { ...base, sections: ['Literature', 'Methods'] };
+    const projectB = { ...base, sections: ['Literature', 'Methods'] };
+    const out = resolveOutline(projectA);
+    expect(out[0]?.id).toBe('sec-0-literature');
+    expect(resolveOutline(projectB)).toEqual(out);
   });
 
   it('falls back to the essay-shaped defaults when there is nothing to derive from', () => {
@@ -39,5 +46,22 @@ describe('resolveOutline', () => {
 
   it('ignores an empty stored outline rather than showing no sections at all', () => {
     expect(resolveOutline({ ...base, outline: [] }).length).toBeGreaterThan(0);
+  });
+
+  it('caps a long legacy title so its derived id stays inside the id grammar the importer enforces', () => {
+    const out = resolveOutline({ ...base, sections: ['A'.repeat(128)] });
+    expect(out[0]?.id.length).toBeLessThanOrEqual(128);
+    expect(ID_PATTERN.test(out[0]?.id ?? '')).toBe(true);
+  });
+
+  it('returns entries the caller can reorder without mutating the stored outline', () => {
+    const outline = [
+      { id: 's1', title: 'Intro' },
+      { id: 's2', title: 'Body' },
+    ];
+    const project = { ...base, outline };
+    const out = resolveOutline(project);
+    out.reverse();
+    expect(project.outline?.map((s) => s.id)).toEqual(['s1', 's2']);
   });
 });

@@ -22,12 +22,19 @@ export const DEFAULT_OUTLINE_TITLES = [
 /** Deterministic id from a title and its position: the same project must
  *  resolve to the same ids on every call, or assignments made against one
  *  render would dangle on the next. A random id here would look correct in
- *  a single render and lose every assignment on reload. */
+ *  a single render and lose every assignment on reload.
+ *
+ *  The slug is capped well under `validate.ts`'s 128-char id grammar: an
+ *  uncapped legacy title (they predate any length limit on `sections`) could
+ *  otherwise mint an id the snapshot importer then rejects outright, failing
+ *  the whole import over one long heading. */
 function derivedId(title: string, index: number): string {
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '');
+    .replace(/^-|-$/g, '')
+    .slice(0, 100)
+    .replace(/-$/, '');
   return `sec-${index}-${slug || 'section'}`;
 }
 
@@ -36,7 +43,10 @@ function fromTitles(titles: readonly string[]): OutlineSection[] {
 }
 
 export function resolveOutline(project: Project): OutlineSection[] {
-  if (project.outline && project.outline.length > 0) return project.outline;
+  // A fresh array even on the stored-outline path: every other branch
+  // returns one, and a caller that reorders the result (an outline editor)
+  // must not reach through it and reorder `project.outline` in place.
+  if (project.outline && project.outline.length > 0) return [...project.outline];
   if (project.sections && project.sections.length > 0) return fromTitles(project.sections);
   return fromTitles(DEFAULT_OUTLINE_TITLES);
 }
