@@ -9,6 +9,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.8.0] — 2026-08-05
+
+The outline release: a bridge from a highlight to a written essay.
+
+### Added
+
+- **Outline & draft export.** Give each highlight a place in your argument, then
+  hand the whole draft to your word processor. A new **Outline** view in the
+  dashboard lists a project's sections — editable (add, rename, reorder,
+  delete) — plus an **Unplaced** bucket for anything not yet assigned; a
+  passage can be placed from there, from any section row, or from a matching
+  control on the side panel's note card while you're still reading. An empty
+  section is flagged rather than staying silent — a missing counter-argument
+  is an easy way to lose marks. **Copy draft** puts the essay on the
+  clipboard as real formatted HTML, with a plain-text fallback (and an
+  honest toast) if the browser refuses the rich write; **Download .md**
+  saves the same draft as a Markdown file.
+- **Citations resolved against the draft as a whole document**, not source
+  by source: every draft export runs one citeproc pass over the whole
+  essay, so a numeric style (Vancouver) numbers sources in the order they
+  are actually cited, an author–date style disambiguates a repeated surname
+  the same way on its first appearance as its second (`2016a`, not a bare
+  `2016` that only a later citation corrects), and the reference list holds
+  **only the sources actually cited**, in first-citation order. A passage
+  whose source has no bibliographic record still appears in the draft,
+  marked `<no bibliographic data — complete it in Documents>`, instead of
+  breaking the export; a project with nothing assigned yet falls back to
+  grouping by highlight colour and says so on screen and in the export.
+- **A research question and a due date** on the project, shown above the
+  Outline (`Settings` is where you set them).
+- The first-run guide and the side panel's getting-started checklist gain a
+  sixth step, **Arrange your draft**, between highlighting and citing.
+
+### Known issues
+
+- **The per-row Cite button (Documents) still numbers every source `(1)`
+  under a numeric style** such as Vancouver. It formats each document's
+  citation alone, with nothing to number it against, so it cannot know its
+  real position in the bibliography. Pre-existing, not introduced or fixed
+  by this release — but this release adds the piece that fixes it properly:
+  `formatRun` resolves a whole set of citations together in one citeproc
+  pass (that is how the draft export gets correct numbering) and the Cite
+  button can be moved onto it in a follow-up.
+
+### Changed
+
+- `Project.sections` (the old hardcoded `Literature / Methods / Data / Report`
+  list) is superseded by the new, editable `Project.outline`. A project that
+  never touched the old field is seeded with an essay-shaped default —
+  `Introduction / Background / Evidence / Counter-arguments / Conclusion` —
+  the first time its outline is read; one that has real `sections` keeps
+  them, promoted into the new shape. Both new fields are optional and
+  nothing is indexed, so this shipped with **no schema migration** —
+  `DB_VERSION` stays at 5.
+
 ## [1.7.4] — 2026-08-04
 
 ### Fixed

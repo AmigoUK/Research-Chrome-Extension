@@ -17,7 +17,19 @@ Fields:
 - `name`: project name.
 - `description`: free-text description.
 - `defaultCitationStyleId`: link to a `CitationStyle`.
-- `sections`: list of section definitions (e.g. `Literature`, `Methods`, `Data`, `FOI`, `Report`).
+- `sections` (`string[]`, **deprecated**): the old hardcoded section-title list. Still accepted on
+  snapshot import and, when `outline` is absent, promoted into it once by `resolveOutline` — never
+  written back to `sections` itself.
+- `outline` (`OutlineSection[]`, optional): the project's draft structure — `{ id, title }[]`, in
+  display/citation order. Absent → derived by `resolveOutline(project)`: from `sections` if that has
+  entries (minting a stable id per title), else the essay-shaped default `Introduction / Background /
+  Evidence / Counter-arguments / Conclusion`. The id is stable and never reused, exactly as
+  `HighlightColor.id` is for the palette, so renaming a section keeps its passages and two sections
+  can never merge by sharing a title.
+- `researchQuestion` (`string`, optional): the question the project answers, shown above the
+  Outline view.
+- `dueDate` (`string`, optional, `YYYY-MM-DD`): hand-in date — a calendar day, not an instant, so
+  "due in 5 days" doesn't jump by a day across time zones.
 - `members`: list of user-role pairs for collaboration.
 - `syncMode`: `local` | `file` — how the project travels between machines. Absent means `local`; there is deliberately no `backend` value, because this build has no server.
 - `createdAt`, `updatedAt`.
@@ -49,6 +61,14 @@ Fields:
 - `content`: text of the note.
 - `tags`: list of tags.
 - `status`: workflow status, e.g. `draft`, `accepted`, `rejected`, `includedInReport`.
+- `color` (optional): a `HighlightColor.id` from the project's palette — the highlight taxonomy,
+  independent of workflow status.
+- `section` (`Id`, optional): an `OutlineSection.id` — as `color` holds a `HighlightColor.id`, not a
+  section *title*, for the same reason (a rename must not orphan the passage). Absent, or naming a
+  section that no longer exists, means the passage is **unplaced**: it shows in the Outline view's
+  Unplaced bucket and, when composing a draft, is either grouped with the rest of the unplaced
+  passages or — if *no* annotation in the project has ever carried a `section` — folds the whole
+  draft back to grouping by `color` instead (see `groupPassages` in `src/core/usecases/draft.ts`).
 - `author`: user id.
 - `createdAt`, `updatedAt`.
 
@@ -139,6 +159,15 @@ A file is validated before it is stored: it must be CSL, in the CSL namespace, i
 | 5 | `customBaseStyles` (imported `.csl` files) |
 
 Migrations are append-only: a shipped migration is never edited.
+
+**Outline & draft export (v1.8.0) needed no migration.** `Project.outline`, `Project.researchQuestion`,
+`Project.dueDate` and `Annotation.section` are all optional fields on stores that already exist, and
+none of them is indexed — the dashboard already loads every annotation for a project, so there is
+nothing a new index would speed up. `DB_VERSION` therefore stays at **5**; an existing record simply
+has no opinion on any of the four fields until something writes one. The one field this feature
+retires, `Project.sections`, is handled the same way in reverse: it stays in the schema, still
+accepted on snapshot import, and is promoted into `outline` (never written back) the first time a
+project's outline is read.
 
 ## Snapshots (Phase 5, M4)
 

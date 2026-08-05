@@ -104,6 +104,51 @@ describe('draftToHtml', () => {
     expect(draftToHtml(draft)).toContain('(Nowak &#38; Kowalski, 2016a)');
   });
 
+  // Fix wave item 3: `DraftEntry.colorLabel` was populated and carried all
+  // the way through but rendered by nothing, so a colour-coded taxonomy
+  // ("disagree" vs "key evidence") had no trace in the draft. Resolved by
+  // rendering it, not by deleting the field.
+  it('renders the colour label as a taxonomy tag beside the entry', () => {
+    expect(draftToHtml(draft)).toContain('<em>Colour:</em> Evidence');
+  });
+
+  it('escapes a hostile colour label', () => {
+    const hostile: Draft = {
+      ...draft,
+      sections: [
+        {
+          id: 's1',
+          title: 'Barriers',
+          entries: [
+            {
+              annotationId: 'a1',
+              note: '',
+              inTextFormatted: '(Nowak, 2016)',
+              colorLabel: 'Evidence <ctag> & camp',
+            },
+          ],
+        },
+      ],
+    };
+    const html = draftToHtml(hostile);
+    expect(html).toContain('Evidence &lt;ctag&gt; &amp; camp');
+    expect(html).not.toContain('<ctag>');
+  });
+
+  it('omits the colour tag entirely when the entry carries no colour label', () => {
+    const html = draftToHtml({
+      ...draft,
+      sections: [
+        {
+          id: 's1',
+          title: 'Barriers',
+          entries: [{ annotationId: 'a1', note: '', inTextFormatted: '(Nowak, 2016)' }],
+        },
+      ],
+    });
+    expect(html).not.toContain('Colour:');
+  });
+
   it('marks a direct quote that has no trustworthy page', () => {
     const pdf: Draft = {
       ...draft,
@@ -309,6 +354,42 @@ describe('draftToMarkdown', () => {
     });
     expect(md).toContain('a & b');
     expect(md).not.toContain('&amp;');
+  });
+
+  // Fix wave item 3, Markdown side — mirrors the HTML tests above.
+  it('renders the colour label as a taxonomy tag beside the entry', () => {
+    expect(draftToMarkdown(textDraft)).toContain('*Colour:* Evidence');
+  });
+
+  it('does not escape the colour label — Markdown is not HTML', () => {
+    const md = draftToMarkdown({
+      ...textDraft,
+      sections: [
+        {
+          id: 's1',
+          title: 'T',
+          entries: [
+            { annotationId: 'a1', note: '', inTextFormatted: '', colorLabel: 'a & b <ctag>' },
+          ],
+        },
+      ],
+    });
+    expect(md).toContain('a & b <ctag>');
+    expect(md).not.toContain('&amp;');
+  });
+
+  it('omits the colour tag entirely when the entry carries no colour label', () => {
+    const md = draftToMarkdown({
+      ...textDraft,
+      sections: [
+        {
+          id: 's1',
+          title: 'Barriers',
+          entries: [{ annotationId: 'a1', note: '', inTextFormatted: '(Nowak, 2016)' }],
+        },
+      ],
+    });
+    expect(md).not.toContain('Colour:');
   });
 
   it('prints the due date', () => {

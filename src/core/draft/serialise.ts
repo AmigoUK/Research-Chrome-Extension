@@ -78,8 +78,12 @@ function entryHtml(entry: DraftEntry): string {
   const body = entry.quote
     ? `<blockquote><p>${quoteHtml(entry.quote)}${citationHtml(entry)}</p></blockquote>`
     : `<p><em>&lt;${escapeHtml(NO_TEXT)}&gt;</em>${citationHtml(entry)}</p>`;
+  // The palette taxonomy, so a student who colour-codes "disagree" versus
+  // "key evidence" can still see which is which in the draft — see
+  // `DraftEntry.colorLabel`'s own doc comment.
+  const tag = entry.colorLabel ? `<p><em>Colour:</em> ${escapeHtml(entry.colorLabel)}</p>` : '';
   const note = entry.note ? `<p><em>My note:</em> ${escapeHtml(entry.note)}</p>` : '';
-  return body + note;
+  return body + tag + note;
 }
 
 export function draftToHtml(draft: Draft): string {
@@ -137,8 +141,10 @@ function entryMarkdown(entry: DraftEntry): string {
   const body = entry.quote
     ? `${quoteMarkdown(entry.quote)}${citationText(entry)}`
     : `<${NO_TEXT}>${citationText(entry)}`;
+  // Mirrors entryHtml's `tag` — see DraftEntry.colorLabel's doc comment.
+  const tag = entry.colorLabel ? `\n\n*Colour:* ${entry.colorLabel}` : '';
   const note = entry.note ? `\n\n*My note:* ${entry.note}` : '';
-  return `${body}${note}\n`;
+  return `${body}${tag}${note}\n`;
 }
 
 export function draftToMarkdown(draft: Draft): string {

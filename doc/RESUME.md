@@ -66,9 +66,10 @@ by `npm run pages` — the generator and Prettier would overwrite each other) an
 ## Candidate next work (pick per user intent)
 
 - **Deferred by design (see `doc/STATUS.md` "Deferred by design"):** `CitationStyle.cslOverride`
-  persistence (won't-do — duplicates `userRules`); per-annotation **"section"** field + link-to-section
-  (needs an IDB schema migration — append-only, bump `DB_VERSION`); **Presence** (needs a live backend —
-  out of scope by the local-first decision).
+  persistence (won't-do — duplicates `userRules`); **Presence** (needs a live backend — out of scope
+  by the local-first decision). The per-annotation **"section"** field once listed here shipped in
+  **v1.8.0** (`Annotation.section` + the Outline view) — it turned out to need no schema migration
+  after all: both new fields are optional, so `DB_VERSION` stayed at 5.
 - **Article/interview:** `doc/developer-interview.md` is committed; still user-owned — the section-1
   opening anecdote is a Claude-written DRAFT (`DO WERYFIKACJI`) to replace with a real story, and an
   optional section-16 case study after the first real project.

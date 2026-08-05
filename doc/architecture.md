@@ -30,6 +30,44 @@ This document describes the high-level architecture of the Scientific Context No
 3. Service worker creates/updates `Document` and `Reference` records for the active project.
 4. When the user creates an annotation, the content script computes an anchor and sends the annotation payload to the service worker.
 5. Citation requests from popup/dashboard are routed to the service worker, which uses CSL to format citations/bibliographies from stored `Reference` data.
+6. A draft export request (`draft/compose`) is routed the same way, but resolves every citation in
+   the draft in **one** citeproc pass over the whole document rather than one call per source — see
+   below.
+
+## Draft composition (`draft/compose`)
+
+Turning a project's annotated highlights into an exportable essay draft is deliberately **not**
+assembled in a surface from the existing per-source citation messages
+(`citations/document`/`citations/bibliography`). A citation is a property of the *document being
+cited from*, not of the source alone: citeproc disambiguates a repeated surname (`2016a`/`2016b`)
+**retroactively**, so a single call only sees the clusters before it, and a numeric style (Vancouver)
+numbers its reference list by the order sources are *first cited* in the draft, not the order they
+were fetched from storage. Composing citation-by-citation in a UI layer produces output that is
+wrong in both ways, silently.
+
+Instead:
+
+- `src/core/usecases/draft.ts` exports `composeDraft(repos, formatter, args)` — pure domain code,
+  no `chrome.*`/DOM/IndexedDB types. It resolves the project's outline (`resolveOutline`), buckets
+  the project's annotations into sections (falling back to grouping by highlight colour when
+  nothing has been assigned yet — `groupPassages`, shared with the Outline view so the screen and
+  the export can never disagree on ordering), fixes the resulting citation order once, and calls a
+  single new citation-port method, `CitationFormatter.formatRun`, to resolve every in-text citation
+  and the bibliography in one citeproc engine state. The result is a `Draft` **structure** — quotes,
+  notes and citations kept as separate typed fields — not a pre-rendered string.
+- `src/core/draft/outline.ts` holds `resolveOutline`/`defaultOutline` — the single answer to "what
+  are this project's sections", used by `composeDraft`, the Outline view and the side-panel section
+  picker alike.
+- `src/core/draft/serialise.ts` renders the `Draft` structure two ways: `draftToHtml` (the
+  clipboard's `text/html` flavour — citeproc's own `<i>…</i>` markup passes through unescaped, while
+  every other field is escaped) and `draftToMarkdown` (the `.md` download and the clipboard's
+  `text/plain` fallback). Both throw rather than accept a `Draft` composed for the other flavour —
+  a `'text'`-flavour citeproc run performs no escaping, so feeding it to `draftToHtml` would be an
+  injection hole.
+- The message itself — `draft/compose { projectId; template; flavour: 'text' | 'html'; styleId? } ->
+  Draft` — is routed by the same pure `handleRequest` as every other message (`src/core/router.ts`);
+  the dashboard calls it once per export action (`html` for the clipboard, `text` for the `.md`
+  file), never caching or reusing one flavour's citeproc output as the other's.
 
 ## Testability
 

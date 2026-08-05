@@ -165,7 +165,7 @@ const NAV: NavDef[] = [
     // the student nothing, while "7 unplaced" is the work outstanding — and it
     // disappears when the outline is complete.
     count: () => {
-      const n = state.annotations.filter((a) => !a.section).length;
+      const n = unsectionedCount();
       return n > 0 ? n : undefined;
     },
     icon: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
@@ -261,6 +261,16 @@ const state: DashState = {
 
 const activeProject = (): Project | undefined =>
   state.projects.find((p) => p.id === state.activeProjectId);
+/** The nav badge and the Overview tile both need this count; `groupPassages`
+ *  (not a hand-rolled `!a.section` filter) is the only correct definition —
+ *  it also catches a passage whose `section` names a section that has since
+ *  been deleted, which a bare truthiness check on `a.section` misses. No
+ *  active project means no annotations are loaded (`loadProjectData`), so
+ *  there is nothing dangling to count. */
+const unsectionedCount = (): number => {
+  const project = activeProject();
+  return project ? groupPassages(state.annotations, project).unsectioned.length : 0;
+};
 const docById = (id: Id): Document | undefined => state.documents.find((d) => d.id === id);
 const activeStyle = (): CitationStyle | undefined =>
   state.styles.find((s) => s.id === activeProject()?.defaultCitationStyleId) ?? state.styles[0];
@@ -576,7 +586,7 @@ function renderOverview(view: HTMLElement, actions: HTMLElement): void {
 
   view.innerHTML = `
     <div class="stats">
-      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${p?.dueDate ? `${esc(dueLabel(p.dueDate, todayDateIso()))} · ` : ''}${state.annotations.filter((a) => !a.section).length} unplaced · ${members} member${members === 1 ? '' : 's'}</div></div>
+      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${p?.dueDate ? `${esc(dueLabel(p.dueDate, todayDateIso()))} · ` : ''}${unsectionedCount()} unplaced · ${members} member${members === 1 ? '' : 's'}</div></div>
       <div class="tile"><div class="tl"><span class="d" style="background:var(--s-analysed)"></span>Analysed</div><div class="tv">${progress.reviewed}</div><div class="tsub">${progress.percent}% of the corpus reviewed</div></div>
       <div class="tile"><div class="tl">Annotations</div><div class="tv">${state.annotations.length}</div><div class="tsub">${inReport} included in the report</div></div>
       <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${styleValue}</div><div class="tsub">${styleSub}</div></div>
@@ -1514,17 +1524,20 @@ function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
   $('#aColours', actions).onclick = () => go('settings');
   if (state.annotations.length === 0) {
     // `outlineOf()` always resolves to a non-empty outline once a project
-    // exists (the five-section default, absent an explicit one) — so this
-    // line shows whenever there's an active project to point at, and is
-    // skipped only in the "no project" case `outlineOf()` itself guards.
-    const hasOutline = outlineOf().length > 0;
+    // exists (the five-section default, absent an explicit one), so this
+    // can't distinguish "already sketched sections" from "never touched the
+    // default" — it only tells us there's a project to point the link at.
+    // Gated on that (not dropped), the copy below is written to be true
+    // either way instead of claiming the student did something they may not
+    // have.
+    const hasProject = outlineOf().length > 0;
     view.innerHTML =
       emptyState(
         'No annotations yet',
         'Highlight a passage on a page with the side panel and your notes collect here.',
       ) +
-      (hasOutline
-        ? `<p class="panel-note" style="text-align:center;margin:12px auto 0">Already sketched an outline? <button class="btn btn--ghost btn--sm" id="aGoOutline" style="margin-left:4px">See it in Outline</button></p>`
+      (hasProject
+        ? `<p class="panel-note" style="text-align:center;margin:12px auto 0">Plan your essay's structure before you have highlights to place — <button class="btn btn--ghost btn--sm" id="aGoOutline" style="margin-left:4px">see Outline</button></p>`
         : '');
     const goOutline = view.querySelector<HTMLButtonElement>('#aGoOutline');
     if (goOutline) goOutline.onclick = () => go('outline');
@@ -1842,13 +1855,21 @@ async function downloadDraftAsMarkdown(): Promise<void> {
 }
 
 function renderOutline(view: HTMLElement, actions: HTMLElement): void {
+  // Zero passages means `composeDraft` still succeeds — it just produces an
+  // empty shell (project name, no sections, no bibliography) — and the old
+  // unconditional buttons copied/downloaded that shell while still toasting
+  // success. Disable instead of claiming a copy that has nothing in it.
+  const hasPassages = state.annotations.length > 0;
+  const exportDisabled = hasPassages
+    ? ''
+    : ' disabled title="Nothing to export yet — highlight a passage first"';
   actions.innerHTML =
     `<button class="btn btn--sm" id="olAdd">Add section</button>` +
-    `<button class="btn btn--sm" id="olCopy">${ICON.copy} Copy draft</button>` +
-    `<button class="btn btn--sm" id="olMd">Download .md</button>`;
+    `<button class="btn btn--sm" id="olCopy"${exportDisabled}>${ICON.copy} Copy draft</button>` +
+    `<button class="btn btn--sm" id="olMd"${exportDisabled}>Download .md</button>`;
   $('#olAdd', actions).onclick = (e) => openAddSectionPop(e.currentTarget as HTMLElement);
-  $('#olCopy', actions).onclick = () => void copyDraftToClipboard();
-  $('#olMd', actions).onclick = () => void downloadDraftAsMarkdown();
+  $('#olCopy', actions).onclick = () => hasPassages && void copyDraftToClipboard();
+  $('#olMd', actions).onclick = () => hasPassages && void downloadDraftAsMarkdown();
 
   const project = activeProject();
   if (!project) {
@@ -3996,8 +4017,13 @@ async function init(): Promise<void> {
   // full-screen style editor. `goNav` renders for us, so only the no-fragment
   // path needs its own `render()` call here.
   const hashRoute = location.hash.slice(1);
-  if (isNavRoute(hashRoute)) goNav(hashRoute);
-  else render();
+  if (isNavRoute(hashRoute)) {
+    // Consumed, not left in place: otherwise navigating to another view (say
+    // Settings) and reloading re-reads this same fragment and snaps back to
+    // Outline instead of staying where the user actually was.
+    history.replaceState(null, '', location.pathname + location.search);
+    goNav(hashRoute);
+  } else render();
 }
 
 document.addEventListener('DOMContentLoaded', () => void init());

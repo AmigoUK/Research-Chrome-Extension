@@ -1,6 +1,7 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-08-04 — **v1.2.0, the onboarding release — the build to submit to the Chrome
+_Last updated: 2026-08-05 — **v1.8.0, the outline release** (highlights become a cited draft);
+**v1.2.0, the onboarding release — the build to submit to the Chrome
 Web Store**; **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
 network/annotator hardening pass**; **v0.27.2 web annotations survive SPA navigation**; **v0.27.3
@@ -18,7 +19,7 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
 - **Branch state:** everything through **v1.2.0 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation + Web Store packaging + the metadata and onboarding releases). No unmerged
   work.
-- **Releases:** v1.2.0 the onboarding release (see below); v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
+- **Releases:** v1.8.0 the outline release (see below); v1.2.0 the onboarding release (see below); v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
   v1.0.0 ready for the Chrome Web Store;
   v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
   feedback; v0.27.5 no dead "Jump to" on an unplaced note;
@@ -30,17 +31,65 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
 - **CI:** GitHub Actions — typecheck → lint → format:check → unit → build, plus an E2E job
   (Playwright under xvfb).
 - **Tests:** 363 unit + 31 E2E (5 PDF viewer + 16 dashboard + 3 side panel + 4 web annotation +
-  3 onboarding), all green.
+  3 onboarding), all green as of v1.2.0; **465 unit + 54 E2E as of v1.8.0** (see below).
+
+### v1.8.0 — the outline release (2026-08-05)
+
+The extension collected well and delivered nothing past the browser: a research session ended with
+highlights in the dashboard, and the only bridge to the student's actual deliverable — an essay in
+a word processor — was copying one in-text citation or one bibliography at a time. Two model fields
+had anticipated this and sat dead in the UI since Phase 2 (`Project.sections`, always the same
+hardcoded four-item list; `Document.section`, never assigned anywhere): this release finishes the
+first and leaves the second alone.
+
+A new **Outline** dashboard route (between Annotations and References) lists a project's sections —
+now editable (add, rename, reorder, delete) — plus an **Unplaced** bucket for anything not yet
+assigned; its nav badge shows the unplaced *count*, not a total, so it disappears once the outline
+is complete. A highlight is assigned to a section either from a matching control on the side
+panel's note card while reading, or in bulk from any row on the Outline screen. An empty section is
+flagged (`empty section`) rather than staying silent — a missing counter-argument is a common way
+to lose marks on a brief.
+
+**Copy draft** and **Download .md** hand the whole thing over: section headings, each quote
+followed by its citation, the student's own notes, and a reference list at the end holding only the
+sources actually cited. The engineering finding that shaped this (see the design spec in
+`doc/superpowers/specs/`): a citation is a property of the *document*, not of the source — composing
+a draft from the existing per-source `citations/document` and whole-project `citations/bibliography`
+messages is provably wrong, because citeproc disambiguates a repeated surname *retroactively* (the
+first `Nowak, 2016` only reads `2016a` once the engine has also seen the *second* one) and a numeric
+style numbers its reference list by *first-citation* order, not input order. `composeDraft`
+(`src/core/usecases/draft.ts`) and a new `CitationFormatter.formatRun`
+(`src/adapters/citation/citejs.ts`) therefore resolve every citation in one citeproc pass over the
+draft as a whole, in `text` and `html` flavours — `format: 'html'` is what makes
+`<i>Land Use Policy</i>` and a hanging indent land in the clipboard for real. A source with no
+bibliographic record still appears, marked
+`<no bibliographic data — complete it in Documents>`, instead of breaking the export; a project with
+nothing assigned yet falls back to grouping by highlight colour and says so both on screen and in
+the export, via one shared `groupPassages` function the Outline view and `composeDraft` both call —
+never two implementations that could silently disagree on citation order.
+
+`Project.outline`, `Project.researchQuestion` and `Project.dueDate` are all optional, and nothing
+new is indexed, so this shipped with **no schema migration** — `DB_VERSION` stays at **5**. The old
+`Project.sections` is accepted on import and derived into `outline` once (`resolveOutline`), never
+written again.
+
+The first-run guide and the side panel's getting-started checklist both grow a sixth step,
+**Arrange your draft**, between highlighting and citing; the guide's step opens the dashboard
+already on the Outline route by opening `src/options/index.html#outline` in a fresh tab
+(`chrome.tabs.create`, validated by `isNavRoute` on arrival) — not a storage-parked request, which
+an earlier attempt tried and which turned out to be silently ignored whenever a dashboard tab was
+already open, since `openOptionsPage()` only focuses one rather than reloading it. **465 unit + 54
+E2E**, all green.
 
 ### v1.2.0 — the onboarding release (2026-08-04)
 
-The workflow now teaches itself. A five-step **guide page** opens once on first install (never on
-updates) and stays reachable from the panel's Guide button, the dashboard footer and the
-empty-Overview callout; its buttons open the side panel, the dashboard and Chrome's Site access
-settings directly. The side panel gains a **getting-started checklist** — the same five steps
-checked off from real project data, with a one-line hint on the current step, dismissable and
-self-retiring — plus **journey nudges**: each completed action suggests the natural next one
-(filed → annotate, first highlight → set a status, status moved → cite, first citation →
+The workflow now teaches itself. A **guide page** (six steps since v1.8.0 added Outline) opens once
+on first install (never on updates) and stays reachable from the panel's Guide button, the
+dashboard footer and the empty-Overview callout; its buttons open the side panel, the dashboard and
+Chrome's Site access settings directly. The side panel gains a **getting-started checklist** — the
+same steps checked off from real project data, with a one-line hint on the current step,
+dismissable and self-retiring — plus **journey nudges**: each completed action suggests the natural
+next one (filed → annotate, first highlight → set a status, status moved → cite, first citation →
 bibliography/sync), once per session and never after the checklist was dismissed. The panel header
 finally links the **Dashboard**, which was previously unreachable from the panel.
 
@@ -328,8 +377,8 @@ styles (v0.2.0–v0.7.0). Dashboard-local CSS; side panel untouched.
 
 - `CitationStyle.cslOverride` is still not persisted — the override object is generated on demand for
   the editor's code view; storing it would only duplicate `userRules`.
-- Per-annotation "section" + link-to-section (mock nicety) omitted — the domain `Annotation` has no
-  section field.
+- ~~Per-annotation "section" + link-to-section (mock nicety) omitted~~ — **done in v1.8.0**, as
+  `Annotation.section` and the Outline view, with no migration needed (see the v1.8.0 entry above).
 - **DOI import** and **open-PDF-by-URL** real-network round trips need a runtime host-permission grant
   and are not exercised in headless CI. Their fetch/negotiation logic **is** unit-tested with an
   injected `fetch` (`src/core/usecases/references.test.ts`, `src/core/files/fetch-pdf.test.ts` — the

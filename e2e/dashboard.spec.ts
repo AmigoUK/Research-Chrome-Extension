@@ -234,6 +234,65 @@ test('a project with no highlights yet still shows its outline, and Add section 
   await page.close();
 });
 
+test('reordering a section changes on-screen citation order and the change persists', async () => {
+  // `moveSection` is the one outline mutation whose entire purpose is
+  // changing citation order (`groupPassages`/`composeDraft` walk the
+  // sections in this same order) — add/rename/delete all had E2E coverage
+  // already; this closes the gap for reorder. An off-by-one, or writing the
+  // pre-swap array back to storage, would renumber a Vancouver draft with
+  // nothing on screen to show it.
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-sec[data-sec]').first()).toBeVisible();
+
+  // `page.$$eval` is Playwright's querySelectorAll-plus-callback helper (runs
+  // the function against the matched elements inside the page), not the
+  // JavaScript `eval()` global — no string of code is being executed here.
+  // Reads just the leading text node of each `<h3>` — the section title,
+  // stripped of the trailing passage count, "empty section" flag and tool
+  // buttons that share the element — so the comparison below can't be
+  // fooled by any of those staying put while the title itself moves.
+  const readTitles = (): Promise<string[]> =>
+    page.$$eval('.ol-sec[data-sec] h3', (nodes) =>
+      nodes.map((h3) => (h3.firstChild?.textContent ?? '').trim()),
+    );
+
+  // Read live, not hardcoded to the five-section default: earlier tests in
+  // this shared-profile suite add and delete sections, so whatever is on
+  // screen by the time this test runs — not necessarily the seeded
+  // default — is the order this test must swap and restore.
+  const titlesBefore = await readTitles();
+  expect(titlesBefore.length).toBeGreaterThanOrEqual(2);
+
+  try {
+    // Move the first section down one slot. Clicking the SAME button again
+    // in `finally` swaps it right back — position 0's down arrow is never
+    // disabled (only position 0's up arrow is), so one button suffices for
+    // both the move and its own undo.
+    await page.locator('[data-down]').first().click();
+
+    const expectedAfterSwap = [titlesBefore[1], titlesBefore[0], ...titlesBefore.slice(2)];
+    await expect.poll(readTitles).toEqual(expectedAfterSwap);
+
+    // Persists — the failure this test exists to catch (an off-by-one, or
+    // the pre-swap array written back to storage) would look right on
+    // screen and then silently revert, or double-apply, on reload.
+    await page.reload();
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    await expect.poll(readTitles).toEqual(expectedAfterSwap);
+  } finally {
+    // Swap back so later tests in this shared profile see the same order
+    // this one found, whatever that order was.
+    await page.locator('[data-down]').first().click();
+    await expect.poll(readTitles).toEqual(titlesBefore);
+  }
+
+  await page.close();
+});
+
 test('Annotations view changes a note review status and persists it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
