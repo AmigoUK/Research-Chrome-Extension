@@ -45,6 +45,9 @@ export interface CitationFormatter {
    * says "(Nowak 2016a)".
    *
    * `flavour: 'html'` keeps the italics a word processor needs.
+   *
+   * When `style` is given, `template` is ignored — the style's compiled base
+   * template is used instead.
    */
   formatRun(
     run: CitationRun,

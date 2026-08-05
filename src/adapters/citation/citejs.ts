@@ -25,6 +25,32 @@ import { compileCsl, applyRulesToItem, applyDoiFormat } from '../../core/citatio
 /** Resolves a citation-js template name to its CSL XML, or undefined. */
 export type CslLoader = (template: string) => Promise<string | undefined>;
 
+/**
+ * Thrown by `formatRun` when `run.order` names an id that is not in
+ * `run.items` — a draft citing a reference that has since been deleted from
+ * the project. citation-js's own failure for the same miss is an opaque
+ * `Cannot find entry with id '...'` thrown from inside its `retrieveItem`
+ * callback, naming neither the draft nor the method that failed; this gives
+ * the caller both.
+ */
+export class UnknownCitationIdError extends Error {
+  constructor(id: string) {
+    super(`formatRun: no item for cited id "${id}"`);
+    this.name = 'UnknownCitationIdError';
+  }
+}
+
+/**
+ * The item for `id`, or a named failure. Shared by the up-front validation
+ * pass and the cited-only bibliography filter below, so both fail the same
+ * way instead of one silently tolerating what the other rejects.
+ */
+function mustItem(byId: Map<string, CslItem>, id: string): CslItem {
+  const item = byId.get(id);
+  if (!item) throw new UnknownCitationIdError(id);
+  return item;
+}
+
 function cslConfig(): {
   templates: { add(name: string, csl: string): void; get?(name: string): unknown };
 } {
@@ -152,15 +178,27 @@ export class CiteJsFormatter implements CitationFormatter {
     const rules = style?.userRules;
     const processed = run.items.map((item) => (rules ? applyRulesToItem(item, rules) : item));
 
+    const byId = new Map(processed.map((i) => [String(i['id']), i]));
+    // Validate before any of it reaches citeproc: every id below is passed to
+    // citeproc as an `entry`, and a miss there surfaces as an opaque
+    // "Cannot find entry with id '...'" from inside its retrieveItem
+    // callback — naming neither this draft nor `formatRun`.
+    run.order.forEach((id) => mustItem(byId, id));
+
     // Only the sources the draft actually cites, ordered by FIRST citation:
     // Vancouver numbers its reference list that way, and a bibliography built
     // on input order would disagree with the numbers in the text. Author-date
     // styles sort themselves, so this ordering is a no-op for them.
     const firstCited = [...new Set(run.order)];
-    const byId = new Map(processed.map((i) => [String((i as { id?: unknown }).id), i]));
-    const cited = firstCited.map((id) => byId.get(id)).filter((i): i is CslItem => i !== undefined);
+    const cited = firstCited.map((id) => mustItem(byId, id));
 
     const cite = new Cite(processed);
+    // citation-js exposes no per-cluster render: `.format('citation')` rebuilds
+    // EVERY cluster in `processed` on each call and returns only the one named
+    // by `entry`, so this loop costs O(run.order.length²) cluster renders. Fine
+    // for a normal draft; a 200-citation one would be tens of thousands of
+    // renders inside the MV3 service worker. There is no cheaper route through
+    // citation-js's public surface — this is deliberate, not unoptimised.
     const inText = run.order.map((id, i) =>
       cite
         .format('citation', {
