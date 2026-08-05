@@ -47,6 +47,13 @@ export interface DraftSection {
 }
 
 export interface Draft {
+  /** Which citeproc run this draft was composed for, set from `composeDraft`'s
+   *  own `args.flavour` — never re-derived. `draftToHtml` and
+   *  `draftToMarkdown` (`serialise.ts`) each require the matching value: a
+   *  `'text'`-flavour citeproc run performs no escaping at all, so its
+   *  `inTextFormatted`/`bibliography` are only safe to interpolate raw into
+   *  the OTHER flavour, never HTML. */
+  flavour: 'text' | 'html';
   projectName: string;
   researchQuestion?: string;
   dueDate?: string;
@@ -303,6 +310,7 @@ export async function composeDraft(
   const unplaced = unplacedItems.map(entryFor);
 
   return {
+    flavour: args.flavour,
     projectName: project.name,
     ...(project.researchQuestion === undefined
       ? {}
