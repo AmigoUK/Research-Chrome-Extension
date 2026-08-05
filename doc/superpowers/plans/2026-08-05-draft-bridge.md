@@ -1086,12 +1086,16 @@ describe('draftToHtml', () => {
   });
 
   it('renders unplaced passages last, under their own heading', () => {
-    const withUnplaced: Draft = {
+    const html = draftToHtml({
       ...draft,
       unplaced: [{ annotationId: 'u1', note: 'stray', inTextFormatted: '(N, 2016)' }],
-    };
-    const html = withUnplaced.unplaced.length ? draftToHtml(withUnplaced) : '';
+    });
+    expect(html).toContain('Unplaced');
     expect(html.indexOf('Unplaced')).toBeGreaterThan(html.indexOf('Barriers'));
+  });
+
+  it('omits the unplaced heading entirely when nothing is unplaced', () => {
+    expect(draftToHtml(draft)).not.toContain('Unplaced');
   });
 });
 
