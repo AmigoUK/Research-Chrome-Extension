@@ -52,7 +52,11 @@ export interface Draft {
    *  `draftToMarkdown` (`serialise.ts`) each require the matching value: a
    *  `'text'`-flavour citeproc run performs no escaping at all, so its
    *  `inTextFormatted`/`bibliography` are only safe to interpolate raw into
-   *  the OTHER flavour, never HTML. */
+   *  the OTHER flavour, never HTML. Every other field that reaches
+   *  `draftToHtml` — `projectName`, `researchQuestion`, `dueDate`, a
+   *  section's `title`, and `DraftEntry.quote`/`note`/`locator` — is treated
+   *  as arbitrary text and escaped there, `locator` included even though it
+   *  currently only ever holds a generated `"PDF p. N"` string. */
   flavour: 'text' | 'html';
   projectName: string;
   researchQuestion?: string;
