@@ -31,8 +31,11 @@ function plainTextFrom(html: string): string {
     .replace(/<\/(h1|h2|p|blockquote)>/gi, '\n')
     .replace(/<[^>]+>/g, '');
   // `&amp;` must decode last: `escapeHtml` turns a literal "&lt;" into
-  // "&amp;lt;", and decoding `&amp;` first would collapse that back to
-  // "&lt;" and then, on the next line, wrongly on to "<".
+  // "&amp;lt;". Decoding `&lt;`/`&gt;`/`&quot;` first leaves that alone (its
+  // only `&` belongs to "&amp;", not to a "&lt;" substring), so the final
+  // `&amp;` step correctly restores "&lt;". Decoding `&amp;` first would
+  // produce "&lt;" one step early, which the *later* `&lt;` replace would
+  // then wrongly decode a second time, into "<".
   const decoded = withBreaks
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
