@@ -564,7 +564,7 @@ function renderOverview(view: HTMLElement, actions: HTMLElement): void {
 
   view.innerHTML = `
     <div class="stats">
-      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${state.annotations.filter((a) => !a.section).length} unplaced · ${members} member${members === 1 ? '' : 's'}</div></div>
+      <div class="tile"><div class="tl">Sources</div><div class="tv">${state.documents.length}</div><div class="tsub">${p?.dueDate ? `${esc(dueLabel(p.dueDate, todayDateIso()))} · ` : ''}${state.annotations.filter((a) => !a.section).length} unplaced · ${members} member${members === 1 ? '' : 's'}</div></div>
       <div class="tile"><div class="tl"><span class="d" style="background:var(--s-analysed)"></span>Analysed</div><div class="tv">${progress.reviewed}</div><div class="tsub">${progress.percent}% of the corpus reviewed</div></div>
       <div class="tile"><div class="tl">Annotations</div><div class="tv">${state.annotations.length}</div><div class="tsub">${inReport} included in the report</div></div>
       <div class="tile"><div class="tl">Style</div><div class="tv" style="font-size:26px;padding-top:4px">${styleValue}</div><div class="tsub">${styleSub}</div></div>
@@ -972,7 +972,9 @@ function renderSettings(view: HTMLElement, actions: HTMLElement): void {
 
 /** Project identity and the style it cites with — the two settings people
  *  looked for in a Settings screen and had to find in the header menu or
- *  the Citation styles view instead. */
+ *  the Citation styles view instead. Research question and due date live
+ *  here too now: the Outline route shows both read-only with an Edit link
+ *  back to this card. */
 function drawProjectSettings(host: HTMLElement, project: Project): void {
   const styles = state.styles;
   const activeId = project.defaultCitationStyleId ?? styles[0]?.id ?? '';
@@ -984,6 +986,11 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
       <label class="palette-use" for="setDesc" style="font-family:var(--font-body);font-size:13px">Description</label>
       <input class="sel" id="setDesc" value="${esc(project.description ?? '')}" maxlength="240"
         placeholder="What this project is about" aria-label="Project description">
+      <label class="palette-use" for="setQ" style="font-family:var(--font-body);font-size:13px">Research question</label>
+      <input class="sel" id="setQ" value="${esc(project.researchQuestion ?? '')}" maxlength="300"
+        placeholder="What is this project trying to answer?" aria-label="Research question">
+      <label class="palette-use" for="setDue" style="font-family:var(--font-body);font-size:13px">Due date</label>
+      <input class="sel" id="setDue" type="date" value="${esc(project.dueDate ?? '')}" aria-label="Due date">
       <label class="palette-use" for="setStyle" style="font-family:var(--font-body);font-size:13px">Citation style</label>
       <div class="row">
         <select class="sel" id="setStyle" aria-label="Default citation style"${styles.length === 0 ? ' disabled' : ''}>
@@ -995,6 +1002,30 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
     <div class="row" style="margin-top:10px">
       <button class="btn btn--primary btn--sm" id="setSave">${ICON.check} Save project</button>
     </div>`;
+
+  // Research question and due date save on `change` (i.e. on blur), independently
+  // of the "Save project" button below: a student following the Outline route's
+  // Edit link here is fixing one fact, not batching a project-identity edit, and
+  // should not have to find a Save button for it.
+  $<HTMLInputElement>('#setQ', host).addEventListener('change', () => {
+    const value = $<HTMLInputElement>('#setQ', host).value.trim();
+    void saveProjectField(project.id, (p) => {
+      const next = { ...p, updatedAt: nowIso() };
+      if (value) next.researchQuestion = value;
+      else delete next.researchQuestion;
+      return next;
+    });
+  });
+  $<HTMLInputElement>('#setDue', host).addEventListener('change', () => {
+    const value = $<HTMLInputElement>('#setDue', host).value;
+    void saveProjectField(project.id, (p) => {
+      const next = { ...p, updatedAt: nowIso() };
+      if (value) next.dueDate = value;
+      else delete next.dueDate;
+      return next;
+    });
+  });
+
   $('#setSave', host).onclick = () => {
     void (async () => {
       const name = $<HTMLInputElement>('#setName', host).value.trim();
@@ -1004,8 +1035,14 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
       }
       const description = $<HTMLInputElement>('#setDesc', host).value.trim();
       const styleId = $<HTMLSelectElement>('#setStyle', host).value;
+      // Read from `state.projects`, not the `project` this draw call closed
+      // over: a `change`-triggered field save above (or a concurrent editor
+      // in another tab) may already have persisted a newer copy, and building
+      // `updated` from the stale closure would silently resurrect whatever
+      // this card looked like when it was first drawn.
+      const base = state.projects.find((pr) => pr.id === project.id) ?? project;
       const updated: Project = {
-        ...project,
+        ...base,
         name,
         ...(description ? { description } : {}),
         ...(styleId ? { defaultCitationStyleId: styleId } : {}),
@@ -1021,6 +1058,25 @@ function drawProjectSettings(host: HTMLElement, project: Project): void {
       }
     })();
   };
+}
+
+/** Shared by the research-question and due-date `change` handlers above: both
+ *  save independently and immediately, so each has to start from whatever is
+ *  freshest in `state.projects` rather than a closure-captured `Project` —
+ *  otherwise saving one field right after the other could overwrite the first
+ *  save with a copy that predates it. Deliberately does not call `render()`
+ *  on success: this card may still hold an un-saved edit in the Name or
+ *  Description input, and a full re-render would discard it mid-edit. */
+async function saveProjectField(id: Id, apply: (project: Project) => Project): Promise<void> {
+  const current = state.projects.find((pr) => pr.id === id);
+  if (!current) return;
+  const updated = apply(current);
+  try {
+    await sendRequest({ type: 'projects/put', project: updated });
+    state.projects = state.projects.map((pr) => (pr.id === updated.id ? updated : pr));
+  } catch (err) {
+    toast(err instanceof Error ? err.message : 'Couldn’t save the project', ICON.warn, true);
+  }
 }
 
 function drawPaletteSettings(view: HTMLElement): void {
@@ -1418,10 +1474,21 @@ function renderAnnotations(view: HTMLElement, actions: HTMLElement): void {
   actions.innerHTML = `<button class="btn btn--sm" id="aColours">Edit colours</button>`;
   $('#aColours', actions).onclick = () => go('settings');
   if (state.annotations.length === 0) {
-    view.innerHTML = emptyState(
-      'No annotations yet',
-      'Highlight a passage on a page with the side panel and your notes collect here.',
-    );
+    // `outlineOf()` always resolves to a non-empty outline once a project
+    // exists (the five-section default, absent an explicit one) — so this
+    // line shows whenever there's an active project to point at, and is
+    // skipped only in the "no project" case `outlineOf()` itself guards.
+    const hasOutline = outlineOf().length > 0;
+    view.innerHTML =
+      emptyState(
+        'No annotations yet',
+        'Highlight a passage on a page with the side panel and your notes collect here.',
+      ) +
+      (hasOutline
+        ? `<p class="panel-note" style="text-align:center;margin:12px auto 0">Already sketched an outline? <button class="btn btn--ghost btn--sm" id="aGoOutline" style="margin-left:4px">See it in Outline</button></p>`
+        : '');
+    const goOutline = view.querySelector<HTMLButtonElement>('#aGoOutline');
+    if (goOutline) goOutline.onclick = () => go('outline');
     return;
   }
   // The legend doubles as a filter: chips looked clickable and did nothing,
@@ -1790,7 +1857,7 @@ function renderOutline(view: HTMLElement, actions: HTMLElement): void {
   // them.
   const noPassages =
     state.annotations.length === 0
-      ? `<div class="ol-notice"><strong>Nothing to outline yet.</strong> Highlight passages while you read and they collect here, ready to arrange.</div>`
+      ? `<div class="ol-notice"><strong>Nothing to outline yet.</strong> Highlight passages while you read and they collect here, ready to arrange. <button class="btn btn--ghost btn--sm" id="olGoAnno" style="margin-left:4px">Go to Annotations</button></div>`
       : '';
 
   const looseBlock =
@@ -1852,6 +1919,11 @@ function annoRowHtml(a: Annotation, sections: OutlineSection[]): string {
 
 function wireOutline(view: HTMLElement, sections: OutlineSection[]): void {
   $('#olEdit', view).onclick = () => go('settings');
+  // Only present in the `noPassages` banner, i.e. when there is nothing
+  // to arrange yet — optional lookup, not `$`, so a project with passages
+  // (where this button never renders) doesn't throw on a null `.onclick`.
+  const goAnno = view.querySelector<HTMLButtonElement>('#olGoAnno');
+  if (goAnno) goAnno.onclick = () => go('annotations');
 
   $$('.anno', view).forEach((card) => {
     const jump = (): void => {

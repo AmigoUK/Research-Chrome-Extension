@@ -1314,3 +1314,84 @@ test('every source row offers both citation forms, named', async () => {
     .toContain('A citable source');
   await page.close();
 });
+
+test('a research question set in Settings shows above the outline', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setQ').fill('Did subsidies increase adoption?');
+  await page.locator('#setQ').blur();
+
+  // Saves on `change` (blur), independently of the "Save project" button —
+  // wait for the write to actually land before navigating away, or the
+  // Outline route (rendered once, on the nav click, from whatever
+  // `state.projects` holds at that instant) could read a stale copy.
+  await expect
+    .poll(async () => {
+      const projects = (await page.evaluate(() =>
+        chrome.runtime.sendMessage({ type: 'projects/list' }),
+      )) as { data: Array<{ researchQuestion?: string }> };
+      return projects.data[0]?.researchQuestion;
+    })
+    .toBe('Did subsidies increase adoption?');
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-q')).toHaveText('Did subsidies increase adoption?');
+
+  await page.close();
+});
+
+test('the due date reaches the Overview tile and the Outline header, and clearing either field removes it from storage rather than blanking it', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  const readProject = async (): Promise<{ researchQuestion?: string; dueDate?: string }> => {
+    const projects = (await page.evaluate(() =>
+      chrome.runtime.sendMessage({ type: 'projects/list' }),
+    )) as { data: Array<{ researchQuestion?: string; dueDate?: string }> };
+    return projects.data[0] ?? {};
+  };
+
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setDue').fill('2099-01-01');
+  await page.locator('#setDue').blur();
+  await expect.poll(async () => (await readProject()).dueDate).toBe('2099-01-01');
+
+  // The Overview tile leads with the due date ahead of "N unplaced" once one
+  // is set — this is the same `dueLabel` string the Outline header uses.
+  const sourcesTile = page.locator('.tile', { hasText: 'Sources' }).locator('.tsub');
+  await page.locator('#nav .nav-item[data-route="overview"]').click();
+  await expect(sourcesTile).toContainText('day');
+  await expect(sourcesTile).toContainText('unplaced');
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-meta')).toContainText('day');
+
+  // Clearing goes back to Settings: an empty input has to delete the key,
+  // not store `''` — `Project.dueDate?: string` would happily hold `''` too,
+  // so reading the field back as empty text would not catch a clear that
+  // silently left the old value (or a stray `''`) in storage. Reading the
+  // stored record itself is the only check that actually distinguishes them.
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setDue').fill('');
+  await page.locator('#setDue').blur();
+  await expect.poll(async () => (await readProject()).dueDate).toBeUndefined();
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-meta')).toContainText('No due date');
+
+  // The research question left behind by the previous test clears the same
+  // way, restoring the shared project to how this file found it.
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setQ').fill('');
+  await page.locator('#setQ').blur();
+  await expect.poll(async () => (await readProject()).researchQuestion).toBeUndefined();
+
+  await page.locator('#nav .nav-item[data-route="outline"]').click();
+  await expect(page.locator('.ol-q')).toHaveText('No research question set');
+
+  await page.close();
+});

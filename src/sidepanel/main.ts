@@ -661,8 +661,52 @@ async function updatePageAnnotationSection(id: Id, section: Id | undefined): Pro
     await sendRequest({ type: 'annotations/put', annotation: updated });
     const title = currentOutline().find((s) => s.id === section)?.title;
     toast(title ? `Section · ${title}` : 'Removed from the outline');
+    // Only assigning (not clearing) a section can create the states either
+    // nudge cares about — clearing one can only ever add to Unplaced.
+    if (section !== undefined) void nudgeOutlineProgress(id);
   } catch (err) {
     toast(err instanceof Error ? err.message : 'Couldn’t change section', true);
+  }
+}
+
+/**
+ * The two Outline-progress nudges, fired from the one place in this panel a
+ * section is actually assigned (the dashboard's Outline route has its own
+ * per-row picker, but no nudge mechanism of its own to hook into). Both
+ * conditions are project-wide — "the very first passage placed" and "the
+ * last unplaced one cleared" — so this re-fetches the whole project's
+ * annotations rather than trusting `state.pageAnnotations`, which only ever
+ * covers the page currently open.
+ */
+async function nudgeOutlineProgress(justSectionedId: Id): Promise<void> {
+  if (!state.activeProjectId) return;
+  try {
+    const all = await sendRequest({
+      type: 'annotations/listByProject',
+      projectId: state.activeProjectId,
+    });
+    // Mirrors `groupPassages`'s `unsectioned` predicate: a `section` naming a
+    // since-deleted section does not count as placed. Safe to treat as
+    // "placed = not unplaced" here specifically, because this function only
+    // ever runs right after a real section was assigned, which rules out the
+    // colour-grouping fallback (`groupPassages` only falls back to colour
+    // grouping while NO annotation carries a section at all).
+    const sectionIds = new Set(currentOutline().map((s) => s.id));
+    const placed = all.filter((a) => a.section !== undefined && sectionIds.has(a.section));
+    // Fires only on the placement that took the project from zero placed
+    // passages to one — not on the first placement action of THIS session,
+    // which could be a project's second, third, or later one.
+    if (placed.length === 1 && placed[0]?.id === justSectionedId) {
+      nudgeNext('first-section', 'Your draft is taking shape — see it in Outline');
+    }
+    // The "at least one placed" half of the condition is `placed.length > 0`,
+    // not merely `all.length > 0`: a project can have annotations that are
+    // all still Unplaced, and this must not fire for that case.
+    if (placed.length > 0 && placed.length === all.length) {
+      nudgeNext('outline-complete', 'Ready to export — copy the draft into your editor');
+    }
+  } catch {
+    // Nudges are decoration — a failed re-fetch must not surface as an error.
   }
 }
 
