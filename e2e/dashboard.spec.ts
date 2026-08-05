@@ -1395,3 +1395,85 @@ test('the due date reaches the Overview tile and the Outline header, and clearin
 
   await page.close();
 });
+
+test('changing the name and the research question, then clicking Save without blurring the question first, keeps both edits', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  const readProject = async (): Promise<{ name: string; researchQuestion?: string }> => {
+    const projects = (await page.evaluate(() =>
+      chrome.runtime.sendMessage({ type: 'projects/list' }),
+    )) as { data: Array<{ name: string; researchQuestion?: string }> };
+    return projects.data[0] as { name: string; researchQuestion?: string };
+  };
+
+  const original = await readProject();
+
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setName').fill('Renamed mid-save-race');
+  await page.locator('#setQ').fill('Does the click-while-focused race happen?');
+  // Deliberately do NOT blur #setQ before clicking Save: with the field still
+  // focused, the click fires #setQ's own `blur` (and therefore its `change`
+  // handler) a moment before the button's `click` handler runs. Both used to
+  // read `state.projects` before either write's `projects/put` resolved,
+  // building two independent updates from the same pre-edit snapshot — the
+  // button's write carried the old (empty) research question, the field's
+  // write carried the old name, and whichever landed last silently dropped
+  // the other's edit.
+  await page.locator('#setSave').click();
+
+  await expect.poll(async () => (await readProject()).name).toBe('Renamed mid-save-race');
+  await expect
+    .poll(async () => (await readProject()).researchQuestion)
+    .toBe('Does the click-while-focused race happen?');
+
+  // Restore the shared project so later tests (and reruns of this file) find
+  // it the way this file found it.
+  await page.locator('#setQ').fill('');
+  await page.locator('#setQ').blur();
+  await expect.poll(async () => (await readProject()).researchQuestion).toBeUndefined();
+  await page.locator('#setName').fill(original.name);
+  await page.locator('#setSave').click();
+  await expect.poll(async () => (await readProject()).name).toBe(original.name);
+
+  await page.close();
+});
+
+test('blurring the research question and immediately blurring the due date persists both, not just whichever write lands last', async () => {
+  const page = await context.newPage();
+  await page.goto(dashboardUrl());
+  await expect(page.locator('#pName')).not.toHaveText('—');
+
+  const readProject = async (): Promise<{ researchQuestion?: string; dueDate?: string }> => {
+    const projects = (await page.evaluate(() =>
+      chrome.runtime.sendMessage({ type: 'projects/list' }),
+    )) as { data: Array<{ researchQuestion?: string; dueDate?: string }> };
+    return projects.data[0] ?? {};
+  };
+
+  await page.locator('#nav .nav-item[data-route="settings"]').click();
+  await page.locator('#setQ').fill('Field-to-field race check?');
+  // Filling #setDue moves focus off #setQ, firing #setQ's `change` handler;
+  // blurring #setDue immediately after fires its own `change` handler before
+  // #setQ's `projects/put` round trip can have resolved. Two unqueued saves
+  // would each build their update from a `state.projects` snapshot that
+  // predates the other's edit.
+  await page.locator('#setDue').fill('2099-06-15');
+  await page.locator('#setDue').blur();
+
+  await expect.poll(async () => (await readProject()).dueDate).toBe('2099-06-15');
+  await expect
+    .poll(async () => (await readProject()).researchQuestion)
+    .toBe('Field-to-field race check?');
+
+  // Restore.
+  await page.locator('#setQ').fill('');
+  await page.locator('#setQ').blur();
+  await page.locator('#setDue').fill('');
+  await page.locator('#setDue').blur();
+  await expect.poll(async () => (await readProject()).researchQuestion).toBeUndefined();
+  await expect.poll(async () => (await readProject()).dueDate).toBeUndefined();
+
+  await page.close();
+});
