@@ -1677,19 +1677,22 @@ function renderOutline(view: HTMLElement, actions: HTMLElement): void {
     return;
   }
 
-  // `unplaced` and `groupedByColour` come from the SAME function
-  // `composeDraft` calls — not a re-derived predicate. A project where
-  // nothing has ever been assigned a section but passages carry colours
-  // groups (and cites) those passages by colour there; recomputing "no
-  // section" here instead used to show one flat, `createdAt`-ordered
-  // Unplaced list for the very same passages — a different order, and colour
-  // headings the student never saw. The section buckets below stay driven by
-  // `resolveOutline` directly, not by `groupPassages`'s buckets: they carry
-  // Rename/Delete/Move controls that write to `project.outline`, and
-  // `groupPassages`'s buckets are colour buckets whenever `groupedByColour`
-  // is true — attaching outline-editing controls to those would let an edit
-  // here silently target the wrong grouping.
-  const { unplaced: loose, groupedByColour } = groupPassages(state.annotations, project);
+  // `unsectioned` and `groupedByColour` come from the SAME function
+  // `composeDraft` calls — not a re-derived predicate. Deliberately
+  // `unsectioned`, not `unplaced`: in colour mode `unplaced` means
+  // colour-orphaned (a passage with a valid colour is treated as accounted
+  // for by its colour bucket), but this screen exists to assign sections, and
+  // it renders no colour buckets of its own — so a coloured, unsectioned
+  // passage read from `unplaced` would appear nowhere on the page at all.
+  // `unsectioned` means the same thing regardless of grouping mode, so
+  // nothing here can go invisible when the draft falls back to colour
+  // grouping. The section buckets below stay driven by `resolveOutline`
+  // directly, not by `groupPassages`'s buckets: they carry Rename/Delete/Move
+  // controls that write to `project.outline`, and `groupPassages`'s buckets
+  // are colour buckets whenever `groupedByColour` is true — attaching
+  // outline-editing controls to those would let an edit here silently target
+  // the wrong grouping.
+  const { unsectioned: loose, groupedByColour } = groupPassages(state.annotations, project);
   const sections = resolveOutline(project);
 
   const head =

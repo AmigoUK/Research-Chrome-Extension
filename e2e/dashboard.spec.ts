@@ -487,12 +487,30 @@ test('a project not yet organised by section is grouped by colour, and the scree
     await expect(page.locator('.ol-notice--accent')).toContainText('colour');
 
     // `groupPassages`'s own definition of "unplaced" in this mode is
-    // colour-orphaned, not section-orphaned: the coloured passage is
-    // accounted for by its colour bucket, not shown as Unplaced here. If
-    // this screen ever goes back to re-implementing the predicate instead of
-    // calling `groupPassages`, this is what drifts first.
+    // colour-orphaned, not section-orphaned: the coloured passage IS
+    // accounted for by a colour bucket in the export. But this screen exists
+    // to assign sections and renders no colour buckets of its own, so it
+    // reads `unsectioned` (has no section, regardless of grouping mode)
+    // rather than `unplaced` — both passages show up here, each with a
+    // working section picker, so the coloured one is never stranded off the
+    // page just because it happens to carry a colour.
     await expect(page.locator('.ol-sec--loose .anno[data-id="e2e-colour-none"]')).toHaveCount(1);
-    await expect(page.locator('.anno[data-id="e2e-colour-yellow"]')).toHaveCount(0);
+    const yellowInUnplaced = page.locator('.ol-sec--loose .anno[data-id="e2e-colour-yellow"]');
+    await expect(yellowInUnplaced).toHaveCount(1);
+
+    // Prove the banner's own instruction — "assign a passage to a section
+    // (here or from the side panel)" — is actually true for this passage:
+    // picking any real section in its own row's picker (skipping the
+    // "No section" option at index 0) must move it out of Unplaced and into
+    // that section.
+    const yellowPicker = yellowInUnplaced.locator('[data-secpick]');
+    const targetSectionId = await yellowPicker.locator('option').nth(1).getAttribute('value');
+    expect(targetSectionId).toBeTruthy();
+    await yellowPicker.selectOption(targetSectionId as string);
+    await expect(
+      page.locator(`.ol-sec[data-sec="${targetSectionId}"] .anno[data-id="e2e-colour-yellow"]`),
+    ).toHaveCount(1);
+    await expect(yellowInUnplaced).toHaveCount(0);
   } finally {
     await page.evaluate(async () => {
       await chrome.runtime.sendMessage({ type: 'documents/delete', id: 'e2e-colour-doc' });
@@ -513,36 +531,54 @@ test('an outline edit on a project with no stored outline persists the derived d
   // applying the edit, and persisting the RESULT in one write) actually
   // runs. Every other test in this file seeds a project that already has a
   // stored outline (`makeProject` always sets one), so this branch is
-  // otherwise never exercised.
-  await page.evaluate(async () => {
+  // otherwise never exercised. The outline being wiped here is captured
+  // first so it can be put back afterwards — this shared profile carries the
+  // "Methodology" section the earlier `#olAdd` test added, and this test
+  // would otherwise discard it permanently for every test that runs after.
+  const originalOutline = await page.evaluate(async () => {
     const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
     const project = projects.data[0];
+    const outline = project.outline;
     delete project.outline;
     await chrome.runtime.sendMessage({ type: 'projects/put', project });
+    return outline as unknown[];
   });
   await page.reload();
 
-  await page.locator('#nav .nav-item[data-route="outline"]').click();
-  // The derived default's first section, shown despite nothing being stored
-  // yet — `.ol-sec[data-sec]` excludes the Unplaced block (it never carries
-  // `data-sec`), so this is a real section, not "Unplaced (N)".
-  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
-  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Introduction');
+  try {
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    // The derived default's first section, shown despite nothing being stored
+    // yet — `.ol-sec[data-sec]` excludes the Unplaced block (it never carries
+    // `data-sec`), so this is a real section, not "Unplaced (N)".
+    await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
+    await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Introduction');
 
-  // Rename it — the first-ever outline mutation for this project.
-  // `mutateOutline` must derive the default, apply the rename, and persist
-  // the RESULT (five sections, one renamed) in that same write — not persist
-  // the transient default and drop the rename, and not apply the rename to a
-  // default that never gets saved.
-  await page.locator('[data-rename]').first().click();
-  await page.locator('#secRename').fill('Framing');
-  await page.locator('#secRenameGo').click();
-  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
+    // Rename it — the first-ever outline mutation for this project.
+    // `mutateOutline` must derive the default, apply the rename, and persist
+    // the RESULT (five sections, one renamed) in that same write — not persist
+    // the transient default and drop the rename, and not apply the rename to a
+    // default that never gets saved.
+    await page.locator('[data-rename]').first().click();
+    await page.locator('#secRename').fill('Framing');
+    await page.locator('#secRenameGo').click();
+    await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
 
-  await page.reload();
-  await page.locator('#nav .nav-item[data-route="outline"]').click();
-  await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
-  await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
+    await page.reload();
+    await page.locator('#nav .nav-item[data-route="outline"]').click();
+    await expect(page.locator('.ol-sec[data-sec] h3').first()).toContainText('Framing');
+    await expect(page.locator('.ol-sec[data-sec]')).toHaveCount(5);
+  } finally {
+    // Restore the outline this test wiped and then overwrote with the
+    // derived-default-plus-rename, so a later test inserted after this one
+    // sees the same outline every earlier test left behind, not a
+    // reset-to-default one.
+    await page.evaluate(async (outline) => {
+      const projects = await chrome.runtime.sendMessage({ type: 'projects/list' });
+      const project = projects.data[0];
+      project.outline = outline;
+      await chrome.runtime.sendMessage({ type: 'projects/put', project });
+    }, originalOutline);
+  }
 
   await page.close();
 });

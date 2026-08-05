@@ -118,6 +118,11 @@ export interface GroupedPassages {
   /** Passages with no section (outline mode) or no colour (colour mode) —
    *  or one naming a bucket that no longer exists. Rendered last. */
   unplaced: Annotation[];
+  /** Every passage with no section, or naming a section that no longer exists.
+   *  This is what the Outline screen must show: unlike `unplaced`, it does not
+   *  change meaning when the draft falls back to colour grouping, so a coloured
+   *  passage can never become invisible there. */
+  unsectioned: Annotation[];
   groupedByColour: boolean;
 }
 
@@ -196,13 +201,20 @@ export function groupPassages(annotations: Annotation[], project: Project): Grou
   // duplicate silently makes one occurrence steal the other's citation.
   // Testing `undefined` explicitly keeps the two predicates exact opposites
   // for every id, including the empty string.
+  // Independent of `groupedByColour` by construction — this predicate never
+  // looks at colour, so a passage carrying a valid colour but no section
+  // still lands here even when the draft falls back to colour buckets. That
+  // is exactly what makes it safe for the Outline screen to render this list
+  // unconditionally instead of `unplaced`, whose meaning flips underneath it.
+  const unsectioned = orderedEntries(
+    annotations.filter((a) => a.section === undefined || !sectionIds.has(a.section)),
+  );
+
   const unplaced = groupedByColour
     ? orderedEntries(annotations.filter((a) => a.color === undefined || !paletteIds.has(a.color)))
-    : orderedEntries(
-        annotations.filter((a) => a.section === undefined || !sectionIds.has(a.section)),
-      );
+    : unsectioned;
 
-  return { buckets, unplaced, groupedByColour };
+  return { buckets, unplaced, unsectioned, groupedByColour };
 }
 
 /** Thrown when `formatRun` returns a different number of citations than it
