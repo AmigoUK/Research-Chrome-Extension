@@ -55,6 +55,12 @@ export function downloadMarkdown(filename: string, body: string): void {
   link.href = url;
   link.download = filename;
   link.click();
-  // Revoking synchronously can race the download in Chrome; one turn is enough.
+  // `click()` hands the blob URL to Chrome's download manager synchronously,
+  // before this function returns, so the manager has already latched onto
+  // the blob's bytes by the time any queued task — including a `setTimeout`
+  // at delay 0 — gets to run. Revoking in the same tick as `click()` can race
+  // that hand-off instead. If this ordering ever stopped holding, the
+  // "Download .md" download in e2e/draft-export.spec.ts would see an empty
+  // or failed file, not just a slow one — that test is what would catch it.
   setTimeout(() => URL.revokeObjectURL(url), 0);
 }
