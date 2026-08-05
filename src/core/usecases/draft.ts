@@ -96,6 +96,7 @@ export async function composeDraft(
   const outline = resolveOutline(project);
   const sectionIds = new Set(outline.map((s) => s.id));
   const palette = project.colorPalette ?? DEFAULT_HIGHLIGHT_COLORS;
+  const paletteIds = new Set(palette.map((c) => c.id));
   const refByDocument = new Map<Id, Reference>();
   for (const reference of references) {
     if (reference.documentId) refByDocument.set(reference.documentId, reference);
@@ -124,8 +125,14 @@ export async function composeDraft(
         items: orderedEntries(placed.filter((a) => a.section === s.id)),
       }));
 
+  // Mirrors the section path exactly: a colour naming no current palette
+  // entry (the entry was deleted — `HighlightColor.id` is "never reused
+  // after deletion") must fall through to `unplaced`, not vanish. Silently
+  // dropping the passage would be the same failure as the section case, with
+  // a worse symptom: the student loses a passage from their essay with
+  // nothing on screen to say it ever existed.
   const unplacedItems = groupedByColour
-    ? orderedEntries(annotations.filter((a) => !a.color))
+    ? orderedEntries(annotations.filter((a) => !a.color || !paletteIds.has(a.color)))
     : orderedEntries(annotations.filter((a) => !a.section || !sectionIds.has(a.section)));
 
   // Flatten in exactly the order the draft reads, then cite once against it.
