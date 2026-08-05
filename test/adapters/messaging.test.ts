@@ -256,8 +256,15 @@ describe('data-changed broadcast', () => {
       'snapshot/preview',
       'snapshot/export',
       'citations/bibliography',
+      'draft/compose',
     ]) {
       expect(mutatesData(type), type).toBe(false);
     }
+  });
+});
+
+describe('draft/compose', () => {
+  it('is a read: composing a draft must not announce a data change', async () => {
+    expect(mutatesData('draft/compose')).toBe(false);
   });
 });
