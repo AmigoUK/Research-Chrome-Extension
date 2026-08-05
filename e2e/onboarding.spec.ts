@@ -135,10 +135,10 @@ test('the checklist starts unchecked, checks off a filed source, and hides once 
   await page.close();
 });
 
-// Last in the file deliberately: this is the one test here that opens the
+// Last in the file deliberately: these are the tests here that open the
 // dashboard, and the dashboard seeds its own default project the moment it
-// finds none — running it before the tests above would leave them racing a
-// "My Research Project" seed instead of the side panel's own "My Research".
+// finds none — running them before the tests above would leave those racing
+// a "My Research Project" seed instead of the side panel's own "My Research".
 test('the guide’s Outline step opens the dashboard already on that route', async () => {
   const page = await context.newPage();
   await page.goto(url('src', 'onboarding', 'index.html'));
@@ -147,11 +147,40 @@ test('the guide’s Outline step opens the dashboard already on that route', asy
   await page.locator('#openOutline').click();
   const dashboardPage = await dashboardPagePromise;
   await dashboardPage.waitForLoadState('domcontentloaded');
-  expect(dashboardPage.url()).toContain('src/options/index.html');
+  expect(dashboardPage.url()).toContain('src/options/index.html#outline');
   // The dashboard reads its topbar title from `state.route` — 'Outline' here
-  // is proof the pending-route handoff actually landed, not just that the
-  // dashboard opened at its default Overview.
+  // is proof the URL fragment actually landed, not just that the dashboard
+  // opened at its default Overview.
   await expect(dashboardPage.locator('#viewTitle')).toHaveText('Outline');
   await dashboardPage.close();
+  await page.close();
+});
+
+// The regression this covers: openOptionsPage() only focuses an
+// already-open dashboard tab rather than reloading it, so a handoff that
+// relied on that reload (the old storage-parked "pending route") would
+// silently do nothing here. chrome.tabs.create() always opens a fresh tab
+// regardless of what is already open, so this must pass exactly like the
+// no-tab-open case above.
+test('the Outline step still lands on Outline with a dashboard tab already open', async () => {
+  const existingDashboard = await context.newPage();
+  await existingDashboard.goto(url('src', 'options', 'index.html'));
+  await expect(existingDashboard.locator('#viewTitle')).toHaveText('Overview');
+
+  const page = await context.newPage();
+  await page.goto(url('src', 'onboarding', 'index.html'));
+  const newDashboardPagePromise = context.waitForEvent('page');
+  await page.locator('#openOutline').click();
+  const newDashboardPage = await newDashboardPagePromise;
+  await newDashboardPage.waitForLoadState('domcontentloaded');
+  expect(newDashboardPage.url()).toContain('src/options/index.html#outline');
+  await expect(newDashboardPage.locator('#viewTitle')).toHaveText('Outline');
+
+  // The pre-existing tab was merely left alone, not hijacked into Outline —
+  // this handoff never touches a tab it didn't itself open.
+  await expect(existingDashboard.locator('#viewTitle')).toHaveText('Overview');
+
+  await newDashboardPage.close();
+  await existingDashboard.close();
   await page.close();
 });
