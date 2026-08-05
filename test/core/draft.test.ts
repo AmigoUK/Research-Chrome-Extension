@@ -344,6 +344,30 @@ describe('composeDraft', () => {
     expect(entry?.locator).toBe('PDF p. 3');
   });
 
+  // Fix round 1, item 1: `draftToHtml`/`draftToMarkdown` (serialise.ts) each
+  // require a matching `Draft.flavour`, and that field is only ever correct
+  // if composeDraft actually sets it from its own request rather than, say,
+  // a stale default.
+  it('sets flavour from the compose request, not a fixed default', async () => {
+    await repos.documents.put(doc('d1'));
+    await repos.references.put(ref('r1', 'd1'));
+    await repos.annotations.put(anno('a1', 'd1', { section: 's1' }));
+
+    const textDraft = await composeDraft(repos, formatter, {
+      projectId: 'p1',
+      template: 'apa',
+      flavour: 'text',
+    });
+    expect(textDraft.flavour).toBe('text');
+
+    const htmlDraft = await composeDraft(repos, formatter, {
+      projectId: 'p1',
+      template: 'apa',
+      flavour: 'html',
+    });
+    expect(htmlDraft.flavour).toBe('html');
+  });
+
   it('carries the colour label even when grouped by outline section', async () => {
     await repos.projects.put({
       ...project,
