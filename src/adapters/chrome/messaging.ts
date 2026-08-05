@@ -9,11 +9,23 @@ import { handleRequest, type RouterDeps } from '../../core/router';
 import type { RepositorySet } from '../../core/ports/repositories';
 import type { MessageMap, MessageType, Request, Result } from '../../core/messages';
 
+/**
+ * Identifies THIS page context (panel, dashboard, reader) for the lifetime of
+ * its document. Every request carries it and the change broadcast echoes it
+ * back, so a surface can tell its own writes from somebody else's — without
+ * it, typing a note made the panel rebuild itself on its own autosave.
+ */
+export const CLIENT_ID = crypto.randomUUID();
+
 /** Send a typed request to the service worker and unwrap the result. */
 export async function sendRequest<T extends MessageType>(
   request: Request<T>,
 ): Promise<MessageMap[T]['res']> {
-  const result = (await chrome.runtime.sendMessage(request)) as Result<T>;
+  // The extra field is invisible to the router, which switches on `type`.
+  const result = (await chrome.runtime.sendMessage({
+    ...request,
+    __client: CLIENT_ID,
+  })) as Result<T>;
   if (!result.ok) {
     throw new Error(result.error);
   }
@@ -35,9 +47,16 @@ export function mutatesData(type: string): boolean {
   return MUTATING.test(type);
 }
 
-/** Fire-and-forget "stored data changed" signal to every extension page. */
-function broadcastDataChanged(type: string): void {
-  chrome.runtime.sendMessage({ control: 'data/changed', changedBy: type }).catch(() => {});
+/** Fire-and-forget "stored data changed" signal to every extension page. The
+ *  origin id lets the surface that caused it skip its own echo. */
+function broadcastDataChanged(type: string, sourceClient: unknown): void {
+  chrome.runtime
+    .sendMessage({
+      control: 'data/changed',
+      changedBy: type,
+      ...(typeof sourceClient === 'string' ? { sourceClient } : {}),
+    })
+    .catch(() => {});
 }
 
 /**
@@ -88,7 +107,7 @@ export function registerMessageRouter(
         sendResponse(result);
         const type = (message as { type?: unknown })?.type;
         if (result.ok && typeof type === 'string' && mutatesData(type)) {
-          broadcastDataChanged(type);
+          broadcastDataChanged(type, (message as { __client?: unknown })?.__client);
         }
       } catch (error) {
         sendResponse({

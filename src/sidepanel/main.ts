@@ -3,7 +3,7 @@
  * typed messaging layer, and to the active tab for capture.
  */
 import './panel.css';
-import { sendRequest } from '../adapters/chrome/messaging';
+import { CLIENT_ID, sendRequest } from '../adapters/chrome/messaging';
 import {
   scanActiveTab,
   captureActiveTab,
@@ -257,6 +257,9 @@ async function loadPageAnnotations(): Promise<void> {
  * wrong page after any tab switch.
  */
 async function refreshPreview(): Promise<void> {
+  // Clicking into the panel raises window focus, which lands here. Repainting
+  // then would replace the very textarea the reader just clicked into.
+  if (isEditingNote()) return;
   await loadPreview();
   await loadPageAnnotations();
   renderCaptureCard();
@@ -512,11 +515,30 @@ function restoreFocusedNoteEdit(focused: FocusedNoteEdit | null): void {
   }
 }
 
+/** What the rendered note list depends on — a cheap identity for "nothing
+ *  the reader can see has changed", so an incidental refresh is not allowed
+ *  to rebuild the DOM under them. */
+function onPageSignature(): string {
+  return JSON.stringify([
+    state.pageAnnotations.map((a) => [a.id, a.content, a.status, a.color]),
+    [...state.resolvedIds].sort(),
+    palette.map((c) => [c.id, c.swatch, c.label]),
+  ]);
+}
+let lastOnPageSignature: string | null = null;
+
 function renderOnPageCard(): void {
   const section = $('onPageCard');
   const capturable = isCapturablePreview();
   section.hidden = !capturable;
-  if (!capturable) return;
+  if (!capturable) {
+    lastOnPageSignature = null;
+    return;
+  }
+
+  const signature = onPageSignature();
+  if (signature === lastOnPageSignature && $('onPageList').childElementCount > 0) return;
+  lastOnPageSignature = signature;
 
   const list = $('onPageList');
   const annotations = state.pageAnnotations;
@@ -569,6 +591,9 @@ async function savePageAnnotationContent(id: Id, content: string): Promise<void>
   if (idx < 0) return;
   const updated: Annotation = { ...state.pageAnnotations[idx]!, content, updatedAt: nowIso() };
   state.pageAnnotations[idx] = updated;
+  // The textarea already shows this; keep the signature in step so no later
+  // render rebuilds the list for a change the reader is looking at.
+  lastOnPageSignature = onPageSignature();
   try {
     await sendRequest({ type: 'annotations/put', annotation: updated });
   } catch (err) {
@@ -818,7 +843,19 @@ function renderGettingStarted(): void {
   );
 }
 
+/** True while the caret is in a note's editor. A repaint would replace that
+ *  textarea mid-keystroke: characters typed in the gap land on a detached
+ *  node, and the value can revert to the last SAVED text. */
+function isEditingNote(): boolean {
+  const active = document.activeElement;
+  return active instanceof HTMLTextAreaElement && active.classList.contains('onpage-note__ta');
+}
+
 function render(): void {
+  // A full repaint reflows the whole panel; without this the list jumped
+  // under the reader's hands whenever anything was saved.
+  const body = document.getElementById('scrollBody');
+  const scrollTop = body?.scrollTop ?? 0;
   renderHeader();
   renderGettingStarted();
   renderCaptureCard();
@@ -826,6 +863,7 @@ function render(): void {
   renderSegmented();
   renderList();
   renderProgress();
+  if (body && body.scrollTop !== scrollTop) body.scrollTop = scrollTop;
 }
 
 // --------------------------------------------------------------------------
@@ -1274,9 +1312,15 @@ async function init(): Promise<void> {
   // this list stale; the service worker broadcasts after every successful
   // mutation. Debounced: an import fires dozens of writes in a burst.
   let dataChangedTimer: ReturnType<typeof setTimeout> | undefined;
+  let refreshDeferred = false;
   const onDataChanged = (): void => {
     clearTimeout(dataChangedTimer);
     dataChangedTimer = setTimeout(() => {
+      // Never repaint under a typing hand: re-read once the note is left.
+      if (isEditingNote()) {
+        refreshDeferred = true;
+        return;
+      }
       void (async () => {
         state.projects = await sendRequest({ type: 'projects/list' });
         await loadStyles();
@@ -1289,9 +1333,32 @@ async function init(): Promise<void> {
     }, 400);
   };
 
+  // A refresh deferred because the reader was mid-sentence runs the moment
+  // the caret leaves the note — never in the middle of a word.
+  document.addEventListener(
+    'focusout',
+    () => {
+      if (!refreshDeferred) return;
+      refreshDeferred = false;
+      setTimeout(() => {
+        if (!isEditingNote()) onDataChanged();
+      }, 0);
+    },
+    true,
+  );
+
   chrome.runtime.onMessage.addListener(
-    (message: { control?: string; id?: string; url?: string; resolvedIds?: string[] }) => {
+    (message: {
+      control?: string;
+      id?: string;
+      url?: string;
+      sourceClient?: string;
+      resolvedIds?: string[];
+    }) => {
       if (message?.control === 'data/changed') {
+        // Our own write coming back to us: the panel already shows it, and
+        // re-reading here is what made typing a note rebuild the panel.
+        if (message.sourceClient === CLIENT_ID) return;
         onDataChanged();
       } else if (message?.control === 'annotator/changed') {
         void (async () => {

@@ -216,6 +216,18 @@ Przejdź podróż w naturalnej kolejności; jeśli cokolwiek zgrzyta, wejdź w o
 - **Oczekiwane**: treść przeżywa przeładowanie panelu; Jump przewija stronę i błyska
   podświetleniem; ✕ usuwa overlay natychmiast. (Osobnego przycisku "Note" nie ma — notatkę
   dopisujesz na karcie; kolor to jedyna decyzja przy zaznaczeniu.)
+### S4.4b Pisanie notatki nie rusza widoku (regresja z v1.7.4)
+- **Kroki**: mając 2–3 notatki na stronie, kliknij w pole tekstowe karty i **pisz zdanie w
+  normalnym tempie** (z pauzami dłuższymi niż 0,5 s, żeby autozapis odpalił kilka razy).
+- **Oczekiwane**: widok **stoi** (przewinięcie tylko raz, przy kliknięciu — przeglądarka pokazuje
+  pole), lista notatek **nie miga**, żaden znak nie ginie, kursor zostaje w polu.
+- **Potencjalne problemy**: migotanie/„skakanie" = panel znów reaguje na własny zapis; znikające
+  znaki = przebudowa listy w trakcie pisania.
+- **Debug**: w konsoli panelu policz przebudowy i broadcasty:
+  `new MutationObserver(m=>console.log('rebuild',m[0].target.id)).observe(document.body,{childList:true,subtree:true})`
+  oraz `chrome.runtime.onMessage.addListener(m=>m?.control==='data/changed'&&console.log(m))` —
+  broadcast z **własnym** `sourceClient` musi zostać zignorowany (0 przebudów).
+
 - **Debug**: autozapis jest debounced 500 ms — zamknięcie panelu w < 0,5 s od wpisania może
   zgubić ostatnie znaki (znany kompromis).
 

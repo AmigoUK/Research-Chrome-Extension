@@ -4,6 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { openContextNotesDB } from '../../src/adapters/idb/db';
 import { createRepositories } from '../../src/adapters/idb/repositories';
 import {
+  CLIENT_ID,
   mutatesData,
   registerMessageRouter,
   sendRequest,
@@ -215,6 +216,20 @@ describe('data-changed broadcast', () => {
     await expect(sendRequest({ type: 'snapshot/import', content: 'not json' })).rejects.toThrow();
     await new Promise((r) => setTimeout(r, 0));
     expect(broadcasts()).toHaveLength(0);
+  });
+
+  it('names the client that caused the change, so a surface can skip its own echo', async () => {
+    // Without this, the side panel re-read and repainted itself on its OWN
+    // note autosave: 13 DOM rebuilds per saved note, a scroll jump, and
+    // keystrokes landing on a textarea that had just been replaced.
+    await sendRequest({ type: 'documents/put', document: doc });
+    await new Promise((r) => setTimeout(r, 0));
+    const broadcast = broadcasts()[0] as { sourceClient?: string } | undefined;
+    expect(broadcast?.sourceClient).toBe(CLIENT_ID);
+    // And the request carried it in the first place.
+    const sentPut = sentMessages.find((m) => (m as { type?: string })?.type === 'documents/put') as
+      { __client?: string } | undefined;
+    expect(sentPut?.__client).toBe(CLIENT_ID);
   });
 
   it('classifies the message families, not a hand-kept list', () => {

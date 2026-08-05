@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.7.4] — 2026-08-04
+
+### Fixed
+
+- **Writing a note no longer makes the panel flicker, jump and drop
+  keystrokes.** Each autosave broadcast "data changed", and the panel — which
+  had just made that change itself — dutifully re-read everything and
+  repainted: measured on a live article, **one saved note caused 13 DOM
+  rebuilds**, including the header, the capture card and the notes list, so
+  characters typed in the gap landed on a textarea that no longer existed.
+  Three fixes: every request now carries the id of the surface that made it
+  and the broadcast echoes it back, so a surface ignores its **own** writes;
+  a repaint is deferred while the caret is in a note (and runs on blur); and
+  the notes list rebuilds only when something a reader can see has actually
+  changed. Clicking into the panel used to re-scan the page and rebuild the
+  list too — that path is guarded as well, and a repaint now preserves the
+  scroll position. Re-measured on the same article: **0 rebuilds, 0 lost
+  characters, no movement while typing.**
+
 ## [1.7.3] — 2026-08-04
 
 ### Fixed

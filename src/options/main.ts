@@ -9,7 +9,7 @@
  * later milestones.
  */
 import './dashboard.css';
-import { sendRequest } from '../adapters/chrome/messaging';
+import { CLIENT_ID, sendRequest } from '../adapters/chrome/messaging';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
@@ -3382,8 +3382,11 @@ async function init(): Promise<void> {
   // bursts, and never while the style editor is open or an import preview is
   // pending — a full re-render there would discard work in progress.
   let dataChangedTimer: ReturnType<typeof setTimeout> | undefined;
-  chrome.runtime.onMessage.addListener((message: { control?: string }) => {
+  chrome.runtime.onMessage.addListener((message: { control?: string; sourceClient?: string }) => {
     if (message?.control !== 'data/changed') return;
+    // Our own write: this view already reflects it, and re-reading would
+    // reset scroll and focus under the user for nothing.
+    if (message.sourceClient === CLIENT_ID) return;
     clearTimeout(dataChangedTimer);
     dataChangedTimer = setTimeout(() => {
       if (state.route === 'styleEditor' || state.pendingImport) return;
