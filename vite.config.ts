@@ -14,6 +14,11 @@ export default defineConfig({
   build: {
     target: 'esnext',
     sourcemap: true,
+    // `minimum_chrome_version` is 116; Chrome has supported native
+    // `<link rel="modulepreload">` since 66, so Vite's legacy-browser
+    // polyfill is dead weight here — and it logs a "preloaded but not used"
+    // console warning on every extension page, including a reviewer's.
+    modulePreload: { polyfill: false },
     rollupOptions: {
       // The PDF reader is opened by extension-page URL (not a manifest surface
       // and NOT web-accessible — the manifest deliberately declares no

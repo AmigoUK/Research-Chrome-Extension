@@ -153,7 +153,14 @@ async function loadDocument(): Promise<void> {
   }
 
   const data = new Uint8Array(base64ToBytes(file.dataBase64));
-  state.pdf = await pdfjs.getDocument({ data }).promise;
+  // isEvalSupported: false — pdf.js's own probe already returns false here,
+  // because the manifest sets no content_security_policy so MV3's default
+  // script-src 'self' makes `new Function` throw and the probe falls back to
+  // PostScriptEvaluator. Passing it explicitly makes that fallback the only
+  // path rather than something a static scanner has to reason its way to —
+  // a store reviewer's automated scan flags `new Function` in the bundle
+  // regardless of whether it is reachable.
+  state.pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
   state.numPages = state.pdf.numPages;
   state.pageNum = 1;
   $('#pgTot').textContent = String(state.numPages);

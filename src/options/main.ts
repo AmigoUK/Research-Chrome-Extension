@@ -11,6 +11,7 @@
 import './dashboard.css';
 import { CLIENT_ID, sendRequest } from '../adapters/chrome/messaging';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
+import { requestDoiAccess } from '../adapters/chrome/doi-access';
 import { DEFAULT_HIGHLIGHT_COLORS } from '../core/model/types';
 import type {
   Project,
@@ -1321,6 +1322,14 @@ function openEditDocPop(anchor: HTMLElement, doc: Document): void {
   if (refresh) {
     refresh.onclick = () => {
       void (async () => {
+        // Same host access importByDoi asks for: without it, a user who has
+        // never run Import by DOI hits a raw fetch error on their first
+        // Refresh instead of the permission prompt.
+        const granted = await requestDoiAccess();
+        if (!granted) {
+          toast('Permission is needed to fetch DOI metadata', ICON.warn, true);
+          return;
+        }
         try {
           await sendRequest({ type: 'documents/enrichFromDoi', documentId: doc.id });
           closePop();
@@ -2380,9 +2389,7 @@ async function importByDoi(raw: string): Promise<void> {
     return;
   }
   if (!state.activeProjectId) return;
-  const granted = await chrome.permissions.request({
-    origins: ['https://doi.org/*', 'https://data.crossref.org/*', 'https://data.datacite.org/*'],
-  });
+  const granted = await requestDoiAccess();
   if (!granted) {
     toast('Permission is needed to fetch DOI metadata', ICON.warn, true);
     return;

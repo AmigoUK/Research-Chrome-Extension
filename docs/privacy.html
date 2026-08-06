@@ -61,7 +61,7 @@
 <body>
 <main>
 <h1>Privacy Policy — Scientific Context Notes</h1>
-<p><em>Last updated: 2026-08-03</em></p>
+<p><em>Last updated: 2026-08-06</em></p>
 <p>Scientific Context Notes is a <strong>local-first</strong> Chrome extension. It is built so that your research data never leaves your browser.</p>
 <h2>What data the extension handles</h2>
 <p>Everything you create — projects, filed documents and PDFs, annotations and their anchored quotes, references and citation styles, comments, and activity history — is stored <strong>locally in this browser's IndexedDB</strong>. It stays on your device.</p>
@@ -71,8 +71,8 @@
 <ul><li><strong><code>storage</code></strong> — to keep your projects and notes in local browser storage.</li><li><strong><code>activeTab</code> / <code>scripting</code></strong> — to inject the annotator into the page you are actively viewing, on demand, when you choose to annotate it.</li><li><strong><code>sidePanel</code></strong> — the extension's main workspace surface.</li><li><strong>Optional host permissions (<code>*://*/*</code>)</strong> — never granted up front, and page content is only ever read locally; nothing is transmitted. Two user-initiated grants exist: - <strong>per site, when you choose to annotate there</strong>, so the extension can read the text on that page to anchor your highlights; - <strong>optionally for pages you open</strong>, if you press <em>Allow reading pages</em> in the side panel's capture card. Chrome's one-time <code>activeTab</code> access covers only the tab where you clicked the toolbar icon and expires on navigation, so without this grant the panel cannot preview the next page you browse to. The grant only feeds the on-device capture preview, and you can revoke it — wholesale or per site — in <code>chrome://extensions</code> → *Site access* at any time.</li></ul>
 <p>After you opt in on a site, the annotator is registered to load automatically <strong>on that site only</strong>, so your highlights repaint on your next visit without another prompt. You can revoke a site at any time in <code>chrome://extensions</code> → Scientific Context Notes → *Details* → *Site access*; the extension listens for that revocation and removes its auto-loading registration for the site immediately.</p>
 <h2>Network requests you initiate</h2>
-<p>Two optional features make a network request <strong>only when you ask for one</strong>, and only to the service you named:</p>
-<ul><li><strong>DOI import</strong> contacts <code>doi.org</code> to fetch citation metadata for a DOI you enter.</li><li><strong>Open PDF by URL</strong> fetches a PDF from a URL you provide, to store it locally for annotation.</li></ul>
+<p>Two optional features make a network request <strong>only when you ask for one</strong>, and only to a service tied to the DOI or file you named:</p>
+<ul><li><strong>DOI import and DOI refresh</strong> contact <code>doi.org</code> to fetch citation metadata for a DOI you enter. <code>doi.org</code> itself holds no metadata — it 303-redirects content negotiation to whichever registration agency owns the record, so the request lands on <code>data.crossref.org</code> or <code>data.datacite.org</code>. Both are requested together with <code>doi.org</code> up front, so the redirect is not a separate, unannounced grant.</li><li><strong>Opening a filed source whose link ends in <code>.pdf</code></strong> fetches that file so it can be cached locally and opened in the bundled reader.</li></ul>
 <p>No other network activity occurs.</p>
 <h2>Sharing your data</h2>
 <p>Collaboration is by <strong>file</strong>, not by server. When you export a project snapshot, it is written as a local file (optionally password-encrypted) that <strong>you</strong> choose to share. The extension does not upload it.</p>

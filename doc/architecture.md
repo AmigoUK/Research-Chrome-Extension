@@ -19,8 +19,8 @@ This document describes the high-level architecture of the Scientific Context No
 
 ## Permissions and Host Access
 
-- Minimal permissions: `storage`, `scripting`, `activeTab`, `sidePanel`, optional `tabs`.
-- Host access follows **least privilege**: `activeTab` for the current page, plus `optional_host_permissions` requested per domain on an opt-in basis. A default `*://*/*` grant is **not** used — it conflicts with the project's privacy-first posture and is a red flag in Chrome Web Store review.
+- Minimal permissions: `storage`, `scripting`, `activeTab`, `sidePanel`.
+- Host access follows **least privilege** but is not always per-origin: `activeTab` covers the current page, and `optional_host_permissions` (`*://*/*`) is requested at runtime, never at install time. Two distinct grants share that one declared pattern — annotating a site requests it for that origin alone, and the annotator then auto-loads only there on later visits; separately, the side panel's "Allow reading pages" button requests the full pattern as one standing grant, because `activeTab` is revoked on navigation and cannot by itself let the panel preview or annotate whatever tab the user switches to next. Holding that standing grant means the annotator auto-loads on any active tab, not just sites individually opted into — the trade the broad pattern exists for.
 - External API calls (e.g. CrossRef, CSL style repository, Zotero style downloads) are made from the service worker. These fetch **data only**; MV3's CSP forbids loading or executing remote code, so engines such as citeproc-js are bundled locally (see `citations.md`).
 
 ## Data Flow

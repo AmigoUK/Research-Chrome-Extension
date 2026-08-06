@@ -14,6 +14,7 @@ import {
 import { buildCaptureInput } from '../adapters/chrome/page-scan';
 import { isSearchPage } from '../core/extract/metadata';
 import { getActiveProjectId, setActiveProjectId } from '../adapters/chrome/active-project';
+import { requestDoiAccess } from '../adapters/chrome/doi-access';
 import { DOCUMENT_STATUSES, type DocumentStatus } from '../core/model/workflow';
 import type {
   Annotation,
@@ -1008,14 +1009,20 @@ async function fileCurrentPage(): Promise<void> {
     // stale DOI) costs nothing and says nothing.
     if (result.document.metadata.doi && !result.deduped) {
       try {
-        const enriched = await sendRequest({
-          type: 'documents/enrichFromDoi',
-          documentId: result.document.id,
-        });
-        state.filedReferenceId = enriched.reference.id;
-        await loadDocuments();
-        render();
-        toast('Metadata completed from the DOI registry');
+        // Same host access importByDoi asks for — without it this lookup
+        // fails with a raw fetch error for anyone who has never used Import
+        // by DOI. Declining costs nothing: the captured metadata stays, same
+        // as any other failure on this best-effort path.
+        if (await requestDoiAccess()) {
+          const enriched = await sendRequest({
+            type: 'documents/enrichFromDoi',
+            documentId: result.document.id,
+          });
+          state.filedReferenceId = enriched.reference.id;
+          await loadDocuments();
+          render();
+          toast('Metadata completed from the DOI registry');
+        }
       } catch {
         // keep the captured metadata
       }

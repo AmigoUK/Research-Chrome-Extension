@@ -1,6 +1,6 @@
 # Privacy Policy — Scientific Context Notes
 
-_Last updated: 2026-08-03_
+_Last updated: 2026-08-06_
 
 > This file is the source. The published policy — the URL given to the Chrome Web Store — is
 > **<https://amigouk.github.io/Research-Chrome-Extension/privacy.html>**, generated from this file by
@@ -47,11 +47,16 @@ listens for that revocation and removes its auto-loading registration for the si
 
 ## Network requests you initiate
 
-Two optional features make a network request **only when you ask for one**, and only to the service
-you named:
+Two optional features make a network request **only when you ask for one**, and only to a service
+tied to the DOI or file you named:
 
-- **DOI import** contacts `doi.org` to fetch citation metadata for a DOI you enter.
-- **Open PDF by URL** fetches a PDF from a URL you provide, to store it locally for annotation.
+- **DOI import and DOI refresh** contact `doi.org` to fetch citation metadata for a DOI you enter.
+  `doi.org` itself holds no metadata — it 303-redirects content negotiation to whichever
+  registration agency owns the record, so the request lands on `data.crossref.org` or
+  `data.datacite.org`. Both are requested together with `doi.org` up front, so the redirect is not
+  a separate, unannounced grant.
+- **Opening a filed source whose link ends in `.pdf`** fetches that file so it can be cached
+  locally and opened in the bundled reader.
 
 No other network activity occurs.
 

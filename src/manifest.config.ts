@@ -7,9 +7,15 @@ import pkg from '../package.json';
  * Permissions follow least privilege (architecture.md):
  * - `sidePanel` is the primary workflow surface.
  * - Host access is NOT granted by default. An all-URLs match pattern is
- *   declared only as an OPTIONAL host permission and requested per-origin
- *   at runtime (opt-in), so the extension holds no standing access to
- *   every site.
+ *   declared only as an OPTIONAL host permission, requested at runtime on a
+ *   user gesture, never at install time. Two distinct grants share it: a
+ *   per-origin request the first time the user annotates a given site (the
+ *   annotator then auto-loads on that site alone), and a separate standing
+ *   all-sites request from the side panel's "Allow reading pages" button,
+ *   which lets the capture preview and the annotator auto-load on whatever
+ *   tab is active — needed because `activeTab` is scoped to the one tab
+ *   where the toolbar icon was clicked and is revoked on navigation. Either
+ *   grant is revocable per site or wholesale in chrome://extensions.
  */
 export default defineManifest({
   manifest_version: 3,

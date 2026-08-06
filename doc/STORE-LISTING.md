@@ -39,9 +39,9 @@ Then take it all the way to a written draft. Give each highlight a place in your
 WHAT YOU GET
 
 • Capture — file any page or PDF into a project, with metadata extracted for you and duplicates caught by DOI.
-• Web annotation — select text on a live page, choose Highlight or Note, and see it painted back on your next visit. Access is opt-in per site: nothing is injected anywhere until you choose to annotate a site, and after you opt in, the annotator loads only on that site (revocable any time in the extension's Site access settings).
+• Web annotation — select text on a live page, choose Highlight or Note, and see it painted back on your next visit. Nothing is injected until you opt in: annotating a site registers the annotator on that site alone, and if you also grant the optional "read pages you open" access (used for the capture preview), the annotator additionally loads automatically on whichever tab is active, on any site — both are revocable any time in the extension's Site access settings.
 • A bundled PDF reader — text highlights and drag-a-rectangle region anchors, stored as fractions of the page box so they survive zoom, reload and a different screen.
-• Outline and draft export — assign each highlight to a section, from the side panel while you read or in bulk on the Outline screen, then Copy draft (formatted for Word or Google Docs) or Download .md. Every citation is resolved against the whole draft in one pass, so a numbered style counts sources in the order they are actually cited and the reference list holds only what you cited — not everything you ever read.
+• Outline and draft export — assign each highlight to a section, from the side panel while you read or all in one place on the Outline screen, then Copy draft (formatted for Word or Google Docs) or Download .md. Every citation is resolved against the whole draft in one pass, so a numbered style counts sources in the order they are actually cited and the reference list holds only what you cited — not everything you ever read.
 • Real citations — citeproc-js with APA, Harvard, Vancouver, MLA and Chicago (author–date and notes). Copy an in-text citation or a bibliography entry wherever you are working.
 • A citation-style editor — turn plain rules (maximum authors, et al. thresholds, DOI and URL inclusion, page labels, FOI and legal templates) into CSL overrides, with a live preview that formats through the real engine. Import a journal's own .csl as a base style, or export the compiled one.
 • A project dashboard — an overview with a Kanban board by review status, plus Documents, References, Annotations, Outline and Citation styles.
@@ -52,7 +52,7 @@ LOCAL-FIRST, AND MEANT
 
 Everything lives in this browser's IndexedDB. There is no backend, no account, no telemetry and no remote code — the citation styles, the PDF engine and the fonts all ship inside the extension. Nothing you read, file or write is transmitted anywhere.
 
-Two features touch the network, and only when you ask: importing a DOI contacts doi.org for that DOI's metadata, and "open PDF by URL" fetches the PDF you named.
+Two features touch the network, and only when you ask: importing or refreshing a DOI's metadata contacts doi.org, which redirects content negotiation to whichever registration agency holds the record — data.crossref.org or data.datacite.org — and opening a filed source whose stored link ends in .pdf fetches that file so it can be cached in the bundled reader.
 
 Because there is no server, collaboration travels as a file rather than through an account, and roles are advisory: every collaborator holds a full copy of the project, so nothing can enforce a role — and the Team view says so in plain words rather than pretending otherwise.
 
@@ -114,7 +114,7 @@ The side panel is the extension's primary interface: capture, the reading list a
 `optional_host_permissions: *://*/*`
 
 ```
-Requested per site and only when the user chooses to annotate on that site — never at install time, and never for sites they have not opted into. It grants the ability to read that page's text so a highlight can be anchored to the exact passage and found again on a later visit. Page content is processed locally and stored in this browser only; it is never transmitted. The pattern is broad because researchers read on arbitrary journal, repository and news domains that cannot be enumerated in advance, but the grant is always one origin at a time, at the user's initiative.
+Two separate grants share this one optional permission, both requested only on a user gesture and neither held at install time. The first is per-origin: the first time the user chooses to annotate a site, chrome.permissions.request asks for that origin alone, so the annotator can read that page's text and anchor a highlight to the exact passage, found again on a later visit. The second is the full pattern as one standing grant, requested only if the user presses "Allow reading pages" in the side panel's capture card — because Chrome's activeTab permission covers only the tab where the toolbar icon was clicked and is revoked on navigation, so without this grant the panel cannot preview or file the next page the user browses to. Page content from either grant is processed locally and stored in this browser only; it is never transmitted. Both grants are revocable at any time, wholesale or per site, in Site access.
 ```
 
 **Remote code use:** *No, I am not using remote code.*
@@ -168,9 +168,9 @@ Manifest V3, no remote code: every asset (CSL styles, the pdf.js reader and work
 
 No backend, no accounts, no telemetry. All user data is stored in this browser's IndexedDB. Page text read for anchoring a highlight is stored locally with the annotation and is never transmitted.
 
-Host access is optional and per-origin. The extension holds no host permission at install time. The first time the user annotates on a given site, chrome.permissions.request is called for that origin alone. Declining is honoured and reported in the UI rather than failing silently.
+Host access is optional and requested only on a user gesture; the extension holds no host permission at install time. Two separate chrome.permissions.request calls exist: the first time the user annotates a given site, it is called for that origin alone; separately, the side panel's "Allow reading pages" button requests the full pattern as one standing grant, needed because activeTab is scoped to the tab where the toolbar icon was clicked and is revoked on navigation, so it cannot by itself let the panel preview the next page. Declining either is honoured and reported in the UI rather than failing silently.
 
-Two network requests exist, both user-initiated and both to a service the user named: importing a DOI fetches metadata from doi.org, and "open PDF by URL" fetches the PDF at a URL the user pasted.
+Two features touch the network, both user-initiated: importing or refreshing a DOI's metadata fetches from doi.org, which redirects content negotiation to data.crossref.org or data.datacite.org depending on which registration agency holds the record; and opening a filed source whose stored link ends in .pdf fetches that file to cache it in the bundled reader.
 
 Source: https://github.com/AmigoUK/Research-Chrome-Extension (own code MIT; bundled citeproc-js CPAL-1.0, pdf.js Apache-2.0 — see THIRD-PARTY-NOTICES.md).
 ```
