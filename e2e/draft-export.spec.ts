@@ -1,4 +1,11 @@
-import { test, expect, chromium, type BrowserContext, type Worker } from '@playwright/test';
+import {
+  test,
+  expect,
+  chromium,
+  type BrowserContext,
+  type Page,
+  type Worker,
+} from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -59,10 +66,45 @@ function dashboardUrl(): string {
   return `chrome-extension://${extensionId}/${path.posix.join('src', 'options', 'index.html')}`;
 }
 
+/**
+ * Wait until the dashboard's first-run seed has actually reached storage.
+ *
+ * `#pName` rendering only proves the project exists in the page's own state —
+ * the seeding `projects/put` can still be in flight. Both tests below then ask
+ * the worker for `projects/list` and index straight into `data[0]`, so on a
+ * fresh profile (this spec launches its own, every run) a slow machine loses
+ * that race and the seed arrives after the read.
+ *
+ * That is not hypothetical: it turned CI red on `main` while a warm local
+ * machine stayed green, failing in 225ms with "Cannot read properties of
+ * undefined (reading 'id')". The sibling `dashboard.spec.ts` uses the same
+ * `#pName` wait and survives only because its earlier tests have already
+ * forced the write to land — which makes its first reader latently fragile
+ * in the same way.
+ *
+ * The outline is part of the condition because the tests need a section id
+ * from it, and a project written without one would satisfy a bare length check.
+ */
+async function waitForSeededProject(page: Page): Promise<void> {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async () => {
+          const res = (await chrome.runtime.sendMessage({ type: 'projects/list' })) as {
+            data?: Array<{ id?: string; outline?: Array<{ id: string }> }>;
+          };
+          const project = res.data?.[0];
+          return Boolean(project?.id) && (project?.outline?.length ?? 0) > 0;
+        }),
+      { message: 'the dashboard never persisted its first-run project' },
+    )
+    .toBe(true);
+}
+
 test('copying a draft puts real markup on the clipboard', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
-  await expect(page.locator('#pName')).not.toHaveText('—');
+  await waitForSeededProject(page);
 
   // One document, one reference tied to it (so the bibliography is real
   // citeproc output, not empty), and one quoted, sectioned annotation — the
@@ -190,7 +232,7 @@ test('a clipboard write the browser refuses still lands the plain text, with an 
     navigator.clipboard.write = () => Promise.reject(new Error('e2e: rich write refused'));
   });
   await page.goto(dashboardUrl());
-  await expect(page.locator('#pName')).not.toHaveText('—');
+  await waitForSeededProject(page);
 
   // Same shape as the clipboard fixture above, with its own ids — this
   // test's cleanup must not depend on the other test's having run, or having
@@ -287,7 +329,7 @@ test('a clipboard write the browser refuses still lands the plain text, with an 
 test('downloading the .md draft produces a real Markdown file with no HTML in it', async () => {
   const page = await context.newPage();
   await page.goto(dashboardUrl());
-  await expect(page.locator('#pName')).not.toHaveText('—');
+  await waitForSeededProject(page);
 
   // Same shape as the clipboard fixture above (one document, one reference
   // tied to it, one quoted and sectioned annotation) but with its own ids —
