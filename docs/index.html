@@ -86,8 +86,10 @@
 <h2>Where your data lives</h2>
 <p>In this browser, in IndexedDB, and nowhere else. There is no backend, no telemetry, no account,
 and no remote code — every asset, from the citation styles to the PDF engine, ships inside the
-extension. Host access is never granted up front: the extension asks per site, the first time you
-annotate there. The full statement is in the <a href="./privacy.html">privacy policy</a>.</p>
+extension. Host access is never granted up front: annotating a site asks for that site alone, and
+previewing every page you open needs a separate, optional grant — because activeTab access expires
+the moment you navigate. Either is revocable any time in Site access. The full statement is in the
+<a href="./privacy.html">privacy policy</a>.</p>
 <h2>Get it</h2>
 <ul>
   <li><a href="https://github.com/AmigoUK/Research-Chrome-Extension">Source, releases and issues on GitHub</a></li>
