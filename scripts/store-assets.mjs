@@ -233,6 +233,51 @@ await renderAt(
 );
 await panel.close();
 
+// --- 6 · outline --------------------------------------------------------
+// `page` was left on the style editor (`#sFull`'s `styleEditor` route),
+// which replaces the whole dashboard chrome including `#nav` — the same
+// reason scripts/screenshots.mjs re-navigates before its next dashboard
+// shot. Reload the dashboard shell first or the nav click below times out
+// waiting on an element that is simply gone.
+await page.goto(url('src/options/index.html'));
+await page.waitForTimeout(900);
+// The seed's `sec-counter` section is deliberately left with no passages so
+// this capture shows the empty-section warning actually firing, not an
+// outline where everything happens to already be placed. It is also the
+// last section, so scrolling `#view` (the scrollable content pane — the
+// topbar with the route title and Add section/Copy draft/Download .md sits
+// outside it and stays put) to the bottom is what brings it into frame at
+// all: the unscrolled page only reaches the third section.
+await page.locator('#nav .nav-item[data-route="outline"]').click();
+await page.waitForTimeout(300);
+await page.evaluate(() => {
+  const view = document.getElementById('view');
+  if (view) view.scrollTop = view.scrollHeight;
+});
+await renderAt(
+  wideFrame(
+    await shotOf(page),
+    'Turn highlights into an essay, one section at a time',
+    'Assign every passage to a place in your argument — an empty section keeps flagging itself until you deal with it.',
+  ),
+  1280,
+  800,
+  `${OUT}/screenshot-6-outline.png`,
+);
+
+// --- 7 · settings ------------------------------------------------------
+await page.locator('#nav .nav-item[data-route="settings"]').click();
+await renderAt(
+  wideFrame(
+    await shotOf(page),
+    'One project card, set once, cited everywhere',
+    'Name, research question and due date sit beside the default citation style — here, Harvard for Solent University.',
+  ),
+  1280,
+  800,
+  `${OUT}/screenshot-7-settings.png`,
+);
+
 // --- promo tiles ------------------------------------------------------------
 const tile = (width, height, scale, art = '') => `<!doctype html><meta charset="utf-8"><style>
   ${FONT_FACES}

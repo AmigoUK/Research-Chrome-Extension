@@ -22,6 +22,57 @@ export const seedDemoProject = async (pdf) => {
     d.setHours(hour, 0, 0, 0);
     return d.toISOString();
   };
+  // Relative to "now" rather than a fixed calendar date, so the due-date
+  // label (`dueLabel` in src/options/view-model.ts) always reads as
+  // comfortably upcoming — "in N days" — no matter when this seed runs.
+  const futureDate = (daysAhead) => {
+    const d = new Date();
+    d.setDate(d.getDate() + daysAhead);
+    return d.toISOString().slice(0, 10);
+  };
+
+  // Harvard — Solent University is vendored (src/assets/csl/solent-university-harvard.csl)
+  // but no CitationStyle entity points at it outside the dashboard's own "New
+  // style" flow — `ensureSeedStyles` in src/options/main.ts only seeds
+  // APA/Chicago/Harvard. The demo project needs its own so Settings has
+  // something real to show as the default. Shape and field values mirror
+  // `defaultRules('authorDate')` there.
+  const solentStyleId = 'harvard-solent';
+  await send({
+    type: 'citationStyles/put',
+    style: {
+      id: solentStyleId,
+      name: 'Harvard — Solent University',
+      baseStyleId: 'harvard-solent',
+      userRules: {
+        system: 'authorDate',
+        maxAuthors: 3,
+        etAlUseFirst: 1,
+        nameAnd: 'symbol',
+        includeDoi: true,
+        doiAsUri: true,
+        includeUrl: false,
+        includeIssue: true,
+        pagePrefix: false,
+        foiTemplate: false,
+        legalTemplate: false,
+      },
+    },
+  });
+
+  // A real outline (OutlineSection[], not the deprecated `Project.sections`
+  // string list) — see src/core/draft/outline.ts. `sec-counter` is left with
+  // no passages on purpose: an empty section is the Outline screen's best
+  // single idea (a missing counter-argument is exactly what costs a real
+  // essay marks) and the screenshot has to show that warning firing, not
+  // hide it behind an outline where everything happens to be placed.
+  const outline = [
+    { id: 'sec-intro', title: 'Why heat mortality is undercounted' },
+    { id: 'sec-mechanism', title: 'The urban heat island mechanism' },
+    { id: 'sec-evidence', title: 'Mortality evidence across temperature bands' },
+    { id: 'sec-limitations', title: 'Gaps in the current evidence base' },
+    { id: 'sec-counter', title: 'Counter-arguments: is the heat–mortality link overstated?' },
+  ];
 
   await send({
     type: 'projects/put',
@@ -29,7 +80,11 @@ export const seedDemoProject = async (pdf) => {
       ...project,
       name: 'Urban Heat & Mortality',
       description: 'Investigation',
-      sections: ['Literature', 'Methods', 'Data', 'Report'],
+      outline,
+      researchQuestion:
+        "Does the intensity of a city's urban heat island independently predict excess mortality during heatwaves?",
+      dueDate: futureDate(90),
+      defaultCitationStyleId: solentStyleId,
     },
   });
 
@@ -138,6 +193,10 @@ export const seedDemoProject = async (pdf) => {
     },
   });
 
+  // `section` is `OutlineSection.id`, one of `outline` above — never a title
+  // (see the doc comment on `Annotation.section` in src/core/model/types.ts).
+  // `sec-counter` gets nothing: that gap is what makes the empty-section
+  // warning appear on the Outline screenshot.
   const notes = [
     [
       'a1',
@@ -146,6 +205,7 @@ export const seedDemoProject = async (pdf) => {
       ['uhi', 'mechanism'],
       'includedInReport',
       'the energetic basis of the urban heat island',
+      'sec-mechanism',
     ],
     [
       'a2',
@@ -154,6 +214,7 @@ export const seedDemoProject = async (pdf) => {
       ['lag', 'method'],
       'accepted',
       'attributable to high and low ambient temperature',
+      'sec-evidence',
     ],
     [
       'a3',
@@ -162,6 +223,7 @@ export const seedDemoProject = async (pdf) => {
       ['caveat'],
       'draft',
       'urban form and extreme heat',
+      'sec-limitations',
     ],
     [
       'a4',
@@ -170,6 +232,7 @@ export const seedDemoProject = async (pdf) => {
       ['caveat', 'model'],
       'draft',
       'horticultural cooling',
+      'sec-limitations',
     ],
     [
       'a5',
@@ -178,9 +241,10 @@ export const seedDemoProject = async (pdf) => {
       ['quote'],
       'accepted',
       'energetic basis',
+      'sec-intro',
     ],
   ];
-  for (const [id, documentId, content, tags, status, exact] of notes) {
+  for (const [id, documentId, content, tags, status, exact, section] of notes) {
     await send({
       type: 'annotations/put',
       annotation: {
@@ -191,6 +255,7 @@ export const seedDemoProject = async (pdf) => {
         content,
         tags,
         status,
+        section,
         author: 'me',
         createdAt: iso(5),
         updatedAt: iso(2),
@@ -217,6 +282,7 @@ export const seedDemoProject = async (pdf) => {
       content: 'Panel composition by geographic band — check the >6 °C row.',
       tags: ['figure'],
       status: 'draft',
+      section: 'sec-evidence',
       author: 'me',
       createdAt: iso(2),
       updatedAt: iso(1),
