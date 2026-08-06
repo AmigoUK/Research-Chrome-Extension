@@ -1,6 +1,6 @@
 # Project Status & Resume Plan
 
-_Last updated: 2026-08-05 — **v1.8.0, the outline release** (highlights become a cited draft);
+_Last updated: 2026-08-06 — **v1.8.1, the pre-submission pass** (store-listing accuracy, the "Refresh from DOI" permission gap, a silent console); **v1.8.0, the outline release** (highlights become a cited draft);
 **v1.2.0, the onboarding release — the build to submit to the Chrome
 Web Store**; **all five roadmap phases delivered**; **polish list complete**;
 **v0.27.0 web-page text annotation shipped** (the one capability the audit had deferred); **v0.27.1
@@ -19,7 +19,7 @@ out of scope by an explicit decision, and the UI shows it as unavailable rather 
 - **Branch state:** everything through **v1.2.0 is on `main`** (Phases 1–5 + polish + hardening +
   web-page annotation + Web Store packaging + the metadata and onboarding releases). No unmerged
   work.
-- **Releases:** v1.8.0 the outline release (see below); v1.2.0 the onboarding release (see below); v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
+- **Releases:** v1.8.1 the pre-submission pass; v1.8.0 the outline release (see below); v1.2.0 the onboarding release (see below); v1.1.0 the metadata release (see below); v1.0.1 failed-highlight toolbar fix;
   v1.0.0 ready for the Chrome Web Store;
   v0.28.0 Chrome Web Store distribution packaging; v0.27.6 honest denied-opt-in
   feedback; v0.27.5 no dead "Jump to" on an unplaced note;

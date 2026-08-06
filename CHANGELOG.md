@@ -9,6 +9,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 _Nothing yet._
 
+## [1.8.1] — 2026-08-06
+
+A pre-submission pass over the Chrome Web Store material, and the two real defects
+it turned up on the way.
+
+### Fixed
+
+- **"Refresh from DOI" asked for no permission and therefore failed.** Importing by
+  DOI requests access to doi.org and the two registration agencies it redirects to;
+  refreshing an existing record called the same network path without asking, so for
+  anyone who had not already used Import by DOI the button died on a raw fetch
+  error. It now requests the same three origins, and handles a refusal the way the
+  import does.
+- **The dashboard logged preload warnings on every load.** Vite emitted a
+  `modulepreload` polyfill for browsers that lack native support; this extension
+  requires Chrome 116, which has had it since 66. The polyfill is gone — one fewer
+  file in the package, and the console is silent on all four surfaces.
+
+### Changed
+
+- **The store listing and the landing page described an access model the extension
+  does not have.** Both said host access is granted "one origin at a time". Three of
+  the four request paths do exactly that, but the side panel's **Allow reading
+  pages** button — the most prominent control in the panel — asks for all sites in
+  one prompt, because `activeTab` covers only the tab where the toolbar icon was
+  clicked and expires on navigation. Both grants are now described honestly, with
+  the reason the broad one exists. No behaviour changed; the text was wrong, not the
+  code. The same oversimplification is corrected in `doc/architecture.md` and the
+  manifest's own comment.
+- The listing no longer claims the annotator "loads only on that site" — true until
+  standing access is granted, after which the panel reads whatever tab is active.
+- The DOI paragraph names all three hosts contacted, not just doi.org.
+- Two overstated claims corrected: there is no "open PDF by URL" control (a filed
+  source whose URL ends `.pdf` is fetched when opened), and passages are assigned
+  one at a time rather than "in bulk".
+- pdf.js is now constructed with `isEvalSupported: false`. The `new Function` branch
+  was already unreachable under MV3's default CSP, but it is a static-analysis
+  flag on an extension whose listing promises no remote code, so it is now
+  unreachable by construction.
+- Two new store screenshots — the Outline screen, showing an empty section flagging
+  itself, and Settings with Harvard (Solent University) as the default style. The
+  demo seed that produces them now assigns passages to real outline sections; it had
+  been writing the retired `sections` field and setting `section` on documents,
+  which nothing reads.
+
+### Documentation
+
+- `THIRD-PARTY-NOTICES.md` gains `diff-match-patch` (Apache-2.0), bundled through
+  `dom-anchor-text-quote`, and `ieee754` (BSD-3-Clause), bundled through
+  `@citation-js/core`. Both were shipping without their attribution.
+- A brief for the attv.uk portfolio page, written to stand on its own.
+
 ## [1.8.0] — 2026-08-05
 
 The outline release: a bridge from a highlight to a written essay.
