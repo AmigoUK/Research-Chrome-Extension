@@ -68,12 +68,17 @@ Open source: https://github.com/AmigoUK/Research-Chrome-Extension — the extens
 |---|---|
 | Store icon (128×128) | built from `src/assets/icons/icon-128.png`, already in the package |
 | Screenshot 1 | `doc/store/screenshot-1-overview.png` |
-| Screenshot 2 | `doc/store/screenshot-2-annotations.png` |
-| Screenshot 3 | `doc/store/screenshot-3-citation-styles.png` |
-| Screenshot 4 | `doc/store/screenshot-4-pdf-reader.png` |
+| Screenshot 2 | `doc/store/screenshot-6-outline.png` |
+| Screenshot 3 | `doc/store/screenshot-2-annotations.png` |
+| Screenshot 4 | `doc/store/screenshot-3-citation-styles.png` |
 | Screenshot 5 | `doc/store/screenshot-5-side-panel.png` |
 | Small promo tile (440×280) | `doc/store/promo-small-440x280.png` |
 | Marquee promo tile (1400×560) | `doc/store/promo-marquee-1400x560.png` |
+
+The store accepts **at most five** screenshots and `doc/store/` holds seven, so two are held back:
+`screenshot-4-pdf-reader.png` and `screenshot-7-settings.png`. Outline is in the five because it is
+what v1.8 added and what the whole draft-export argument rests on; a carousel without it sells the
+previous product.
 
 ---
 
